@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>반듯한시공 경비지출관리</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #2563EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid var(--gray-200);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--gray-200);
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--gray-900);
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 16px 0;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--gray-600);
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: var(--gray-50);
+            color: var(--primary);
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 12px;
+        }
+
+        .user-section {
+            padding: 20px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 8px;
+            background: var(--gray-100);
+            border: none;
+            border-radius: 6px;
+            color: var(--gray-700);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: var(--gray-200);
+        }
+
+        /* 메인 콘텐츠 */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        /* 폼 섹션 */
+        .form-section {
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 32px;
+            max-width: 800px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--gray-700);
+        }
+
+        .form-input {
+            padding: 10px 14px;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 24px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .radio-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .radio-item label {
+            font-size: 15px;
+            color: var(--gray-700);
+            cursor: pointer;
+        }
+
+        .file-upload {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .file-button {
+            padding: 8px 16px;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            background: white;
+            color: var(--gray-700);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .file-button:hover {
+            background: var(--gray-50);
+            border-color: var(--primary);
+        }
+
+        .file-name {
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .btn-cancel {
+            padding: 10px 20px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            background: white;
+            color: var(--gray-700);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel:hover {
+            background: var(--gray-50);
+        }
+
+        /* 테이블 섹션 */
+        .table-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .table-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .table-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--gray-50);
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        th {
+            padding: 16px 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-700);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        th.text-right {
+            text-align: right;
+        }
+
+        td {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--gray-100);
+            font-size: 14px;
+            color: var(--gray-700);
+        }
+
+        td.text-right {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-transfer {
+            background: #DBEAFE;
+            color: #1E40AF;
+        }
+
+        .badge-card {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .action-btn.delete:hover {
+            background: var(--danger);
+        }
+
+        .table-footer {
+            padding: 20px 24px;
+            background: var(--gray-50);
+            border-top: 2px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .footer-label {
+            font-size: 14px;
+            color: var(--gray-600);
+        }
+
+        .footer-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* 슬라이드 패널 오버레이 */
+        .panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .panel-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        /* 슬라이드 패널 */
+        .slide-panel {
+            position: fixed;
+            top: 0;
+            right: -500px;
+            width: 500px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: right 0.3s ease-out;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .slide-panel.active {
+            right: 0;
+        }
+
+        .panel-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .panel-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 6px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .panel-close:hover {
+            background: var(--gray-200);
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .panel-form-row {
+            margin-bottom: 24px;
+        }
+
+        .panel-form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+
+        .panel-actions {
+            padding: 20px 24px;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* 이미지 미리보기 모달 */
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .image-modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .image-modal-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .image-modal-header {
+            padding: 16px 20px;
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .image-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .image-modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .image-modal-close:hover {
+            background: var(--gray-200);
+        }
+
+        .image-modal-body {
+            padding: 20px;
+            background: var(--gray-50);
+            max-height: 70vh;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-modal-body img {
+            max-width: 100%;
+            max-height: 60vh;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .file-link {
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .file-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 사이드바 -->
+        <div class="sidebar">
+            <div class="logo">
+                <i class="fas fa-tools"></i> 반듯한시공
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item">
+                    <i class="fas fa-home"></i>
+                    대시보드
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    경영실적관리
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-file-invoice"></i>
+                    견적서관리
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-calendar-week"></i>
+                    주간보고
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-money-bill-wave"></i>
+                    미수금
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-building"></i>
+                    업체정보관리
+                </a>
+                <a href="#" class="nav-item active">
+                    <i class="fas fa-receipt"></i>
+                    경비지출관리
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-users-cog"></i>
+                    사용자관리
+                </a>
+            </nav>
+            <div class="user-section">
+                <div class="user-info">
+                    <div class="user-avatar">방</div>
+                    <div>
+                        <div style="font-weight: 600; color: var(--gray-900);">방준호</div>
+                        <div style="font-size: 12px; color: var(--gray-500);">관리자</div>
+                    </div>
+                </div>
+                <button class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> 로그아웃
+                </button>
+            </div>
+        </div>
+
+        <!-- 메인 콘텐츠 -->
+        <div class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">경비지출관리</h1>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-primary" onclick="openPanel()" style="background: var(--success);">
+                        <i class="fas fa-plus"></i>
+                        경비 등록
+                    </button>
+                    <button class="btn btn-primary" onclick="downloadCSV()">
+                        <i class="fas fa-download"></i>
+                        엑셀 내보내기
+                    </button>
+                </div>
+            </div>
+
+            <!-- 목록 테이블 -->
+            <div class="table-section">
+                <div class="table-header">
+                    <div class="table-title">경비 내역</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>번호</th>
+                            <th>구분</th>
+                            <th>사용일시</th>
+                            <th>사용건물</th>
+                            <th>사용목적</th>
+                            <th>사진</th>
+                            <th class="text-right">결제금액</th>
+                            <th style="width: 100px; text-align: center;">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseTableBody">
+                        <!-- 데이터가 여기에 들어갑니다 -->
+                    </tbody>
+                </table>
+                <div class="table-footer">
+                    <div>
+                        <span class="footer-label">총 경비 지출:</span>
+                    </div>
+                    <div>
+                        <span class="footer-value" id="totalAmount">0원</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 슬라이드 패널 오버레이 -->
+    <div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+
+    <!-- 슬라이드 패널 -->
+    <div class="slide-panel" id="slidePanel">
+        <div class="panel-header">
+            <div class="panel-title" id="panelTitle">경비 등록</div>
+            <button class="panel-close" onclick="closePanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-body">
+            <div class="panel-form-row">
+                <label class="panel-form-label">구분 *</label>
+                <div class="radio-group">
+                    <div class="radio-item">
+                        <input type="radio" id="typeTransfer" name="paymentType" value="계좌이체" checked>
+                        <label for="typeTransfer">계좌이체</label>
+                    </div>
+                    <div class="radio-item">
+                        <input type="radio" id="typeCard" name="paymentType" value="카드사용">
+                        <label for="typeCard">카드사용</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-form-row">
+                <label class="panel-form-label">사용건물</label>
+                <input type="text" class="form-input" id="building" placeholder="사용건물을 입력하세요">
+            </div>
+
+            <div class="panel-form-row">
+                <label class="panel-form-label">사용일시 *</label>
+                <input type="date" class="form-input" id="usageDate">
+            </div>
+
+            <div class="panel-form-row">
+                <label class="panel-form-label">사용목적</label>
+                <input type="text" class="form-input" id="purpose" placeholder="사용목적을 입력하세요">
+            </div>
+
+            <div class="panel-form-row">
+                <label class="panel-form-label">사진</label>
+                <div class="file-upload">
+                    <input type="file" id="receipt" style="display: none;" accept="image/*,.pdf" onchange="updateFileName()">
+                    <button class="file-button" onclick="document.getElementById('receipt').click()">
+                        <i class="fas fa-paperclip"></i> 파일 선택
+                    </button>
+                    <span class="file-name" id="receiptName">선택한 파일 없음</span>
+                </div>
+            </div>
+
+            <div class="panel-form-row">
+                <label class="panel-form-label">결제 금액 *</label>
+                <input type="number" class="form-input" id="amount" placeholder="0" min="0">
+            </div>
+        </div>
+        <div class="panel-actions">
+            <button class="btn-cancel" onclick="closePanel()">취소</button>
+            <button class="btn btn-primary" onclick="saveExpense()">
+                <i class="fas fa-save"></i> 저장
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 경비 데이터
+        let expenses = [
+            { id: 1, type: '계좌이체', date: '2026-03-10', building: '서울파이낸스센터', purpose: '자재 구매', hasReceipt: true, amount: 250000 },
+            { id: 2, type: '카드사용', date: '2026-03-09', building: '코오롱 본사', purpose: '식사비', hasReceipt: true, amount: 45000 },
+            { id: 3, type: '계좌이체', date: '2026-03-08', building: '', purpose: '교통비', hasReceipt: false, amount: 30000 }
+        ];
+
+        let editingId = null;
+
+        // 오늘 날짜 설정
+        function setTodayDate() {
+            document.getElementById('usageDate').valueAsDate = new Date();
+        }
+
+        // 슬라이드 패널 열기
+        function openPanel() {
+            document.getElementById('panelTitle').textContent = editingId ? '경비 수정' : '경비 등록';
+            if (!editingId) {
+                setTodayDate();
+            }
+            document.getElementById('panelOverlay').classList.add('active');
+            document.getElementById('slidePanel').classList.add('active');
+        }
+
+        // 슬라이드 패널 닫기
+        function closePanel() {
+            document.getElementById('panelOverlay').classList.remove('active');
+            document.getElementById('slidePanel').classList.remove('active');
+            resetForm();
+        }
+
+        // 파일명 업데이트
+        function updateFileName() {
+            const input = document.getElementById('receipt');
+            const nameSpan = document.getElementById('receiptName');
+            
+            if (input.files.length > 0) {
+                nameSpan.textContent = input.files[0].name;
+            } else {
+                nameSpan.textContent = '선택한 파일 없음';
+            }
+        }
+
+        // 테이블 렌더링
+        function renderTable() {
+            const tbody = document.getElementById('expenseTableBody');
+            
+            if (expenses.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                            등록된 경비 내역이 없습니다
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('totalAmount').textContent = '0원';
+                return;
+            }
+
+            tbody.innerHTML = expenses.map((item, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><span class="badge ${item.type === '계좌이체' ? 'badge-transfer' : 'badge-card'}">${item.type}</span></td>
+                    <td>${item.date}</td>
+                    <td>${item.building || '-'}</td>
+                    <td>${item.purpose || '-'}</td>
+                    <td>${item.hasReceipt ? `<span class="file-link" onclick="viewExpenseImage(${item.id})" style="color: var(--success); cursor: pointer;"><i class="fas fa-image"></i> 있음</span>` : '<span style="color: var(--gray-400);">없음</span>'}</td>
+                    <td class="text-right">${item.amount.toLocaleString()}원</td>
+                    <td style="text-align: center;">
+                        <div class="action-buttons">
+                            <button class="action-btn" title="수정" onclick="editExpense(${item.id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete" title="삭제" onclick="deleteExpense(${item.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            // 합계 업데이트
+            const total = expenses.reduce((sum, item) => sum + item.amount, 0);
+            document.getElementById('totalAmount').textContent = total.toLocaleString() + '원';
+        }
+
+        // 저장
+        function saveExpense() {
+            const type = document.querySelector('input[name="paymentType"]:checked').value;
+            const date = document.getElementById('usageDate').value;
+            const building = document.getElementById('building').value.trim();
+            const purpose = document.getElementById('purpose').value.trim();
+            const amount = parseInt(document.getElementById('amount').value) || 0;
+            const hasReceipt = document.getElementById('receipt').files.length > 0;
+
+            if (!date) {
+                alert('사용일시는 필수 입력 항목입니다.');
+                return;
+            }
+
+            if (amount <= 0) {
+                alert('결제 금액을 입력해주세요.');
+                return;
+            }
+
+            if (editingId) {
+                // 수정
+                const index = expenses.findIndex(e => e.id === editingId);
+                if (index !== -1) {
+                    expenses[index] = {
+                        ...expenses[index],
+                        type,
+                        date,
+                        building,
+                        purpose,
+                        amount,
+                        hasReceipt: hasReceipt || expenses[index].hasReceipt
+                    };
+                }
+                alert('경비 내역이 수정되었습니다.');
+                editingId = null;
+            } else {
+                // 신규 등록
+                const newExpense = {
+                    id: expenses.length > 0 ? Math.max(...expenses.map(e => e.id)) + 1 : 1,
+                    type,
+                    date,
+                    building,
+                    purpose,
+                    amount,
+                    hasReceipt
+                };
+                expenses.unshift(newExpense);
+                alert('경비가 등록되었습니다.');
+            }
+
+            closePanel();
+            renderTable();
+        }
+
+        // 수정
+        function editExpense(id) {
+            const expense = expenses.find(e => e.id === id);
+            if (!expense) return;
+
+            editingId = id;
+            
+            // 라디오 버튼 설정
+            if (expense.type === '계좌이체') {
+                document.getElementById('typeTransfer').checked = true;
+            } else {
+                document.getElementById('typeCard').checked = true;
+            }
+            
+            document.getElementById('usageDate').value = expense.date;
+            document.getElementById('building').value = expense.building;
+            document.getElementById('purpose').value = expense.purpose;
+            document.getElementById('amount').value = expense.amount;
+            
+            openPanel();
+        }
+
+        // 삭제
+        function deleteExpense(id) {
+            if (confirm('이 경비 내역을 삭제하시겠습니까?')) {
+                expenses = expenses.filter(e => e.id !== id);
+                renderTable();
+                alert('삭제되었습니다.');
+            }
+        }
+
+        // 폼 초기화
+        function resetForm() {
+            editingId = null;
+            document.getElementById('typeTransfer').checked = true;
+            document.getElementById('building').value = '';
+            document.getElementById('purpose').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('receipt').value = '';
+            document.getElementById('receiptName').textContent = '선택한 파일 없음';
+        }
+
+        // 이미지 보기
+        function viewExpenseImage(id) {
+            const expense = expenses.find(e => e.id === id);
+            if (!expense) return;
+            if (!expense.hasReceipt) return;
+
+            // 실제로는 서버에 저장된 이미지 URL을 사용해야 하지만,
+            // 데모를 위해 샘플 이미지를 표시합니다
+            const modal = document.createElement('div');
+            modal.className = 'image-modal active';
+            modal.innerHTML = `
+                <div class="image-modal-content">
+                    <div class="image-modal-header">
+                        <div class="image-modal-title">
+                            <i class="fas fa-image"></i> 영수증 사진 - ${expense.purpose || '경비 지출'}
+                        </div>
+                        <button class="image-modal-close" onclick="this.closest('.image-modal').remove()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="image-modal-body">
+                        <img src="https://via.placeholder.com/600x800/E5E7EB/6B7280?text=${encodeURIComponent('영수증 사진')}" 
+                             alt="영수증 사진">
+                    </div>
+                </div>
+            `;
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+            document.body.appendChild(modal);
+        }
+
+        // CSV 다운로드
+        function downloadCSV() {
+            let csv = '\uFEFF'; // UTF-8 BOM
+            csv += '번호,구분,사용일시,사용건물,사용목적,사진,결제금액\n';
+            
+            expenses.forEach((item, index) => {
+                csv += `${index + 1},${item.type},${item.date},${item.building || ''},${item.purpose || ''},${item.hasReceipt ? '있음' : '없음'},${item.amount}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `경비지출내역_${new Date().toISOString().slice(0, 10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 초기 렌더링
+        renderTable();
+    </script>
+</body>
+</html>

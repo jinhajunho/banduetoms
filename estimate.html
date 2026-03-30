@@ -1,0 +1,4115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>반듯한시공 견적서관리</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3B82F6;
+            --primary-dark: #2563EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid var(--gray-200);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .sidebar.collapsed {
+            width: 70px;
+        }
+
+        .sidebar.collapsed .logo-text,
+        .sidebar.collapsed .nav-item span,
+        .sidebar.collapsed .user-info,
+        .sidebar.collapsed .logout-btn {
+            display: none;
+        }
+
+        .sidebar.collapsed .nav-item {
+            justify-content: center;
+            padding: 12px;
+        }
+
+        .sidebar.collapsed .nav-item i {
+            margin-right: 0;
+        }
+
+        .sidebar.collapsed .user-section {
+            padding: 12px;
+        }
+
+        .logo {
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--gray-200);
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--gray-900);
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-text {
+            transition: opacity 0.3s;
+        }
+
+        /* 사이드바 토글 버튼 (엣지 스타일) */
+        .sidebar-toggle {
+            position: absolute;
+            top: 50%;
+            right: -12px;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 48px;
+            border: 1px solid var(--gray-200);
+            border-radius: 0 8px 8px 0;
+            background: white;
+            color: var(--gray-500);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            z-index: 10;
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--gray-50);
+            color: var(--primary);
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-toggle i {
+            font-size: 14px;
+            transition: transform 0.3s;
+        }
+
+        .sidebar.collapsed .sidebar-toggle i {
+            transform: rotate(180deg);
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 16px 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: var(--gray-600);
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-item:hover {
+            background: var(--gray-50);
+            color: var(--primary);
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 12px;
+        }
+
+        .user-section {
+            padding: 20px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 8px;
+            background: var(--gray-100);
+            border: none;
+            border-radius: 6px;
+            color: var(--gray-700);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: var(--gray-200);
+        }
+
+        /* 메인 콘텐츠 */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 32px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-50);
+        }
+
+        /* 필터 섹션 */
+        .filter-section {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--gray-200);
+            padding-bottom: 0;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: var(--gray-600);
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--primary);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-bottom: 6px;
+        }
+
+        .filter-select,
+        .filter-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: white;
+            cursor: pointer;
+            position: relative;
+        }
+
+        /* 선택자 커스텀 스타일 */
+        .filter-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url('data:image/svg+xml;charset=UTF-8,<svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1.5L6 6.5L11 1.5" stroke="%236B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+
+        .filter-select:hover,
+        .filter-input:hover {
+            border-color: var(--gray-400);
+        }
+
+        .filter-select:focus,
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        /* 선택 옵션 스타일링 */
+        .filter-select option {
+            padding: 10px;
+            border-radius: 6px;
+            background: white;
+            color: var(--gray-900);
+        }
+
+        .filter-select option:hover {
+            background: var(--gray-100);
+        }
+
+        /* 테이블 섹션 */
+        .table-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--gray-50);
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        th {
+            padding: 16px 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-700);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--gray-100);
+            font-size: 14px;
+            color: var(--gray-700);
+        }
+
+        tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        /* 클릭 가능한 테이블 행 */
+        .table-row-clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .table-row-clickable:hover {
+            background: var(--gray-100) !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .table-row-clickable:active {
+            background: var(--gray-200) !important;
+        }
+
+        /* 컬러 바 (수금상태) */
+        .color-bar {
+            width: 4px;
+            height: 40px;
+            border-radius: 2px;
+            cursor: help;
+            position: relative;
+        }
+
+        .color-bar.paid {
+            background: var(--success);
+        }
+
+        .color-bar.unpaid {
+            background: var(--danger);
+        }
+
+        .color-bar.partial {
+            background: var(--warning);
+        }
+
+        .color-bar.na {
+            background: var(--gray-300);
+        }
+
+        .tooltip {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--gray-900);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-bar:hover .tooltip {
+            opacity: 1;
+        }
+
+        .tooltip-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .tooltip-line:last-child {
+            margin-bottom: 0;
+        }
+
+        /* 상태 뱃지 */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-estimate {
+            background: #FEF3C7;
+            color: #92400E;
+        }
+
+        .badge-progress {
+            background: #DBEAFE;
+            color: #1E40AF;
+        }
+
+        .badge-complete {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .badge-hold {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+
+        .badge-issued {
+            background: #D1FAE5;
+            color: #065F46;
+        }
+
+        .badge-not-issued {
+            background: #FEE2E2;
+            color: #991B1B;
+        }
+
+        .badge-na {
+            background: var(--gray-200);
+            color: var(--gray-600);
+        }
+
+        /* 상태 변경 드롭다운 */
+        .status-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .status-dropdown .badge {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+        }
+
+        .status-dropdown .badge:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+
+        .status-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            z-index: 100;
+            display: none;
+            min-width: 110px;
+            padding: 6px;
+            animation: dropdownFadeIn 0.2s ease-out;
+        }
+
+        @keyframes dropdownFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-dropdown-menu.active {
+            display: block;
+        }
+
+        .status-dropdown-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 6px;
+        }
+
+        .status-dropdown-item:hover {
+            background: var(--gray-100);
+        }
+
+        .status-dropdown-item.selected {
+            background: var(--gray-100);
+            font-weight: 600;
+        }
+
+        .status-dropdown-item .status-color {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dropdown-item.estimate .status-color {
+            background: #F59E0B;
+        }
+
+        .status-dropdown-item.progress .status-color {
+            background: #3B82F6;
+        }
+
+        .status-dropdown-item.complete .status-color {
+            background: #10B981;
+        }
+
+        .status-dropdown-item.hold .status-color {
+            background: var(--gray-500);
+        }
+
+        /* 액션 버튼 */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* 요약 */
+        .table-summary {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 24px;
+            background: var(--gray-50);
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-label {
+            font-size: 13px;
+            color: var(--gray-600);
+            margin-bottom: 4px;
+        }
+
+        .summary-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        /* 슬라이드 패널 오버레이 */
+        .panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .panel-overlay.active {
+            display: block;
+            opacity: 1;
+        }
+
+        /* 슬라이드 패널 */
+        .slide-panel {
+            position: fixed;
+            top: 0;
+            right: -600px;
+            width: 600px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: right 0.3s ease-out;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .slide-panel.active {
+            right: 0;
+        }
+
+        .panel-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .panel-header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-edit {
+            padding: 8px 16px;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            background: white;
+            color: var(--primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-edit:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-save {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: var(--primary);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-save:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-cancel {
+            padding: 8px 16px;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            background: white;
+            color: var(--gray-700);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel:hover {
+            background: var(--gray-50);
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .panel-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 6px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .panel-close:hover {
+            background: var(--gray-200);
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        /* 패널 탭 */
+        .panel-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--gray-200);
+            background: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .panel-tab {
+            flex: 1;
+            padding: 16px 20px;
+            border: none;
+            background: transparent;
+            color: var(--gray-600);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .panel-tab:hover {
+            color: var(--primary);
+            background: var(--gray-50);
+        }
+
+        .panel-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: white;
+        }
+
+        /* 탭 컨텐츠 */
+        .panel-tab-content {
+            display: none;
+            padding: 24px;
+        }
+
+        .panel-tab-content.active {
+            display: block;
+        }
+
+
+
+        .panel-section {
+            margin-bottom: 32px;
+        }
+
+        /* 단계별 네비게이션 */
+        .step-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            background: linear-gradient(to right, #f8fafc, #ffffff);
+            border-bottom: 2px solid var(--gray-200);
+            margin: -24px -24px 24px -24px;
+        }
+
+        .step-item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+        }
+
+        .step-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            right: -50%;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 100%;
+            height: 2px;
+            background: var(--gray-300);
+            z-index: 0;
+        }
+
+        .step-item.completed:not(:last-child)::after {
+            background: var(--primary);
+        }
+
+        .step-number {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--gray-200);
+            color: var(--gray-500);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            z-index: 1;
+            transition: all 0.3s;
+        }
+
+        .step-item.active .step-number {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .step-item.completed .step-number {
+            background: var(--success);
+            color: white;
+        }
+
+        .step-info {
+            z-index: 1;
+        }
+
+        .step-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-600);
+            transition: all 0.3s;
+        }
+
+        .step-item.active .step-title {
+            color: var(--primary);
+            font-size: 15px;
+        }
+
+        .step-item.completed .step-title {
+            color: var(--success);
+        }
+
+        .step-desc {
+            font-size: 11px;
+            color: var(--gray-400);
+            margin-top: 2px;
+        }
+
+        .step-item.active .step-desc {
+            color: var(--primary);
+            opacity: 0.8;
+        }
+
+        /* 단계별 컨텐츠 */
+        .step-content {
+            display: none;
+        }
+
+        .step-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 견적서 미리보기 */
+        .estimate-preview {
+            background: white;
+            padding: 40px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .estimate-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .estimate-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+
+        .estimate-subtitle {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+
+        .estimate-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+            padding: 20px;
+            background: var(--gray-50);
+            border-radius: 6px;
+        }
+
+        .estimate-info-item {
+            display: flex;
+            gap: 12px;
+        }
+
+        .estimate-info-label {
+            font-weight: 600;
+            color: var(--gray-700);
+            min-width: 80px;
+        }
+
+        .estimate-info-value {
+            color: var(--gray-900);
+        }
+
+        .estimate-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+
+        .estimate-table th {
+            background: var(--gray-800);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .estimate-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 14px;
+        }
+
+        .estimate-table tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        .estimate-table tfoot td {
+            font-weight: 700;
+            background: var(--gray-100);
+            padding: 16px 12px;
+        }
+
+        .estimate-total {
+            text-align: right;
+            padding: 20px;
+            background: var(--gray-50);
+            border-radius: 6px;
+        }
+
+        .estimate-total-item {
+            display: flex;
+            justify-content: flex-end;
+            gap: 40px;
+            padding: 8px 0;
+            font-size: 16px;
+        }
+
+        .estimate-total-item.main {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            padding-top: 16px;
+            border-top: 2px solid var(--gray-300);
+            margin-top: 8px;
+        }
+
+        .estimate-total-label {
+            font-weight: 600;
+        }
+
+        .estimate-footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--gray-200);
+            text-align: center;
+            color: var(--gray-500);
+            font-size: 12px;
+        }
+
+        /* 인쇄/PDF용 스타일 */
+        @media print {
+            /* 페이지 설정 */
+            @page {
+                size: A4;
+                margin: 20mm;
+            }
+            
+            /* 불필요한 요소 숨김 */
+            .step-navigation,
+            .step-buttons,
+            .panel-header,
+            .sidebar,
+            .main-header {
+                display: none !important;
+            }
+            
+            /* 미리보기만 표시 */
+            .estimate-preview {
+                padding: 0;
+                border: none;
+                box-shadow: none;
+            }
+            
+            /* 품목 행이 페이지 경계에서 안 잘리게 */
+            .estimate-table tr {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            /* 특이사항/푸터가 안 잘리게 */
+            .estimate-total,
+            .estimate-footer {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            /* 품목 테이블과 특이사항이 같이 있도록 */
+            .estimate-table {
+                page-break-after: avoid;
+            }
+            
+            /* 배경색 인쇄 */
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+        /* 단계 버튼 그룹 */
+        .step-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 2px solid var(--gray-200);
+        }
+
+        .btn-step {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-step-prev {
+            background: var(--gray-100);
+            color: var(--gray-700);
+        }
+
+        .btn-step-prev:hover {
+            background: var(--gray-200);
+        }
+
+        .btn-step-next,
+        .btn-step-complete {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-step-next:hover,
+        .btn-step-complete:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .panel-section {
+            margin-bottom: 32px;
+        }
+
+        .panel-section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .detail-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .detail-row {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .detail-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-600);
+            padding-top: 2px;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            color: var(--gray-900);
+        }
+
+        .detail-value.large {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* 파일 목록 */
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--gray-50);
+            border-radius: 6px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .file-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--primary);
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-size: 14px;
+            color: var(--gray-900);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-meta {
+            font-size: 12px;
+            color: var(--gray-600);
+            margin-top: 2px;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .file-action-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 4px;
+            background: white;
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .file-action-btn:hover {
+            background: var(--gray-100);
+            color: var(--primary);
+        }
+
+        .empty-files {
+            text-align: center;
+            padding: 32px;
+            color: var(--gray-500);
+            font-size: 14px;
+        }
+
+        /* 품목 테이블 */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .items-table th {
+            background: var(--gray-50);
+            padding: 10px 8px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-700);
+            border-bottom: 2px solid var(--gray-200);
+        }
+
+        .items-table th.text-right {
+            text-align: right;
+        }
+
+        .items-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .items-table td.text-right {
+            text-align: right;
+        }
+
+        .items-total {
+            background: var(--gray-50);
+            font-weight: 700;
+        }
+
+        /* 편집 모드 */
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .edit-mode .detail-value {
+            display: none;
+        }
+
+        .edit-mode .edit-input {
+            display: block;
+        }
+
+        .view-mode .edit-input {
+            display: none;
+        }
+
+        /* 수금/이체 내역 테이블 */
+        .payment-list {
+            margin-top: 24px;
+        }
+
+        .payment-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .payment-list-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .btn-add-payment {
+            padding: 6px 12px;
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            background: white;
+            color: var(--primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-add-payment:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .payment-table {
+            width: 100%;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .payment-table thead {
+            background: var(--gray-50);
+        }
+
+        .payment-table th {
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-700);
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .payment-table td {
+            padding: 10px 12px;
+            font-size: 14px;
+            color: var(--gray-900);
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .payment-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .payment-table tbody tr:hover {
+            background: var(--gray-50);
+        }
+
+        .payment-table input,
+        .payment-table select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--gray-300);
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .payment-table input:focus,
+        .payment-table select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn-remove-payment {
+            padding: 4px 8px;
+            border: 1px solid var(--danger);
+            border-radius: 4px;
+            background: white;
+            color: var(--danger);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-remove-payment:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* 저장/삭제 버튼 스타일 */
+        .btn-save-row {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: var(--primary);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-right: 6px;
+        }
+
+        .btn-save-row:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-delete-row {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: var(--danger);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-delete-row:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
+
+        /* 수정 버튼 */
+        .btn-edit-row {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: var(--warning);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-right: 6px;
+        }
+
+        .btn-edit-row:hover {
+            background: #d97706;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+        }
+
+        /* 취소 버튼 */
+        .btn-cancel-row {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            background: var(--gray-500);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-cancel-row:hover {
+            background: var(--gray-600);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+        }
+
+        /* 견적서 보기/수정 버튼 */
+        .btn-estimate-edit {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            background: white;
+            color: var(--primary);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .btn-estimate-edit:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-estimate-edit i {
+            font-size: 20px;
+        }
+
+        .row-input {
+            border: 1px solid var(--gray-300);
+            background: var(--gray-50);
+        }
+
+        .row-input:focus {
+            border-color: var(--primary);
+            background: white;
+            outline: none;
+        }
+
+        .payment-summary {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--gray-50);
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .payment-summary-label {
+            color: var(--gray-700);
+        }
+
+        .payment-summary-value {
+            color: var(--primary);
+        }
+
+        /* 파일 업로드 버튼 (테이블 내) */
+        .btn-file-upload {
+            padding: 4px 8px;
+            border: 1px solid var(--primary);
+            border-radius: 4px;
+            background: white;
+            color: var(--primary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-file-upload:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-file-view {
+            padding: 4px 8px;
+            border: 1px solid var(--success);
+            border-radius: 4px;
+            background: white;
+            color: var(--success);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-file-view:hover {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-file-download {
+            padding: 4px 8px;
+            border: 1px solid var(--primary);
+            border-radius: 4px;
+            background: white;
+            color: var(--primary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-file-download:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .file-input-hidden {
+            display: none;
+        }
+
+        .file-count-badge {
+            background: var(--success);
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 10px;
+            margin-left: 4px;
+        }
+
+        /* 파일 목록 모달 */
+        .file-list-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-list-modal.active {
+            display: flex;
+        }
+
+        .file-list-modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-list-modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-list-modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .file-list-modal-body {
+            padding: 20px 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .file-list-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            transition: all 0.2s;
+        }
+
+        .file-list-item:hover {
+            background: var(--gray-50);
+            border-color: var(--primary);
+        }
+
+        .file-list-item-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gray-100);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 18px;
+            margin-right: 12px;
+        }
+
+        .file-list-item-info {
+            flex: 1;
+        }
+
+        .file-list-item-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+
+        .file-list-item-meta {
+            font-size: 12px;
+            color: var(--gray-500);
+        }
+
+        .file-list-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .file-list-modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 이미지/파일 미리보기 모달 */
+        .image-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .image-modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .image-modal-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .image-modal-header {
+            padding: 16px 20px;
+            background: white;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .image-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .image-modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .image-modal-close:hover {
+            background: var(--gray-200);
+        }
+
+        .image-modal-body {
+            padding: 20px;
+            background: var(--gray-50);
+            max-height: 70vh;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-modal-body img {
+            max-width: 100%;
+            max-height: 60vh;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 품목 입력 테이블 */
+        .items-input-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 12px;
+        }
+
+        .items-input-table th {
+            background: var(--gray-50);
+            padding: 10px 8px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gray-700);
+            border: 1px solid var(--gray-200);
+        }
+
+        .items-input-table td {
+            padding: 8px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .items-input-table input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--gray-300);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .items-input-table input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .btn-add-item {
+            margin-top: 12px;
+            padding: 8px 16px;
+            border: 1px dashed var(--gray-400);
+            border-radius: 6px;
+            background: white;
+            color: var(--gray-700);
+            font-size: 14px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .btn-add-item:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--gray-50);
+        }
+
+        .btn-remove-item {
+            padding: 4px 8px;
+            border: none;
+            border-radius: 4px;
+            background: var(--danger);
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-remove-item:hover {
+            background: #DC2626;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .detail-row.form-row {
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 사이드바 -->
+        <div class="sidebar" id="sidebar">
+            <!-- 사이드바 토글 버튼 (경계선에 위치) -->
+            <button class="sidebar-toggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            
+            <div class="logo">
+                <span class="logo-text"><i class="fas fa-tools"></i> 반듯한시공</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item">
+                    <i class="fas fa-home"></i>
+                    <span>대시보드</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span>경영실적관리</span>
+                </a>
+                <a href="#" class="nav-item active">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>견적서관리</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>주간보고</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>미수금</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-building"></i>
+                    <span>업체정보관리</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-receipt"></i>
+                    <span>경비지출관리</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-users-cog"></i>
+                    <span>사용자관리</span>
+                </a>
+            </nav>
+            <div class="user-section">
+                <div class="user-info">
+                    <div class="user-avatar">방</div>
+                    <div>
+                        <div style="font-weight: 600; color: var(--gray-900);">방준호</div>
+                        <div style="font-size: 12px; color: var(--gray-500);">관리자</div>
+                    </div>
+                </div>
+                <button class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> 로그아웃
+                </button>
+            </div>
+        </div>
+
+        <!-- 메인 콘텐츠 -->
+        <div class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">견적서 관리</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary">
+                        <i class="fas fa-download"></i>
+                        엑셀 내보내기
+                    </button>
+                    <button class="btn btn-primary" onclick="openNewEstimate()">
+                        <i class="fas fa-plus"></i>
+                        신규 견적 등록
+                    </button>
+                </div>
+            </div>
+
+            <!-- 필터 섹션 -->
+            <div class="filter-section">
+                <div class="tabs">
+                    <button class="tab active" data-status="all">전체</button>
+                    <button class="tab" data-status="견적">견적</button>
+                    <button class="tab" data-status="진행">진행</button>
+                    <button class="tab" data-status="완료">완료</button>
+                    <button class="tab" data-status="보류">보류</button>
+                </div>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label class="filter-label">대분류</label>
+                        <select class="filter-select" id="filterCategory1">
+                            <option value="">전체</option>
+                            <option value="B2B">B2B</option>
+                            <option value="B2C">B2C</option>
+                            <option value="컨텍터스">컨텍터스</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">중분류</label>
+                        <select class="filter-select" id="filterCategory2">
+                            <option value="">전체</option>
+                            <option value="코오롱">코오롱</option>
+                            <option value="저스트코">저스트코</option>
+                            <option value="다락">다락</option>
+                            <option value="관리건물">관리건물</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">세금계산서</label>
+                        <select class="filter-select" id="filterTax">
+                            <option value="">전체</option>
+                            <option value="발행완료">발행완료</option>
+                            <option value="미발행">미발행</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">검색</label>
+                        <input type="text" class="filter-input" id="filterSearch" placeholder="건물명, 공사명, 담당자 검색">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 테이블 -->
+            <div class="table-section">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 20px;"></th>
+                                <th>상태</th>
+                                <th>대분류</th>
+                                <th>중분류</th>
+                                <th>건물명</th>
+                                <th>공사명</th>
+                                <th>담당자</th>
+                                <th style="text-align: right;">매출금액</th>
+                                <th>세금계산서</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- 데이터가 여기에 들어갑니다 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-summary">
+                    <div class="summary-item">
+                        <span class="summary-label">총 건수</span>
+                        <span class="summary-value" id="totalCount">0건</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">총 매출금액</span>
+                        <span class="summary-value" id="totalAmount">0원</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 실제 데이터 (CSV 기반)
+        const estimates = [
+            { code: '2603043', date: '2026-03-11', status: '견적', category1: 'B2B', category2: '코오롱', building: '개별-성남', project: '정수기 트레이 설치', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 423500, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603041', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '코오롱', building: '개별-성남', project: '정수기 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 127600, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603039', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '코오롱', building: '개별-서울', project: '유리 부착물 제거', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 127600, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603037', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '저스트코', building: '서울파이낸스센터', project: '8층 팬트리 수전 수리', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 176000, paidStatus: '미수', purchase: 176000, hasSales: true, hasPurchase: true, taxIssued: true },
+            { code: '2603035', date: '2026-03-10', status: '진행', category1: 'B2B', category2: '다락', building: '선유도점', project: '조명 제어 수리', manager: '방준호', type: '세금계산서', contractor: '강서집수리', revenue: 330000, paidStatus: '미수', purchase: 291500, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603033', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '여의도 3관', project: '사무실 도어락 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 390500, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603031', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '안마의자 설치 도어 탈부착', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 294800, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603029', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '복합거점-울산', project: '탕비실 싱크대 문짝 고장', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 271700, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603027', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '노동조합 현판 제작', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 478500, paidStatus: '부분', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603023', date: '2026-03-09', status: '보류', category1: 'B2B', category2: '코오롱', building: '그랜드센트럴', project: '10층 플랜터박스 제작 설치', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 0, paidStatus: '해당없음', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603021', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: 'TV 전원선 연장 및 몰딩', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 233200, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
+            { code: '2603019', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '복합거점-인천', project: '호텔링 11층 천장 텍스 교체', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 851400, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
+            { code: '2603017', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '복합거점-부산', project: '9층 레이아웃 변경 작업', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 817300, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
+            { code: '2603015', date: '2026-03-09', status: '진행', category1: 'B2B', category2: '코오롱', building: '그랜드센트럴', project: '2층 락커장 설치', manager: '방준호', type: '세금계산서', contractor: '바른시공', revenue: 1994300, paidStatus: '미수', purchase: 1687500, hasSales: false, hasPurchase: true, taxIssued: false },
+            { code: '2603013', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '외창 쎈텐지 작업', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 2972200, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
+            { code: '2603011', date: '2026-03-09', status: '완료', category1: '컨텍터스', category2: '관리건물', building: '신라빌딩', project: '문틀 고정 공사', manager: '방준호', type: '자체인력', contractor: '영진인프라', revenue: 0, paidStatus: '해당없음', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
+            { code: '2603009', date: '2026-03-05', status: '완료', category1: 'B2B', category2: '저스트코', building: '더피나클강남', project: '시트지 보수', manager: '방준호', type: '세금계산서', contractor: '소나무P&G', revenue: 0, paidStatus: '해당없음', purchase: 550000, hasSales: false, hasPurchase: true, taxIssued: false },
+            { code: '2603007', date: '2026-03-05', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '사인 변경 요청', manager: '방준호', type: '세금계산서', contractor: '바른시공', revenue: 0, paidStatus: '해당없음', purchase: 154000, hasSales: false, hasPurchase: true, taxIssued: false },
+            { code: '2603005', date: '2026-03-04', status: '완료', category1: 'B2B', category2: '코오롱', building: '코오롱', project: '비상벨 설치 자재 구매', manager: '방준호', type: '사업소득', contractor: '솔트', revenue: 0, paidStatus: '해당없음', purchase: 22000, hasSales: false, hasPurchase: true, taxIssued: false },
+            { code: '2603003', date: '2026-03-03', status: '완료', category1: '컨텍터스', category2: '관리건물', building: '동화프라자', project: '도어보수 2건', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 484000, paidStatus: '부분', purchase: 440000, hasSales: false, hasPurchase: false, taxIssued: true },
+            { code: '2603001', date: '2026-03-03', status: '완료', category1: 'B2C', category2: '관리건물', building: '메디스타워', project: '1층 여자화장실 도어 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 220000, paidStatus: '전액', purchase: 187000, hasSales: true, hasPurchase: true, taxIssued: true }
+        ];
+
+        let currentStatus = 'all';
+
+        // 컬러 바 색상 결정 (수금상태 기준)
+        function getColorBarClass(item) {
+            if (item.paidStatus === '전액') return 'paid';
+            if (item.paidStatus === '미수') return 'unpaid';
+            if (item.paidStatus === '부분') return 'partial';
+            return 'na';
+        }
+
+        // 컬러 바 툴팁 생성
+        function getColorBarTooltip(item) {
+            const statusText = {
+                '전액': '수금 완료',
+                '미수': '미수금 있음',
+                '부분': '일부 수금',
+                '해당없음': '수금 해당없음'
+            }[item.paidStatus] || '정보없음';
+
+            return `<div class="tooltip-line">💰 수금상태: ${statusText}</div>`;
+        }
+
+        // 테이블 렌더링
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            const filterCategory1 = document.getElementById('filterCategory1').value;
+            const filterCategory2 = document.getElementById('filterCategory2').value;
+            const filterTax = document.getElementById('filterTax').value;
+            const filterSearch = document.getElementById('filterSearch').value.toLowerCase();
+
+            let filtered = estimates.filter(item => {
+                if (currentStatus !== 'all' && item.status !== currentStatus) return false;
+                if (filterCategory1 && item.category1 !== filterCategory1) return false;
+                if (filterCategory2 && item.category2 !== filterCategory2) return false;
+                
+                // 세금계산서 필터
+                if (filterTax) {
+                    if (filterTax === '발행완료' && !item.taxIssued) return false;
+                    if (filterTax === '미발행' && (item.taxIssued || item.type !== '세금계산서')) return false;
+                }
+                
+                if (filterSearch) {
+                    const searchText = `${item.building} ${item.project} ${item.manager}`.toLowerCase();
+                    if (!searchText.includes(filterSearch)) return false;
+                }
+                return true;
+            });
+
+            tbody.innerHTML = filtered.map(item => {
+                const statusBadgeClass = {
+                    '견적': 'badge-estimate',
+                    '진행': 'badge-progress',
+                    '완료': 'badge-complete',
+                    '보류': 'badge-hold'
+                }[item.status];
+
+                // 세금계산서 발행 여부 뱃지
+                let taxBadgeClass, taxText;
+                if (item.type === '세금계산서') {
+                    if (item.taxIssued) {
+                        taxBadgeClass = 'badge-issued';
+                        taxText = '발행완료';
+                    } else {
+                        taxBadgeClass = 'badge-not-issued';
+                        taxText = '미발행';
+                    }
+                } else {
+                    taxBadgeClass = 'badge-na';
+                    // 세금계산서 타입이 아닌 경우에는 세금계산서 컬럼을 표시하지 않음
+                    taxText = '-';
+                }
+
+                const colorBarClass = getColorBarClass(item);
+                const tooltip = getColorBarTooltip(item);
+
+                return `
+                    <tr class="table-row-clickable" onclick="openPanelFromRow(event, '${item.code}')" data-code="${item.code}">
+                        <td>
+                            <div class="color-bar ${colorBarClass}">
+                                <div class="tooltip">${tooltip}</div>
+                            </div>
+                        </td>
+                        <td onclick="event.stopPropagation()">
+                            <div class="status-dropdown" data-code="${item.code}">
+                                <span class="badge ${statusBadgeClass}" onclick="toggleStatusDropdown(event, '${item.code}')">${item.status}</span>
+                                <div class="status-dropdown-menu" id="statusMenu-${item.code}">
+                                    <div class="status-dropdown-item estimate ${item.status === '견적' ? 'selected' : ''}" onclick="changeStatus('${item.code}', '견적')">
+                                        <span class="status-color"></span>
+                                        견적
+                                    </div>
+                                    <div class="status-dropdown-item progress ${item.status === '진행' ? 'selected' : ''}" onclick="changeStatus('${item.code}', '진행')">
+                                        <span class="status-color"></span>
+                                        진행
+                                    </div>
+                                    <div class="status-dropdown-item complete ${item.status === '완료' ? 'selected' : ''}" onclick="changeStatus('${item.code}', '완료')">
+                                        <span class="status-color"></span>
+                                        완료
+                                    </div>
+                                    <div class="status-dropdown-item hold ${item.status === '보류' ? 'selected' : ''}" onclick="changeStatus('${item.code}', '보류')">
+                                        <span class="status-color"></span>
+                                        보류
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${item.category1}</td>
+                        <td>${item.category2}</td>
+                        <td>${item.building}</td>
+                        <td>${item.project}</td>
+                        <td>${item.manager}</td>
+                        <td style="text-align: right; font-weight: 600;">${item.revenue.toLocaleString()}원</td>
+                        <td><span class="badge ${taxBadgeClass}">${taxText}</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+            // 요약 업데이트
+            const totalCount = filtered.length;
+            const totalAmount = filtered.reduce((sum, item) => sum + item.revenue, 0);
+            document.getElementById('totalCount').textContent = `${totalCount}건`;
+            document.getElementById('totalAmount').textContent = `${totalAmount.toLocaleString()}원`;
+        }
+
+        // 탭 클릭
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                currentStatus = tab.dataset.status;
+                renderTable();
+            });
+        });
+
+        // 필터 변경
+        document.getElementById('filterCategory1').addEventListener('change', renderTable);
+        document.getElementById('filterCategory2').addEventListener('change', renderTable);
+        document.getElementById('filterTax').addEventListener('change', renderTable);
+        document.getElementById('filterSearch').addEventListener('input', renderTable);
+
+        // 초기 렌더링
+        renderTable();
+    </script>
+
+    <!-- 슬라이드 패널 오버레이 -->
+    <div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+
+    <!-- 슬라이드 패널 -->
+    <div class="slide-panel" id="slidePanel">
+        <div class="panel-header">
+            <div class="panel-title" id="panelTitle">견적서 상세</div>
+            <div class="panel-header-actions" id="panelActions">
+                <button class="btn-edit" id="btnEdit" onclick="toggleEditMode()" style="display: inline-flex;">
+                    <i class="fas fa-edit"></i> 수정
+                </button>
+                <button class="btn-save" id="btnSave" onclick="saveChanges()" style="display: none;">
+                    <i class="fas fa-save"></i> 저장
+                </button>
+                <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()" style="display: none;">
+                    <i class="fas fa-times"></i> 취소
+                </button>
+            </div>
+            <button class="panel-close" onclick="closePanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-body view-mode" id="panelBody">
+            <!-- 내용이 동적으로 들어갑니다 -->
+        </div>
+    </div>
+
+    <script>
+        let currentEditItem = null;
+        let isEditMode = false;
+        let isNewEstimate = false;
+        let itemRows = [];
+        let currentStep = 1; // 신규 견적 등록 단계 (1: 기본정보, 2: 견적서작성, 3: 미리보기)
+
+        // 신규 견적 등록
+        function openNewEstimate() {
+            isNewEstimate = true;
+            isEditMode = true;
+            
+            // 새 견적서 기본 데이터
+            const newCode = '26' + String(Date.now()).slice(-6);
+            const today = new Date().toISOString().slice(0, 10);
+            
+            currentEditItem = {
+                code: newCode,
+                date: today,
+                status: '견적',
+                category1: 'B2B',
+                category2: '코오롱',
+                building: '',
+                project: '',
+                manager: '방준호',
+                type: '세금계산서',
+                contractor: '',
+                revenue: 0,
+                paidStatus: '미수',
+                purchase: 0,
+                taxIssued: false,
+                hasSales: false,
+                hasPurchase: false
+            };
+
+            itemRows = [{
+                name: '',
+                quantity: 1,
+                price: 0,
+                amount: 0
+            }];
+
+            renderNewEstimatePanel();
+
+            document.getElementById('panelOverlay').classList.add('active');
+            document.getElementById('slidePanel').classList.add('active');
+        }
+
+        // 신규 견적서 패널 렌더링
+        function renderNewEstimatePanel() {
+            document.getElementById('panelTitle').textContent = '신규 견적 등록';
+            
+            const panelBody = document.getElementById('panelBody');
+            panelBody.className = 'panel-body edit-mode';
+
+            panelBody.innerHTML = `
+                <!-- 기본 정보 -->
+                <div class="panel-section">
+                    <div class="panel-section-title">기본 정보</div>
+                    <div class="detail-grid">
+                        <div class="detail-row form-row">
+                            <label class="form-label">진행상태</label>
+                            <select class="form-select" id="new_status">
+                                <option value="견적" selected>견적</option>
+                                <option value="진행">진행</option>
+                                <option value="완료">완료</option>
+                                <option value="보류">보류</option>
+                            </select>
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">대분류</label>
+                            <select class="form-select" id="new_category1">
+                                <option value="B2B" selected>B2B</option>
+                                <option value="B2C">B2C</option>
+                                <option value="컨텍터스">컨텍터스</option>
+                            </select>
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">중분류</label>
+                            <input type="text" class="form-input" id="new_category2" value="코오롱" placeholder="코오롱, 저스트코, 다락 등">
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">건물명 *</label>
+                            <input type="text" class="form-input" id="new_building" placeholder="예: 서울파이낸스센터">
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">공사명 *</label>
+                            <input type="text" class="form-input" id="new_project" placeholder="예: 8층 팬트리 수전 수리">
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">담당자</label>
+                            <select class="form-select" id="new_manager">
+                                <option value="방준호" selected>방준호</option>
+                            </select>
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">구분</label>
+                            <select class="form-select" id="new_type" onchange="togglePurchaseSection()">
+                                <option value="세금계산서" selected>세금계산서</option>
+                                <option value="사업소득">사업소득</option>
+                                <option value="자체인력">자체인력</option>
+                            </select>
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">도급사</label>
+                            <input type="text" class="form-input" id="new_contractor" placeholder="예: 영진인프라">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 품목 -->
+                <div class="panel-section">
+                    <div class="panel-section-title">품목 내역</div>
+                    <table class="items-input-table" id="itemsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 35%;">품목명</th>
+                                <th style="width: 15%;">수량</th>
+                                <th style="width: 20%;">단가</th>
+                                <th style="width: 20%;">금액</th>
+                                <th style="width: 10%;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsTableBody">
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" style="text-align: right; font-weight: 700; background: var(--gray-50);">공급가액</td>
+                                <td style="font-weight: 700; background: var(--gray-50);" id="totalSupply">0원</td>
+                                <td style="background: var(--gray-50);"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="text-align: right; font-weight: 700; background: var(--gray-50);">부가세 (10%)</td>
+                                <td style="font-weight: 700; background: var(--gray-50);" id="totalVAT">0원</td>
+                                <td style="background: var(--gray-50);"></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="text-align: right; font-weight: 700; background: var(--primary); color: white;">총 금액</td>
+                                <td style="font-weight: 700; background: var(--primary); color: white;" id="totalAmount">0원</td>
+                                <td style="background: var(--primary);"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <button class="btn-add-item" onclick="addItemRow()">
+                        <i class="fas fa-plus"></i> 품목 추가
+                    </button>
+                </div>
+
+                <!-- 매출 정보 -->
+                <div class="panel-section">
+                    <div class="panel-section-title">매출 정보</div>
+                    <div class="detail-grid">
+                        <div class="detail-row form-row">
+                            <label class="form-label">수금상태</label>
+                            <select class="form-select" id="new_paidStatus">
+                                <option value="미수" selected>미수</option>
+                                <option value="전액">전액</option>
+                                <option value="부분">부분</option>
+                                <option value="해당없음">해당없음</option>
+                            </select>
+                        </div>
+                        <div class="detail-row form-row">
+                            <label class="form-label">세금계산서 발행</label>
+                            <select class="form-select" id="new_taxIssued">
+                                <option value="false" selected>미발행</option>
+                                <option value="true">발행완료</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 매입 정보 -->
+                <div class="panel-section" id="purchaseSection">
+                    <div class="panel-section-title">매입 정보</div>
+                    <div class="detail-grid">
+                        <div class="detail-row form-row">
+                            <label class="form-label">매입금액</label>
+                            <input type="number" class="form-input" id="new_purchase" value="0" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 버튼 표시
+            document.getElementById('btnEdit').style.display = 'none';
+            document.getElementById('btnSave').style.display = 'inline-flex';
+            document.getElementById('btnCancel').style.display = 'inline-flex';
+
+            // 품목 테이블 렌더링
+            renderItemRows();
+        }
+
+        // 품목 행 렌더링
+        function renderItemRows() {
+            const tbody = document.getElementById('itemsTableBody');
+            tbody.innerHTML = itemRows.map((row, index) => `
+                <tr>
+                    <td><input type="text" value="${row.name}" onchange="updateItemRow(${index}, 'name', this.value)" placeholder="품목명 입력"></td>
+                    <td><input type="number" value="${row.quantity}" onchange="updateItemRow(${index}, 'quantity', this.value)" min="1"></td>
+                    <td><input type="number" value="${row.price}" onchange="updateItemRow(${index}, 'price', this.value)" min="0"></td>
+                    <td style="text-align: right; font-weight: 600;">${row.amount.toLocaleString()}원</td>
+                    <td style="text-align: center;">
+                        ${itemRows.length > 1 ? `<button class="btn-remove-item" onclick="removeItemRow(${index})"><i class="fas fa-times"></i></button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+
+            updateTotals();
+        }
+
+        // 품목 행 추가
+        function addItemRow() {
+            itemRows.push({
+                name: '',
+                quantity: 1,
+                price: 0,
+                amount: 0
+            });
+            renderItemRows();
+        }
+
+        // 품목 행 제거
+        function removeItemRow(index) {
+            if (itemRows.length > 1) {
+                itemRows.splice(index, 1);
+                renderItemRows();
+            }
+        }
+
+        // 품목 행 업데이트
+        function updateItemRow(index, field, value) {
+            itemRows[index][field] = field === 'name' ? value : parseFloat(value) || 0;
+            itemRows[index].amount = itemRows[index].quantity * itemRows[index].price;
+            renderItemRows();
+        }
+
+        // 합계 업데이트
+        function updateTotals() {
+            const supply = itemRows.reduce((sum, row) => sum + row.amount, 0);
+            const vat = Math.round(supply * 0.1);
+            const total = supply + vat;
+
+            document.getElementById('totalSupply').textContent = supply.toLocaleString() + '원';
+            document.getElementById('totalVAT').textContent = vat.toLocaleString() + '원';
+            document.getElementById('totalAmount').textContent = total.toLocaleString() + '원';
+        }
+
+        // 매입 섹션 토글
+        function togglePurchaseSection() {
+            const type = document.getElementById('new_type').value;
+            const purchaseSection = document.getElementById('purchaseSection');
+            purchaseSection.style.display = type === '세금계산서' ? 'block' : 'none';
+        }
+
+        // 슬라이드 패널 열기
+        function openPanel(code) {
+            const item = estimates.find(e => e.code === code);
+            if (!item) return;
+
+            currentEditItem = {...item}; // 복사본 저장
+            isEditMode = false;
+
+            renderPanelContent(item);
+
+            document.getElementById('panelOverlay').classList.add('active');
+            document.getElementById('slidePanel').classList.add('active');
+        }
+
+        // 패널 내용 렌더링
+        function renderPanelContent(item) {
+            document.getElementById('panelTitle').textContent = isEditMode ? '견적서 수정' : '견적서 상세';
+            
+            const panelBody = document.getElementById('panelBody');
+            panelBody.className = isEditMode ? 'panel-body edit-mode' : 'panel-body view-mode';
+
+            panelBody.innerHTML = `
+                <!-- 탭 메뉴 -->
+                <div class="panel-tabs">
+                    <button class="panel-tab active" onclick="switchPanelTab(event, 'basic')">
+                        <i class="fas fa-info-circle"></i> 기본정보
+                    </button>
+                    <button class="panel-tab" onclick="switchPanelTab(event, 'sales')">
+                        <i class="fas fa-file-invoice-dollar"></i> 매출정보
+                    </button>
+                    ${item.type === '세금계산서' ? `
+                    <button class="panel-tab" onclick="switchPanelTab(event, 'purchase')">
+                        <i class="fas fa-receipt"></i> 매입정보
+                    </button>
+                    <button class="panel-tab" onclick="switchPanelTab(event, 'profit')">
+                        <i class="fas fa-chart-line"></i> 수익분석
+                    </button>
+                    ` : ''}
+                </div>
+
+                <!-- 기본 정보 탭 -->
+                <div class="panel-tab-content active" id="tab-basic">
+                    <div class="panel-section">
+                        <div class="detail-grid">
+                            <div class="detail-row">
+                                <div class="detail-label">등록일</div>
+                                <div class="detail-value">${item.date}</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">진행상태</div>
+                                <div class="detail-value">
+                                    <span class="badge ${getBadgeClass(item.status)}">${item.status}</span>
+                                </div>
+                                <select class="form-select edit-input" id="edit_status">
+                                    <option value="견적" ${item.status === '견적' ? 'selected' : ''}>견적</option>
+                                    <option value="진행" ${item.status === '진행' ? 'selected' : ''}>진행</option>
+                                    <option value="완료" ${item.status === '완료' ? 'selected' : ''}>완료</option>
+                                    <option value="보류" ${item.status === '보류' ? 'selected' : ''}>보류</option>
+                                </select>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">대분류</div>
+                                <div class="detail-value">${item.category1}</div>
+                                <select class="form-select edit-input" id="edit_category1">
+                                    <option value="B2B" ${item.category1 === 'B2B' ? 'selected' : ''}>B2B</option>
+                                    <option value="B2C" ${item.category1 === 'B2C' ? 'selected' : ''}>B2C</option>
+                                    <option value="컨텍터스" ${item.category1 === '컨텍터스' ? 'selected' : ''}>컨텍터스</option>
+                                </select>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">중분류</div>
+                                <div class="detail-value">${item.category2}</div>
+                                <input type="text" class="form-input edit-input" id="edit_category2" value="${item.category2}">
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">건물명</div>
+                                <div class="detail-value">${item.building}</div>
+                                <input type="text" class="form-input edit-input" id="edit_building" value="${item.building}">
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">공사명</div>
+                                <div class="detail-value">${item.project}</div>
+                                <input type="text" class="form-input edit-input" id="edit_project" value="${item.project}">
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">담당자</div>
+                                <div class="detail-value">${item.manager}</div>
+                                <select class="form-select edit-input" id="edit_manager">
+                                    <option value="방준호" ${item.manager === '방준호' ? 'selected' : ''}>방준호</option>
+                                </select>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">구분</div>
+                                <div class="detail-value">${item.type}</div>
+                                <select class="form-select edit-input" id="edit_type">
+                                    <option value="세금계산서" ${item.type === '세금계산서' ? 'selected' : ''}>세금계산서</option>
+                                    <option value="사업소득" ${item.type === '사업소득' ? 'selected' : ''}>사업소득</option>
+                                    <option value="자체인력" ${item.type === '자체인력' ? 'selected' : ''}>자체인력</option>
+                                </select>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">도급사</div>
+                                <div class="detail-value">${item.contractor}</div>
+                                <input type="text" class="form-input edit-input" id="edit_contractor" value="${item.contractor}">
+                            </div>
+                        </div>
+                        
+                        <!-- 견적서 보기/수정 버튼 -->
+                        <div style="margin-top: 24px; padding-top: 24px; border-top: 2px solid var(--gray-200);">
+                            <button class="btn-estimate-edit" onclick="openEstimateEditor('${item.code}')">
+                                <i class="fas fa-file-invoice"></i> 견적서 보기/수정
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 매출 정보 탭 -->
+                <div class="panel-tab-content" id="tab-sales">
+                    <div class="panel-section">
+                        <!-- 매출 내역 (상호명별) -->
+                        <div class="payment-list">
+                            <div class="payment-list-header">
+                                <div class="payment-list-title">
+                                    <i class="fas fa-store"></i> 매출 내역 (상호명별)
+                                </div>
+                                <button class="btn-add-payment" onclick="addSalesRow('${item.code}')">
+                                    <i class="fas fa-plus"></i> 매출 추가
+                                </button>
+                            </div>
+                            <div class="payment-table-wrap">
+                            <table class="payment-table">
+                                <thead>
+                                    <tr>
+                                        <th>상호명</th>
+                                        <th style="width: 120px;">매출금액</th>
+                                        <th style="width: 120px;">수금상태</th>
+                                        <th style="width: 120px;">세금계산서</th>
+                                        <th style="width: 100px;">첨부파일</th>
+                                        <th>메모</th>
+                                        <th style="width: 140px;">액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="salesList-${item.code}">
+                                    <!-- 매출 내역이 여기에 동적으로 추가됩니다 -->
+                                </tbody>
+                            </table>
+                            </div>
+                            <div class="payment-summary">
+                                <span class="payment-summary-label">총 매출액</span>
+                                <span class="payment-summary-value">${item.revenue.toLocaleString()}원</span>
+                            </div>
+                        </div>
+
+                        <!-- 수금 내역 (날짜별) -->
+                        <div class="payment-list" style="margin-top: 32px;">
+                            <div class="payment-list-header">
+                                <div class="payment-list-title">
+                                    <i class="fas fa-money-check-alt"></i> 수금 내역 (날짜별)
+                                </div>
+                                <button class="btn-add-payment" onclick="addPaymentRow('sales', '${item.code}')">
+                                    <i class="fas fa-plus"></i> 수금 추가
+                                </button>
+                            </div>
+                            <div class="payment-table-wrap">
+                            <table class="payment-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 140px;">수금일자</th>
+                                        <th style="width: 120px;">수금금액</th>
+                                        <th>수금방법</th>
+                                        <th>메모</th>
+                                        <th style="width: 140px;">액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="salesPayments-${item.code}">
+                                    <tr>
+                                        <td>2026-03-10</td>
+                                        <td style="font-weight: 600;">${(item.revenue * 0.4).toLocaleString()}원</td>
+                                        <td>계좌이체</td>
+                                        <td>1차 수금</td>
+                                        <td><button class="btn-remove-payment" onclick="removePaymentRow(this)"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>미수금</td>
+                                        <td style="font-weight: 600; color: var(--danger);">${(item.revenue * 0.6).toLocaleString()}원</td>
+                                        <td>-</td>
+                                        <td>잔금</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            </div>
+                            <div class="payment-summary">
+                                <span class="payment-summary-label">총 수금액</span>
+                                <span class="payment-summary-value">${(item.revenue * 0.4).toLocaleString()}원 / ${item.revenue.toLocaleString()}원</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 매입 정보 탭 -->
+                ${item.type === '세금계산서' ? `
+                <div class="panel-tab-content" id="tab-purchase">
+                    <div class="panel-section">
+                        <!-- 매입 내역 (업체별) -->
+                        <div class="payment-list">
+                            <div class="payment-list-header">
+                                <div class="payment-list-title">
+                                    <i class="fas fa-building"></i> 매입 내역 (업체별)
+                                </div>
+                                <button class="btn-add-payment" onclick="addPurchaseRow('${item.code}')">
+                                    <i class="fas fa-plus"></i> 매입 추가
+                                </button>
+                            </div>
+                            <div class="payment-table-wrap">
+                            <table class="payment-table">
+                                <thead>
+                                    <tr>
+                                        <th>업체명</th>
+                                        <th style="width: 120px;">매입금액</th>
+                                        <th style="width: 120px;">이체상태</th>
+                                        <th style="width: 120px;">세금계산서</th>
+                                        <th style="width: 100px;">첨부파일</th>
+                                        <th>메모</th>
+                                        <th style="width: 140px;">액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="purchaseList-${item.code}">
+                                    <tr>
+                                        <td>영진인프라</td>
+                                        <td style="font-weight: 600;">${(item.purchase * 0.6).toLocaleString()}원</td>
+                                        <td><span class="badge badge-issued">완료</span></td>
+                                        <td><span class="badge badge-issued">발행</span></td>
+                                        <td>
+                                            <button class="btn-file-view" onclick="viewTaxFile('purchase', '영진인프라')">
+                                                <i class="fas fa-eye"></i> 보기
+                                            </button>
+                                        </td>
+                                        <td>바닥공사</td>
+                                        <td><button class="btn-remove-payment" onclick="removePaymentRow(this)"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>강서집수리</td>
+                                        <td style="font-weight: 600;">${(item.purchase * 0.4).toLocaleString()}원</td>
+                                        <td><span class="badge badge-not-issued">대기</span></td>
+                                        <td><span class="badge badge-not-issued">미발행</span></td>
+                                        <td>
+                                            <button class="btn-file-upload" onclick="uploadTaxFile(this, 'purchase')">
+                                                <i class="fas fa-upload"></i> 업로드
+                                            </button>
+                                        </td>
+                                        <td>전기설비</td>
+                                        <td><button class="btn-remove-payment" onclick="removePaymentRow(this)"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            </div>
+                            <div class="payment-summary">
+                                <span class="payment-summary-label">총 매입액</span>
+                                <span class="payment-summary-value">${item.purchase.toLocaleString()}원</span>
+                            </div>
+                        </div>
+
+                        <!-- 이체 내역 (날짜별) -->
+                        <div class="payment-list" style="margin-top: 32px;">
+                            <div class="payment-list-header">
+                                <div class="payment-list-title">
+                                    <i class="fas fa-exchange-alt"></i> 이체 내역 (날짜별)
+                                </div>
+                                <button class="btn-add-payment" onclick="addTransferRow('${item.code}')">
+                                    <i class="fas fa-plus"></i> 이체 추가
+                                </button>
+                            </div>
+                            <div class="payment-table-wrap">
+                            <table class="payment-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 140px;">이체일자</th>
+                                        <th style="width: 120px;">이체금액</th>
+                                        <th>이체방법</th>
+                                        <th>메모</th>
+                                        <th style="width: 140px;">액션</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transferList-${item.code}">
+                                    <tr>
+                                        <td>2026-03-10</td>
+                                        <td style="font-weight: 600;">${(item.purchase * 0.6).toLocaleString()}원</td>
+                                        <td>계좌이체</td>
+                                        <td>영진인프라</td>
+                                        <td><button class="btn-remove-payment" onclick="removePaymentRow(this)"><i class="fas fa-times"></i></button></td>
+                                    </tr>
+                                    <tr>
+                                        <td>미이체</td>
+                                        <td style="font-weight: 600; color: var(--danger);">${(item.purchase * 0.4).toLocaleString()}원</td>
+                                        <td>-</td>
+                                        <td>강서집수리 (대기)</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            </div>
+                            <div class="payment-summary">
+                                <span class="payment-summary-label">총 이체액</span>
+                                <span class="payment-summary-value">${(item.purchase * 0.6).toLocaleString()}원 / ${item.purchase.toLocaleString()}원</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 수익 분석 탭 -->
+                <div class="panel-tab-content" id="tab-profit">
+                    <div class="panel-section">
+                        <div class="detail-grid">
+                            <div class="detail-row">
+                                <div class="detail-label">매출금액</div>
+                                <div class="detail-value large" style="color: var(--primary);">${item.revenue.toLocaleString()}원</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">매입금액</div>
+                                <div class="detail-value large" style="color: var(--danger);">${item.purchase.toLocaleString()}원</div>
+                            </div>
+                            <div class="detail-row" style="padding-top: 16px; border-top: 2px solid var(--gray-200);">
+                                <div class="detail-label">순이익</div>
+                                <div class="detail-value large" style="color: var(--success); font-size: 24px; font-weight: 700;">${(item.revenue - item.purchase).toLocaleString()}원</div>
+                            </div>
+                            <div class="detail-row">
+                                <div class="detail-label">수익률</div>
+                                <div class="detail-value large" style="color: var(--success);">${item.revenue > 0 ? ((item.revenue - item.purchase) / item.revenue * 100).toFixed(1) : 0}%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+
+            // 버튼 표시/숨김
+            document.getElementById('btnEdit').style.display = isEditMode ? 'none' : 'inline-flex';
+            document.getElementById('btnSave').style.display = isEditMode ? 'inline-flex' : 'none';
+            document.getElementById('btnCancel').style.display = isEditMode ? 'inline-flex' : 'none';
+        }
+
+        // 패널 탭 전환
+        function switchPanelTab(event, tabId) {
+            // 모든 탭 비활성화
+            document.querySelectorAll('.panel-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 클릭한 탭 활성화
+            event.currentTarget.classList.add('active');
+            
+            // 모든 탭 컨텐츠 숨김
+            document.querySelectorAll('.panel-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 선택한 탭 컨텐츠 표시
+            document.getElementById('tab-' + tabId).classList.add('active');
+        }
+
+        // 수금 내역 추가
+        function addPaymentRow(type, code) {
+            const tbody = document.getElementById(`salesPayments-${code}`);
+            const newRow = tbody.insertRow(tbody.rows.length - 1); // 미수금 행 앞에 추가
+            newRow.innerHTML = `
+                <td><input type="date" value="${new Date().toISOString().slice(0, 10)}" class="row-input"></td>
+                <td><input type="number" placeholder="금액" style="text-align: right;" class="row-input"></td>
+                <td>
+                    <select class="row-input">
+                        <option>계좌이체</option>
+                        <option>현금</option>
+                        <option>카드</option>
+                    </select>
+                </td>
+                <td><input type="text" placeholder="비고" class="row-input"></td>
+                <td>
+                    <button class="btn-save-row" onclick="saveRow(this)" title="저장">
+                        <i class="fas fa-save"></i> 저장
+                    </button>
+                </td>
+            `;
+        }
+
+        // 매출 내역 추가 (상호명별)
+        function addSalesRow(code) {
+            const tbody = document.getElementById(`salesList-${code}`);
+            const newRow = tbody.insertRow();
+            const rowId = 'sales-' + Date.now();
+            newRow.innerHTML = `
+                <td><input type="text" placeholder="상호명" class="row-input"></td>
+                <td><input type="number" placeholder="금액" style="text-align: right;" class="row-input"></td>
+                <td>
+                    <select class="row-input">
+                        <option value="미수">미수</option>
+                        <option value="부분">부분</option>
+                        <option value="전액">전액</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="row-input">
+                        <option value="미발행">미발행</option>
+                        <option value="발행">발행</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="file" id="${rowId}" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, '${rowId}')">
+                    <button class="btn-file-upload" onclick="document.getElementById('${rowId}').click()">
+                        <i class="fas fa-upload"></i> 업로드
+                    </button>
+                </td>
+                <td><input type="text" placeholder="메모" class="row-input"></td>
+                <td>
+                    <button class="btn-save-row" onclick="saveRow(this)" title="저장">
+                        <i class="fas fa-save"></i> 저장
+                    </button>
+                </td>
+            `;
+        }
+
+        // 매입 내역 추가
+        function addPurchaseRow(code) {
+            const tbody = document.getElementById(`purchaseList-${code}`);
+            const newRow = tbody.insertRow();
+            const rowId = 'purchase-' + Date.now();
+            newRow.innerHTML = `
+                <td><input type="text" placeholder="업체명" class="row-input"></td>
+                <td><input type="number" placeholder="금액" style="text-align: right;" class="row-input"></td>
+                <td>
+                    <select class="row-input">
+                        <option value="대기">대기</option>
+                        <option value="완료">완료</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="row-input">
+                        <option value="미발행">미발행</option>
+                        <option value="발행">발행</option>
+                    </select>
+                </td>
+                <td>
+                    <input type="file" id="${rowId}" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, '${rowId}')">
+                    <button class="btn-file-upload" onclick="document.getElementById('${rowId}').click()">
+                        <i class="fas fa-upload"></i> 업로드
+                    </button>
+                </td>
+                <td><input type="text" placeholder="메모" class="row-input"></td>
+                <td>
+                    <button class="btn-save-row" onclick="saveRow(this)" title="저장">
+                        <i class="fas fa-save"></i> 저장
+                    </button>
+                </td>
+            `;
+        }
+
+        // 이체 내역 추가
+        function addTransferRow(code) {
+            const tbody = document.getElementById(`transferList-${code}`);
+            const newRow = tbody.insertRow(tbody.rows.length - 1); // 미이체 행 앞에 추가
+            newRow.innerHTML = `
+                <td><input type="date" value="${new Date().toISOString().slice(0, 10)}" class="row-input"></td>
+                <td><input type="number" placeholder="금액" style="text-align: right;" class="row-input"></td>
+                <td>
+                    <select class="row-input">
+                        <option>계좌이체</option>
+                        <option>현금</option>
+                    </select>
+                </td>
+                <td><input type="text" placeholder="비고" class="row-input"></td>
+                <td>
+                    <button class="btn-save-row" onclick="saveRow(this)" title="저장">
+                        <i class="fas fa-save"></i> 저장
+                    </button>
+                </td>
+            `;
+        }
+
+        // 행 저장
+        function saveRow(btn) {
+            const row = btn.closest('tr');
+            const inputs = row.querySelectorAll('.row-input');
+            
+            // 필수 입력 검증
+            let hasEmptyField = false;
+            inputs.forEach(input => {
+                if (input.tagName === 'INPUT' && input.type !== 'file' && input.type !== 'date' && !input.value.trim()) {
+                    hasEmptyField = true;
+                    input.style.borderColor = 'var(--danger)';
+                } else {
+                    input.style.borderColor = '';
+                }
+            });
+            
+            if (hasEmptyField) {
+                alert('모든 필드를 입력해주세요.');
+                return;
+            }
+            
+            // 저장 확인
+            if (!confirm('입력한 내용을 저장하시겠습니까?')) {
+                return;
+            }
+            
+            // 입력 필드를 읽기 전용으로 변경 (배경색 흰색, 테두리 연한 회색)
+            inputs.forEach(input => {
+                input.style.background = 'white';
+                input.style.borderColor = 'var(--gray-200)';
+                input.readOnly = true;
+                if (input.tagName === 'SELECT') {
+                    input.disabled = true;
+                    input.style.pointerEvents = 'none';
+                    input.style.opacity = '1';
+                }
+            });
+            
+            // 행에 저장 완료 표시
+            row.setAttribute('data-saved', 'true');
+            
+            // 액션 버튼을 수정/삭제로 변경
+            const actionCell = btn.closest('td');
+            actionCell.innerHTML = `
+                <button class="btn-edit-row" onclick="editRow(this)" title="수정">
+                    <i class="fas fa-edit"></i> 수정
+                </button>
+                <button class="btn-delete-row" onclick="deleteRow(this)" title="삭제">
+                    <i class="fas fa-trash"></i> 삭제
+                </button>
+            `;
+            
+            // 실제로는 여기서 서버에 데이터 전송
+            console.log('저장된 데이터:', {
+                row: row,
+                timestamp: new Date().toISOString()
+            });
+            
+            // 성공 알림
+            alert('저장되었습니다.');
+        }
+
+        // 행 수정
+        function editRow(btn) {
+            const row = btn.closest('tr');
+            const inputs = row.querySelectorAll('.row-input');
+            
+            // 입력 필드를 편집 가능하게 변경
+            inputs.forEach(input => {
+                input.style.background = 'var(--gray-50)';
+                input.style.borderColor = 'var(--gray-300)';
+                input.readOnly = false;
+                if (input.tagName === 'SELECT') {
+                    input.disabled = false;
+                    input.style.pointerEvents = 'auto';
+                }
+            });
+            
+            // 행의 저장 상태를 편집 중으로 변경
+            row.setAttribute('data-saved', 'false');
+            
+            // 원본 데이터 저장 (취소 시 복원용)
+            const originalData = [];
+            inputs.forEach(input => {
+                originalData.push(input.value);
+            });
+            row.setAttribute('data-original', JSON.stringify(originalData));
+            
+            // 액션 버튼을 저장/취소로 변경
+            const actionCell = btn.closest('td');
+            actionCell.innerHTML = `
+                <button class="btn-save-row" onclick="saveEditedRow(this)" title="저장">
+                    <i class="fas fa-save"></i> 저장
+                </button>
+                <button class="btn-cancel-row" onclick="cancelEdit(this)" title="취소">
+                    <i class="fas fa-times"></i> 취소
+                </button>
+            `;
+        }
+
+        // 수정 저장
+        function saveEditedRow(btn) {
+            const row = btn.closest('tr');
+            const inputs = row.querySelectorAll('.row-input');
+            
+            // 필수 입력 검증
+            let hasEmptyField = false;
+            inputs.forEach(input => {
+                if (input.tagName === 'INPUT' && input.type !== 'file' && input.type !== 'date' && !input.value.trim()) {
+                    hasEmptyField = true;
+                    input.style.borderColor = 'var(--danger)';
+                } else {
+                    input.style.borderColor = '';
+                }
+            });
+            
+            if (hasEmptyField) {
+                alert('모든 필드를 입력해주세요.');
+                return;
+            }
+            
+            // 저장 확인
+            if (!confirm('수정한 내용을 저장하시겠습니까?')) {
+                return;
+            }
+            
+            // 입력 필드를 읽기 전용으로 변경
+            inputs.forEach(input => {
+                input.style.background = 'white';
+                input.style.borderColor = 'var(--gray-200)';
+                input.readOnly = true;
+                if (input.tagName === 'SELECT') {
+                    input.disabled = true;
+                    input.style.pointerEvents = 'none';
+                    input.style.opacity = '1';
+                }
+            });
+            
+            // 행에 저장 완료 표시
+            row.setAttribute('data-saved', 'true');
+            row.removeAttribute('data-original');
+            
+            // 액션 버튼을 수정/삭제로 변경
+            const actionCell = btn.closest('td');
+            actionCell.innerHTML = `
+                <button class="btn-edit-row" onclick="editRow(this)" title="수정">
+                    <i class="fas fa-edit"></i> 수정
+                </button>
+                <button class="btn-delete-row" onclick="deleteRow(this)" title="삭제">
+                    <i class="fas fa-trash"></i> 삭제
+                </button>
+            `;
+            
+            console.log('수정 저장된 데이터:', {
+                row: row,
+                timestamp: new Date().toISOString()
+            });
+            
+            alert('수정 내용이 저장되었습니다.');
+        }
+
+        // 수정 취소
+        function cancelEdit(btn) {
+            const row = btn.closest('tr');
+            const inputs = row.querySelectorAll('.row-input');
+            const originalData = JSON.parse(row.getAttribute('data-original') || '[]');
+            
+            // 원본 데이터 복원
+            inputs.forEach((input, index) => {
+                if (originalData[index] !== undefined) {
+                    input.value = originalData[index];
+                }
+                input.style.background = 'white';
+                input.style.borderColor = 'var(--gray-200)';
+                input.readOnly = true;
+                if (input.tagName === 'SELECT') {
+                    input.disabled = true;
+                    input.style.pointerEvents = 'none';
+                    input.style.opacity = '1';
+                }
+            });
+            
+            // 행 상태 복원
+            row.setAttribute('data-saved', 'true');
+            row.removeAttribute('data-original');
+            
+            // 액션 버튼 복원
+            const actionCell = btn.closest('td');
+            actionCell.innerHTML = `
+                <button class="btn-edit-row" onclick="editRow(this)" title="수정">
+                    <i class="fas fa-edit"></i> 수정
+                </button>
+                <button class="btn-delete-row" onclick="deleteRow(this)" title="삭제">
+                    <i class="fas fa-trash"></i> 삭제
+                </button>
+            `;
+        }
+
+        // 행 삭제
+        function deleteRow(btn) {
+            if (confirm('이 항목을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) {
+                btn.closest('tr').remove();
+                alert('삭제되었습니다.');
+            }
+        }
+
+        // 행 삭제 (구 버전 - 호환성 유지)
+        function removePaymentRow(btn) {
+            deleteRow(btn);
+        }
+
+        // 다중 파일 선택 처리
+        function handleMultiFileSelect(input, rowId) {
+            if (input.files && input.files.length > 0) {
+                const fileCount = input.files.length;
+                
+                // 업로드 버튼을 보기 버튼으로 변경
+                const td = input.parentElement;
+                td.innerHTML = `
+                    <input type="file" id="${rowId}" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, '${rowId}')">
+                    <button class="btn-file-view" onclick="showFileList('${rowId}')">
+                        <i class="fas fa-eye"></i> 보기<span class="file-count-badge">${fileCount}</span>
+                    </button>
+                `;
+                
+                // 파일들을 임시로 저장
+                if (!window.uploadedFiles) window.uploadedFiles = {};
+                window.uploadedFiles[rowId] = [];
+                
+                Array.from(input.files).forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        window.uploadedFiles[rowId].push({
+                            name: file.name,
+                            data: e.target.result,
+                            type: file.type,
+                            date: new Date().toISOString().slice(0, 10)
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+        }
+
+        // 파일 목록 모달 표시
+        function showFileList(rowId) {
+            if (!window.uploadedFiles || !window.uploadedFiles[rowId] || window.uploadedFiles[rowId].length === 0) {
+                alert('파일을 찾을 수 없습니다.');
+                return;
+            }
+            
+            const files = window.uploadedFiles[rowId];
+            
+            const modal = document.createElement('div');
+            modal.className = 'file-list-modal active';
+            modal.innerHTML = `
+                <div class="file-list-modal-content">
+                    <div class="file-list-modal-header">
+                        <div class="file-list-modal-title">
+                            <i class="fas fa-file-invoice"></i> 세금계산서 파일 목록 (${files.length}개)
+                        </div>
+                        <button onclick="this.closest('.file-list-modal').remove()" style="width: 32px; height: 32px; border: none; border-radius: 6px; background: var(--gray-100); color: var(--gray-600); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="file-list-modal-body">
+                        ${files.map((file, index) => `
+                            <div class="file-list-item">
+                                <div class="file-list-item-icon">
+                                    <i class="fas ${file.type === 'application/pdf' ? 'fa-file-pdf' : 'fa-image'}"></i>
+                                </div>
+                                <div class="file-list-item-info">
+                                    <div class="file-list-item-name">${file.name}</div>
+                                    <div class="file-list-item-meta">업로드: ${file.date}</div>
+                                </div>
+                                <div class="file-list-item-actions">
+                                    <button class="btn-file-view" onclick="viewFileFromList('${rowId}', ${index})">
+                                        <i class="fas fa-eye"></i> 보기
+                                    </button>
+                                    <button class="btn-file-download" onclick="downloadFileFromList('${rowId}', ${index})">
+                                        <i class="fas fa-download"></i> 다운로드
+                                    </button>
+                                    <button class="btn-remove-payment" onclick="removeFileFromList('${rowId}', ${index})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="file-list-modal-footer">
+                        <span style="font-size: 13px; color: var(--gray-600);">
+                            <i class="fas fa-info-circle"></i> 분할 발행된 세금계산서를 각각 업로드하세요
+                        </span>
+                        <button class="btn-file-upload" onclick="addMoreFiles('${rowId}')">
+                            <i class="fas fa-plus"></i> 파일 추가
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+            
+            document.body.appendChild(modal);
+        }
+
+        // 목록에서 파일 보기
+        function viewFileFromList(rowId, index) {
+            if (window.uploadedFiles && window.uploadedFiles[rowId] && window.uploadedFiles[rowId][index]) {
+                const file = window.uploadedFiles[rowId][index];
+                viewFileModal(file.name, file.data, file.type);
+            }
+        }
+
+        // 목록에서 파일 다운로드
+        function downloadFileFromList(rowId, index) {
+            if (window.uploadedFiles && window.uploadedFiles[rowId] && window.uploadedFiles[rowId][index]) {
+                const file = window.uploadedFiles[rowId][index];
+                
+                // Base64 데이터를 Blob으로 변환
+                const byteString = atob(file.data.split(',')[1]);
+                const mimeString = file.data.split(',')[0].split(':')[1].split(';')[0];
+                const ab = new ArrayBuffer(byteString.length);
+                const ia = new Uint8Array(ab);
+                
+                for (let i = 0; i < byteString.length; i++) {
+                    ia[i] = byteString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([ab], { type: mimeString });
+                
+                // 다운로드 링크 생성
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // 알림 표시
+                const btn = event.target.closest('button');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> 완료';
+                btn.style.background = 'var(--success)';
+                btn.style.color = 'white';
+                btn.style.borderColor = 'var(--success)';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.style.background = '';
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                }, 1500);
+            }
+        }
+
+        // 목록에서 파일 삭제
+        function removeFileFromList(rowId, index) {
+            if (confirm('이 파일을 삭제하시겠습니까?')) {
+                window.uploadedFiles[rowId].splice(index, 1);
+                
+                // 모달 닫고 다시 열기
+                document.querySelector('.file-list-modal').remove();
+                
+                // 파일이 남아있으면 목록 다시 표시, 없으면 업로드 버튼으로 변경
+                if (window.uploadedFiles[rowId].length > 0) {
+                    showFileList(rowId);
+                    
+                    // 테이블의 버튼도 업데이트
+                    const fileInput = document.getElementById(rowId);
+                    if (fileInput) {
+                        const td = fileInput.parentElement;
+                        const fileCount = window.uploadedFiles[rowId].length;
+                        td.innerHTML = `
+                            <input type="file" id="${rowId}" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, '${rowId}')">
+                            <button class="btn-file-view" onclick="showFileList('${rowId}')">
+                                <i class="fas fa-eye"></i> 보기<span class="file-count-badge">${fileCount}</span>
+                            </button>
+                        `;
+                    }
+                } else {
+                    const fileInput = document.getElementById(rowId);
+                    if (fileInput) {
+                        const td = fileInput.parentElement;
+                        td.innerHTML = `
+                            <input type="file" id="${rowId}" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, '${rowId}')">
+                            <button class="btn-file-upload" onclick="document.getElementById('${rowId}').click()">
+                                <i class="fas fa-upload"></i> 업로드
+                            </button>
+                        `;
+                    }
+                }
+            }
+        }
+
+        // 파일 추가
+        function addMoreFiles(rowId) {
+            document.getElementById(rowId).click();
+            document.querySelector('.file-list-modal').remove();
+        }
+
+        // 파일 선택 처리 (단일 - 이전 버전 호환용)
+        function handleFileSelect(input, rowId) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const fileName = file.name;
+                
+                // 업로드 버튼을 보기 버튼으로 변경
+                const td = input.parentElement;
+                td.innerHTML = `
+                    <input type="file" id="${rowId}" class="file-input-hidden" accept="image/*,application/pdf" onchange="handleFileSelect(this, '${rowId}')">
+                    <button class="btn-file-view" onclick="viewUploadedFile('${rowId}', '${fileName}')">
+                        <i class="fas fa-eye"></i> 보기
+                    </button>
+                `;
+                
+                // 파일을 임시로 저장 (실제로는 서버에 업로드)
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // 파일 데이터를 전역 객체에 저장
+                    if (!window.uploadedFiles) window.uploadedFiles = {};
+                    window.uploadedFiles[rowId] = {
+                        name: fileName,
+                        data: e.target.result,
+                        type: file.type
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 업로드된 파일 보기
+        function viewUploadedFile(rowId, fileName) {
+            if (window.uploadedFiles && window.uploadedFiles[rowId]) {
+                const file = window.uploadedFiles[rowId];
+                viewFileModal(fileName, file.data, file.type);
+            } else {
+                alert('파일을 찾을 수 없습니다.');
+            }
+        }
+
+        // 세금계산서 파일 보기 (기존 데이터)
+        function viewTaxFile(type, name) {
+            const fileName = `${type === 'sales' ? '매출' : '매입'}_세금계산서_${name}.pdf`;
+            // 샘플 이미지 표시
+            viewFileModal(fileName, 'https://via.placeholder.com/600x800/E5E7EB/6B7280?text=' + encodeURIComponent(fileName), 'image/png');
+        }
+
+        // 파일 미리보기 모달
+        function viewFileModal(fileName, fileData, fileType) {
+            const modal = document.createElement('div');
+            modal.className = 'image-modal active';
+            
+            let content = '';
+            if (fileType.startsWith('image/') || fileData.includes('placeholder')) {
+                content = `<img src="${fileData}" alt="${fileName}" style="max-width: 100%; max-height: 70vh; border-radius: 8px;">`;
+            } else if (fileType === 'application/pdf') {
+                content = `<iframe src="${fileData}" style="width: 800px; height: 70vh; border: none; border-radius: 8px;"></iframe>`;
+            } else {
+                content = `<div style="padding: 40px; text-align: center;">
+                    <i class="fas fa-file" style="font-size: 48px; color: var(--gray-400);"></i>
+                    <p style="margin-top: 20px; color: var(--gray-600);">미리보기를 지원하지 않는 파일 형식입니다.</p>
+                </div>`;
+            }
+            
+            modal.innerHTML = `
+                <div class="image-modal-content" style="max-width: 90vw; max-height: 90vh;">
+                    <div class="image-modal-header" style="padding: 16px 20px; background: white; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="font-size: 16px; font-weight: 600; color: var(--gray-900);">
+                            <i class="fas fa-file-invoice"></i> ${fileName}
+                        </div>
+                        <button onclick="this.closest('.image-modal').remove()" style="width: 32px; height: 32px; border: none; border-radius: 6px; background: var(--gray-100); color: var(--gray-600); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div style="padding: 20px; background: var(--gray-50); display: flex; align-items: center; justify-content: center; overflow: auto;">
+                        ${content}
+                    </div>
+                </div>
+            `;
+            
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+            
+            document.body.appendChild(modal);
+        }
+
+        // 편집 모드 토글
+        function toggleEditMode() {
+            isEditMode = true;
+            renderPanelContent(currentEditItem);
+        }
+
+        // 수정 취소
+        function cancelEdit() {
+            isEditMode = false;
+            // 원본 데이터로 복원
+            const originalItem = estimates.find(e => e.code === currentEditItem.code);
+            if (originalItem) {
+                currentEditItem = {...originalItem};
+                renderPanelContent(currentEditItem);
+            }
+        }
+
+        // 저장
+        function saveChanges() {
+            if (isNewEstimate) {
+                // 신규 견적 저장
+                const building = document.getElementById('new_building').value.trim();
+                const project = document.getElementById('new_project').value.trim();
+
+                if (!building || !project) {
+                    alert('건물명과 공사명은 필수 입력 항목입니다.');
+                    return;
+                }
+
+                const supply = itemRows.reduce((sum, row) => sum + row.amount, 0);
+                const total = supply + Math.round(supply * 0.1);
+
+                const newEstimate = {
+                    code: currentEditItem.code,
+                    date: currentEditItem.date,
+                    status: document.getElementById('new_status').value,
+                    category1: document.getElementById('new_category1').value,
+                    category2: document.getElementById('new_category2').value,
+                    building: building,
+                    project: project,
+                    manager: document.getElementById('new_manager').value,
+                    type: document.getElementById('new_type').value,
+                    contractor: document.getElementById('new_contractor').value,
+                    revenue: total,
+                    paidStatus: document.getElementById('new_paidStatus').value,
+                    purchase: document.getElementById('new_type').value === '세금계산서' ? 
+                        parseInt(document.getElementById('new_purchase').value) || 0 : 0,
+                    taxIssued: document.getElementById('new_taxIssued').value === 'true',
+                    hasSales: false,
+                    hasPurchase: false
+                };
+
+                // 배열에 추가
+                estimates.unshift(newEstimate);
+
+                alert('견적서가 등록되었습니다.');
+                closePanel();
+                renderTable();
+
+            } else {
+                // 기존 견적 수정
+                currentEditItem.status = document.getElementById('edit_status').value;
+                currentEditItem.category1 = document.getElementById('edit_category1').value;
+                currentEditItem.category2 = document.getElementById('edit_category2').value;
+                currentEditItem.building = document.getElementById('edit_building').value;
+                currentEditItem.project = document.getElementById('edit_project').value;
+                currentEditItem.manager = document.getElementById('edit_manager').value;
+                currentEditItem.type = document.getElementById('edit_type').value;
+                currentEditItem.contractor = document.getElementById('edit_contractor').value;
+                currentEditItem.revenue = parseInt(document.getElementById('edit_revenue').value) || 0;
+                currentEditItem.paidStatus = document.getElementById('edit_paidStatus').value;
+                currentEditItem.taxIssued = document.getElementById('edit_taxIssued').value === 'true';
+                
+                if (currentEditItem.type === '세금계산서') {
+                    currentEditItem.purchase = parseInt(document.getElementById('edit_purchase').value) || 0;
+                }
+
+                // 원본 데이터 업데이트
+                const index = estimates.findIndex(e => e.code === currentEditItem.code);
+                if (index !== -1) {
+                    estimates[index] = {...currentEditItem};
+                }
+
+                // 읽기 모드로 전환
+                isEditMode = false;
+                renderPanelContent(currentEditItem);
+
+                // 테이블 다시 렌더링
+                renderTable();
+
+                alert('저장되었습니다.');
+            }
+        }
+
+        // 슬라이드 패널 닫기
+        function closePanel() {
+            document.getElementById('panelOverlay').classList.remove('active');
+            document.getElementById('slidePanel').classList.remove('active');
+            
+            // 상태 초기화
+            isEditMode = false;
+            isNewEstimate = false;
+            currentEditItem = null;
+            itemRows = [];
+            currentStep = 1;
+        }
+
+        // 견적서 편집기 열기 (단계별 UI)
+        function openEstimateEditor(code) {
+            const estimate = estimates.find(e => e.code === code);
+            if (!estimate) return;
+            
+            currentEditItem = {...estimate};
+            isEditMode = true;
+            isNewEstimate = false;
+            currentStep = 1;
+            
+            // 기존 품목 데이터 로드 (임시 데이터)
+            itemRows = [
+                { name: '타일 시공', quantity: 50, unit: '장', price: 10000, amount: 500000 },
+                { name: '접착제', quantity: 5, unit: '통', price: 8000, amount: 40000 }
+            ];
+            
+            renderEstimateEditor();
+            
+            document.getElementById('panelOverlay').classList.add('active');
+            document.getElementById('slidePanel').classList.add('active');
+        }
+
+        // 견적서 편집기 렌더링
+        function renderEstimateEditor() {
+            document.getElementById('panelTitle').textContent = '견적서 보기/수정';
+            
+            const panelBody = document.getElementById('panelBody');
+            panelBody.className = 'panel-body edit-mode';
+            
+            panelBody.innerHTML = `
+                <!-- 단계 네비게이션 -->
+                <div class="step-navigation">
+                    <div class="step-item ${currentStep === 1 ? 'active' : ''} ${currentStep > 1 ? 'completed' : ''}">
+                        <div class="step-number">${currentStep > 1 ? '✓' : '1'}</div>
+                        <div class="step-info">
+                            <div class="step-title">기본 정보</div>
+                            <div class="step-desc">날짜, 건물명, 공사명</div>
+                        </div>
+                    </div>
+                    <div class="step-item ${currentStep === 2 ? 'active' : ''} ${currentStep > 2 ? 'completed' : ''}">
+                        <div class="step-number">${currentStep > 2 ? '✓' : '2'}</div>
+                        <div class="step-info">
+                            <div class="step-title">견적서 작성</div>
+                            <div class="step-desc">품목, 수량, 단가</div>
+                        </div>
+                    </div>
+                    <div class="step-item ${currentStep === 3 ? 'active' : ''}">
+                        <div class="step-number">3</div>
+                        <div class="step-info">
+                            <div class="step-title">미리보기</div>
+                            <div class="step-desc">확인 및 저장</div>
+                        </div>
+                    </div>
+                </div>
+                
+                ${renderStepContent()}
+            `;
+            
+            // 버튼 숨김
+            document.getElementById('btnEdit').style.display = 'none';
+            document.getElementById('btnSave').style.display = 'none';
+            document.getElementById('btnCancel').style.display = 'none';
+        }
+
+        // 단계별 컨텐츠 렌더링
+        function renderStepContent() {
+            if (currentStep === 1) {
+                return renderStep1_BasicInfo();
+            } else if (currentStep === 2) {
+                return renderStep2_Items();
+            } else if (currentStep === 3) {
+                return renderStep3_Preview();
+            }
+        }
+
+        // 1단계: 기본 정보
+        function renderStep1_BasicInfo() {
+            return `
+                <div class="step-content active">
+                    <div class="panel-section">
+                        <div class="detail-grid">
+                            <div class="detail-row form-row">
+                                <label class="form-label">등록일</label>
+                                <input type="date" class="form-input" id="step_date" value="${currentEditItem.date}">
+                            </div>
+                            <div class="detail-row form-row">
+                                <label class="form-label">건물명 *</label>
+                                <input type="text" class="form-input" id="step_building" value="${currentEditItem.building}" placeholder="예: 서울파이낸스센터">
+                            </div>
+                            <div class="detail-row form-row">
+                                <label class="form-label">공사명 *</label>
+                                <input type="text" class="form-input" id="step_project" value="${currentEditItem.project}" placeholder="예: 8층 팬트리 수전 수리">
+                            </div>
+                            <div class="detail-row form-row">
+                                <label class="form-label">담당자</label>
+                                <select class="form-select" id="step_manager">
+                                    <option value="방준호" ${currentEditItem.manager === '방준호' ? 'selected' : ''}>방준호</option>
+                                </select>
+                            </div>
+                            <div class="detail-row form-row">
+                                <label class="form-label">구분</label>
+                                <select class="form-select" id="step_type">
+                                    <option value="세금계산서" ${currentEditItem.type === '세금계산서' ? 'selected' : ''}>세금계산서</option>
+                                    <option value="사업소득" ${currentEditItem.type === '사업소득' ? 'selected' : ''}>사업소득</option>
+                                    <option value="자체인력" ${currentEditItem.type === '자체인력' ? 'selected' : ''}>자체인력</option>
+                                </select>
+                            </div>
+                            <div class="detail-row form-row">
+                                <label class="form-label">도급사</label>
+                                <input type="text" class="form-input" id="step_contractor" value="${currentEditItem.contractor || ''}" placeholder="예: 영진인프라">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="step-buttons">
+                        <button class="btn-step btn-step-prev" onclick="closePanel()" style="visibility: hidden;">
+                            <i class="fas fa-arrow-left"></i> 이전
+                        </button>
+                        <button class="btn-step btn-step-next" onclick="goToStep(2)">
+                            다음: 견적서 작성 <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2단계: 견적서 작성
+        function renderStep2_Items() {
+            const supply = itemRows.reduce((sum, row) => sum + row.amount, 0);
+            const vat = Math.round(supply * 0.1);
+            const total = supply + vat;
+            
+            return `
+                <div class="step-content active">
+                    <div class="panel-section">
+                        <div class="panel-section-title">품목 내역</div>
+                        <table class="items-input-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%;">품목명</th>
+                                    <th style="width: 10%;">수량</th>
+                                    <th style="width: 10%;">단위</th>
+                                    <th style="width: 20%;">단가</th>
+                                    <th style="width: 20%;">금액</th>
+                                    <th style="width: 10%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsTableBody">
+                                ${itemRows.map((row, index) => `
+                                    <tr>
+                                        <td><input type="text" value="${row.name}" onchange="updateItemRow(${index}, 'name', this.value)" placeholder="품목명 입력"></td>
+                                        <td><input type="number" value="${row.quantity}" onchange="updateItemRow(${index}, 'quantity', this.value)" min="1"></td>
+                                        <td><input type="text" value="${row.unit}" onchange="updateItemRow(${index}, 'unit', this.value)" placeholder="단위"></td>
+                                        <td><input type="number" value="${row.price}" onchange="updateItemRow(${index}, 'price', this.value)" min="0" style="text-align: right;"></td>
+                                        <td style="text-align: right; font-weight: 600; padding: 8px;">${row.amount.toLocaleString()}원</td>
+                                        <td style="text-align: center;">
+                                            <button class="btn-remove-item" onclick="removeItemRow(${index})">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" style="text-align: right; font-weight: 700; background: var(--gray-50);">공급가액</td>
+                                    <td style="font-weight: 700; background: var(--gray-50); text-align: right;">${supply.toLocaleString()}원</td>
+                                    <td style="background: var(--gray-50);"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" style="text-align: right; font-weight: 700; background: var(--gray-50);">부가세 (10%)</td>
+                                    <td style="font-weight: 700; background: var(--gray-50); text-align: right;">${vat.toLocaleString()}원</td>
+                                    <td style="background: var(--gray-50);"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" style="text-align: right; font-weight: 700; background: var(--primary); color: white;">총 금액</td>
+                                    <td style="font-weight: 700; background: var(--primary); color: white; text-align: right;">${total.toLocaleString()}원</td>
+                                    <td style="background: var(--primary);"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <button class="btn-add-item" onclick="addItemRowInStep()">
+                            <i class="fas fa-plus"></i> 품목 추가
+                        </button>
+                    </div>
+                    
+                    <div class="step-buttons">
+                        <button class="btn-step btn-step-prev" onclick="goToStep(1)">
+                            <i class="fas fa-arrow-left"></i> 이전
+                        </button>
+                        <button class="btn-step btn-step-next" onclick="goToStep(3)">
+                            다음: 미리보기 <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 3단계: 미리보기
+        function renderStep3_Preview() {
+            const supply = itemRows.reduce((sum, row) => sum + row.amount, 0);
+            const vat = Math.round(supply * 0.1);
+            const total = supply + vat;
+            
+            const building = document.getElementById('step_building')?.value || currentEditItem.building;
+            const project = document.getElementById('step_project')?.value || currentEditItem.project;
+            const date = document.getElementById('step_date')?.value || currentEditItem.date;
+            
+            return `
+                <div class="step-content active">
+                    <div class="estimate-preview">
+                        <div class="estimate-header">
+                            <h1 class="estimate-title">견 적 서</h1>
+                            <p class="estimate-subtitle">Estimate</p>
+                        </div>
+                        
+                        <div class="estimate-info">
+                            <div class="estimate-info-item">
+                                <span class="estimate-info-label">작성일:</span>
+                                <span class="estimate-info-value">${date}</span>
+                            </div>
+                            <div class="estimate-info-item">
+                                <span class="estimate-info-label">공사장소:</span>
+                                <span class="estimate-info-value">${building}</span>
+                            </div>
+                            <div class="estimate-info-item">
+                                <span class="estimate-info-label">공사명:</span>
+                                <span class="estimate-info-value">${project}</span>
+                            </div>
+                            <div class="estimate-info-item">
+                                <span class="estimate-info-label">담당자:</span>
+                                <span class="estimate-info-value">${currentEditItem.manager}</span>
+                            </div>
+                        </div>
+                        
+                        <table class="estimate-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40%;">품목</th>
+                                    <th style="width: 10%;">수량</th>
+                                    <th style="width: 10%;">단위</th>
+                                    <th style="width: 20%;">단가</th>
+                                    <th style="width: 20%;">금액</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemRows.map(row => `
+                                    <tr>
+                                        <td>${row.name}</td>
+                                        <td style="text-align: center;">${row.quantity}</td>
+                                        <td style="text-align: center;">${row.unit}</td>
+                                        <td style="text-align: right;">${row.price.toLocaleString()}원</td>
+                                        <td style="text-align: right;">${row.amount.toLocaleString()}원</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        
+                        <div class="estimate-total">
+                            <div class="estimate-total-item">
+                                <span class="estimate-total-label">공급가액</span>
+                                <span>${supply.toLocaleString()}원</span>
+                            </div>
+                            <div class="estimate-total-item">
+                                <span class="estimate-total-label">부가세 (10%)</span>
+                                <span>${vat.toLocaleString()}원</span>
+                            </div>
+                            <div class="estimate-total-item main">
+                                <span class="estimate-total-label">총 금액</span>
+                                <span>${total.toLocaleString()}원</span>
+                            </div>
+                        </div>
+                        
+                        <div class="estimate-footer">
+                            <p><strong>반듯한시공</strong></p>
+                            <p>상기 금액으로 견적합니다.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="step-buttons">
+                        <button class="btn-step btn-step-prev" onclick="goToStep(2)">
+                            <i class="fas fa-arrow-left"></i> 이전
+                        </button>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn-step btn-step-next" onclick="window.print()">
+                                <i class="fas fa-print"></i> 인쇄/PDF
+                            </button>
+                            <button class="btn-step btn-step-complete" onclick="saveEstimateFromEditor()">
+                                <i class="fas fa-save"></i> 저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 단계 이동
+        function goToStep(step) {
+            // 1단계에서 2단계로 갈 때 유효성 검사
+            if (currentStep === 1 && step === 2) {
+                const building = document.getElementById('step_building').value.trim();
+                const project = document.getElementById('step_project').value.trim();
+                
+                if (!building || !project) {
+                    alert('건물명과 공사명은 필수 입력 항목입니다.');
+                    return;
+                }
+                
+                // 데이터 저장
+                currentEditItem.date = document.getElementById('step_date').value;
+                currentEditItem.building = building;
+                currentEditItem.project = project;
+                currentEditItem.manager = document.getElementById('step_manager').value;
+                currentEditItem.type = document.getElementById('step_type').value;
+                currentEditItem.contractor = document.getElementById('step_contractor').value;
+            }
+            
+            currentStep = step;
+            renderEstimateEditor();
+        }
+
+        // 품목 행 업데이트
+        function updateItemRow(index, field, value) {
+            itemRows[index][field] = field === 'name' || field === 'unit' ? value : parseFloat(value) || 0;
+            
+            // 금액 자동 계산
+            if (field === 'quantity' || field === 'price') {
+                itemRows[index].amount = itemRows[index].quantity * itemRows[index].price;
+            }
+            
+            renderEstimateEditor();
+        }
+
+        // 품목 추가
+        function addItemRowInStep() {
+            itemRows.push({
+                name: '',
+                quantity: 1,
+                unit: '',
+                price: 0,
+                amount: 0
+            });
+            renderEstimateEditor();
+        }
+
+        // 품목 삭제
+        function removeItemRow(index) {
+            if (itemRows.length === 1) {
+                alert('최소 1개의 품목이 필요합니다.');
+                return;
+            }
+            itemRows.splice(index, 1);
+            renderEstimateEditor();
+        }
+
+        // 견적서 저장
+        function saveEstimateFromEditor() {
+            if (!confirm('견적서를 저장하시겠습니까?')) {
+                return;
+            }
+            
+            const supply = itemRows.reduce((sum, row) => sum + row.amount, 0);
+            const total = supply + Math.round(supply * 0.1);
+            
+            currentEditItem.revenue = total;
+            
+            // 기존 견적 업데이트 또는 새 견적 추가
+            const existingIndex = estimates.findIndex(e => e.code === currentEditItem.code);
+            if (existingIndex >= 0) {
+                estimates[existingIndex] = {...currentEditItem};
+            } else {
+                estimates.unshift(currentEditItem);
+            }
+            
+            renderTable();
+            closePanel();
+            
+            alert('견적서가 저장되었습니다.');
+        }
+
+        // 뱃지 클래스 가져오기
+        function getBadgeClass(status) {
+            const classes = {
+                '견적': 'badge-estimate',
+                '진행': 'badge-progress',
+                '완료': 'badge-complete',
+                '보류': 'badge-hold'
+            };
+            return classes[status] || '';
+        }
+
+        // 상태 드롭다운 토글
+        function toggleStatusDropdown(event, code) {
+            event.stopPropagation();
+            
+            // 다른 드롭다운 모두 닫기
+            document.querySelectorAll('.status-dropdown-menu').forEach(menu => {
+                if (menu.id !== `statusMenu-${code}`) {
+                    menu.classList.remove('active');
+                }
+            });
+            
+            // 현재 드롭다운 토글
+            const menu = document.getElementById(`statusMenu-${code}`);
+            menu.classList.toggle('active');
+        }
+
+        // 상태 변경
+        function changeStatus(code, newStatus) {
+            const item = estimates.find(e => e.code === code);
+            if (item) {
+                item.status = newStatus;
+                renderTable();
+                
+                // 드롭다운 닫기
+                document.querySelectorAll('.status-dropdown-menu').forEach(menu => {
+                    menu.classList.remove('active');
+                });
+            }
+        }
+
+        // 테이블 행 클릭으로 패널 열기
+        function openPanelFromRow(event, code) {
+            // 상태 드롭다운 클릭은 무시
+            if (event.target.closest('.status-dropdown')) {
+                return;
+            }
+            openPanel(code);
+        }
+
+        // 외부 클릭 시 드롭다운 닫기
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.status-dropdown-menu').forEach(menu => {
+                menu.classList.remove('active');
+            });
+        });
+
+        // 사이드바 토글
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            
+            // 로컬 스토리지에 상태 저장
+            const isCollapsed = sidebar.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', isCollapsed);
+        }
+
+        // 페이지 로드 시 사이드바 상태 복원
+        document.addEventListener('DOMContentLoaded', () => {
+            const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (isCollapsed) {
+                document.getElementById('sidebar').classList.add('collapsed');
+            }
+        });
+    </script>
+</body>
+</html>

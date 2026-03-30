@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>반듯한시공 - 관리시스템</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 사이드바 -->
+        <div class="sidebar" id="sidebar">
+            <!-- 사이드바 토글 버튼 (경계선에 위치) -->
+            <button class="sidebar-toggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            
+            <a href="#dashboard" class="logo" onclick="showPage('dashboard'); return false;">
+                <span class="logo-icon"><i class="fas fa-tools"></i></span>
+                <span class="logo-label">반듯한시공</span>
+            </a>
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-item active" data-page="dashboard" onclick="showPage('dashboard'); return false;">
+                    <i class="fas fa-th-large"></i>
+                    <span>대시보드</span>
+                </a>
+                <a href="#estimate" class="nav-item" data-page="estimate" onclick="showPage('estimate'); return false;">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>프로젝트 관리</span>
+                </a>
+                <a href="#performance" class="nav-item" data-page="performance" onclick="showPage('performance'); return false;">
+                    <i class="fas fa-chart-line"></i>
+                    <span>경영실적관리</span>
+                </a>
+                <a href="#weekly" class="nav-item" data-page="weekly" onclick="showPage('weekly'); return false;">
+                    <i class="fas fa-calendar-week"></i>
+                    <span>주간보고</span>
+                </a>
+                <a href="#unpaid" class="nav-item" data-page="unpaid" onclick="showPage('unpaid'); return false;">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <span>미수금</span>
+                </a>
+                <a href="#contractors" class="nav-item" data-page="contractors" onclick="showPage('contractors'); return false;">
+                    <i class="fas fa-building"></i>
+                    <span>업체정보관리</span>
+                </a>
+                <a href="#expenses" class="nav-item" data-page="expenses" onclick="showPage('expenses'); return false;">
+                    <i class="fas fa-receipt"></i>
+                    <span>경비지출관리</span>
+                </a>
+                <a href="#sga" class="nav-item" data-page="sga" onclick="showPage('sga'); return false;">
+                    <i class="fas fa-briefcase"></i>
+                    <span>판관비관리</span>
+                </a>
+                <a href="#users" class="nav-item" data-page="users" onclick="showPage('users'); return false;">
+                    <i class="fas fa-users-cog"></i>
+                    <span>관리자설정</span>
+                </a>
+            </nav>
+            <div class="user-section">
+                <div class="user-info">
+                    <div class="user-avatar">방</div>
+                    <div>
+                        <div style="font-weight: 600; color: var(--gray-900);">방준호</div>
+                        <div style="font-size: 12px; color: var(--gray-500);">관리자</div>
+                    </div>
+                </div>
+                <button class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> 로그아웃
+                </button>
+            </div>
+        </div>
+
+        <!-- 메인 콘텐츠 -->
+        <div class="main-content">
+            <!-- 대시보드 섹션 (dashboard.html과 동일) -->
+            <div id="page-dashboard" class="page-section active">
+                <div class="dashboard-page-header">
+                    <h1 class="page-title">📅 대시보드</h1>
+                    <button type="button" class="theme-toggle" onclick="toggleDashboardTheme()" id="dashboardThemeBtn">
+                        <i class="fas fa-moon"></i> 다크모드
+                    </button>
+                </div>
+
+                <div class="calendar-container">
+                    <div class="dashboard-calendar-header">
+                        <div class="calendar-title" id="dashboardCalendarTitle">2026년 3월</div>
+                        <div class="calendar-nav">
+                            <button type="button" class="nav-btn" onclick="dashboardChangeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                            <button type="button" class="nav-btn" onclick="dashboardChangeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="filter-container">
+                        <button type="button" class="filter-btn active" data-filter="all">전체</button>
+                        <button type="button" class="filter-btn" data-filter="진행">진행</button>
+                        <button type="button" class="filter-btn" data-filter="완료">완료</button>
+                    </div>
+
+                    <div class="calendar-weekdays">
+                        <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+                    </div>
+
+                    <div class="calendar-grid" id="dashboardCalendarGrid"></div>
+                </div>
+                <!-- 일정 상세 모달 -->
+                <div class="modal event-modal" id="dashboardEventModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-title">일정 상세</div>
+                            <button type="button" class="modal-close" onclick="closeDashboardEventModal()">&times;</button>
+                        </div>
+                        <div id="dashboardEventModalBody"></div>
+                    </div>
+                </div>
+                <!-- 일자별 일정 목록 모달 -->
+                <div class="modal event-modal" id="dashboardDayEventsModal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-title" id="dashboardDayEventsTitle">일정 목록</div>
+                            <button type="button" class="modal-close" onclick="closeDashboardDayEventsModal()">&times;</button>
+                        </div>
+                        <div id="dashboardDayEventsBody"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 견적서 관리 섹션 -->
+            <div id="page-estimate" class="page-section" style="display: none;">
+            <div class="page-header">
+                <h1 class="page-title">프로젝트 관리</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="downloadEstimateCSV()">
+                        <i class="fas fa-download"></i>
+                        CSV 다운로드
+                    </button>
+                    <button class="btn btn-primary" onclick="openNewEstimate()">
+                        <i class="fas fa-plus"></i>
+                        프로젝트 등록
+                    </button>
+                </div>
+            </div>
+
+            <!-- 필터 섹션 -->
+            <div class="filter-section">
+                <div class="tabs">
+                    <div class="tabs-left">
+                        <button class="tab active" data-status="all">전체</button>
+                        <button class="tab" data-status="견적">견적</button>
+                        <button class="tab" data-status="진행">진행</button>
+                        <button class="tab" data-status="완료">완료</button>
+                        <button class="tab" data-status="보류">보류</button>
+                    </div>
+                    <div class="tabs-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" id="filterResetBtn">
+                            <i class="fas fa-rotate-left"></i> 초기화
+                        </button>
+                    </div>
+                </div>
+                <input type="hidden" id="filterDatePreset" value="all">
+                <div class="estimate-filter-layout">
+                    <div class="estimate-filter-top">
+                        <!-- 상단 좌측: 기준일 + (전체/월 선택/기간 직접) -->
+                        <div class="estimate-filter-left">
+                            <div class="estimate-filter-left-row">
+                                <div class="estimate-filter-basis">
+                                    <div class="estimate-filter-basis-top">
+                                        <label class="filter-label estimate-filter-basis-label">기준일</label>
+                                        <div class="estimate-filter-left-actions estimate-filter-left-actions--compact">
+                                            <div class="estimate-filter-presets" role="group" aria-label="기간 빠른 선택">
+                                                <button type="button" class="btn-filter-preset active estimate-filter-preset" data-preset="all">전체</button>
+                                                <div class="estimate-filter-popover-anchor">
+                                                    <button type="button" class="btn-filter-preset estimate-filter-preset" data-preset="byMonth">월별</button>
+                                                    <div id="estimateFilterMonthWrap" class="estimate-filter-popover-panel estimate-filter-month-panel custom-month-picker" style="display: none;">
+                                                        <input type="hidden" id="filterByMonth" value="">
+                                                        <div class="cmp-month-view" id="cmpMonthView">
+                                                            <div class="cmp-year-nav">
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearPrev" aria-label="이전 연도">‹</button>
+                                                                <button type="button" class="cmp-year-label-btn" id="cmpYearOpenGrid" aria-label="연도 목록 열기">2026년</button>
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearNext" aria-label="다음 연도">›</button>
+                                                            </div>
+                                                            <div class="cmp-month-grid" id="cmpMonthGrid" role="listbox" aria-label="월 선택"></div>
+                                                            <div class="cmp-footer">
+                                                                <button type="button" class="cmp-text-btn" id="cmpMonthClear">지우기</button>
+                                                                <button type="button" class="cmp-text-btn" id="cmpMonthThis">이번 달</button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="cmp-year-view" id="cmpYearView" hidden>
+                                                            <div class="cmp-year-page-nav">
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearPagePrev" aria-label="이전 연도 구간">‹</button>
+                                                                <span class="cmp-year-page-label" id="cmpYearPageLabel">2024–2035</span>
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearPageNext" aria-label="다음 연도 구간">›</button>
+                                                            </div>
+                                                            <div class="cmp-year-grid" id="cmpYearGrid" role="grid" aria-label="연도 선택"></div>
+                                                            <button type="button" class="cmp-back-btn" id="cmpBackToMonths">월 선택으로</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-group filter-group--date-actions estimate-filter-popover-anchor">
+                                                <button type="button" class="btn btn-secondary btn-sm" id="toggleEstimateCustomRange" aria-expanded="false">기간별</button>
+                                                <div id="estimateFilterCustomRange" class="estimate-filter-popover-panel estimate-filter-custom-range" style="display: none;">
+                                                    <div class="estimate-filter-range-field">
+                                                        <label class="filter-label" for="filterDateFrom">시작</label>
+                                                        <input type="hidden" id="filterDateFrom" value="">
+                                                        <button type="button" class="filter-date-display" id="filterDateFromBtn" style="max-width: 150px;" aria-label="시작 날짜 선택" title="시작 날짜 선택">날짜 선택</button>
+                                                    </div>
+                                                    <div class="estimate-filter-range-field">
+                                                        <label class="filter-label" for="filterDateTo">종료</label>
+                                                        <input type="hidden" id="filterDateTo" value="">
+                                                        <button type="button" class="filter-date-display" id="filterDateToBtn" style="max-width: 150px;" aria-label="종료 날짜 선택" title="종료 날짜 선택">날짜 선택</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <select class="filter-select" id="filterDateBasis" title="날짜 필터 기준">
+                                        <option value="date">등록일</option>
+                                        <option value="sales">매출일자</option>
+                                        <option value="start">진행일</option>
+                                        <option value="end">완료일</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 상단 우측: (대/중/소) + (세금계산서/입금상태) 2행 가로 묶음 -->
+                        <div class="estimate-filter-right">
+                            <div class="estimate-filter-right-row estimate-filter-right-row--single">
+                                <div class="filter-group">
+                                    <label class="filter-label">대분류</label>
+                                    <select class="filter-select" id="filterCategory1">
+                                        <option value="">전체</option>
+                                        <option value="B2B">B2B</option>
+                                        <option value="B2C">B2C</option>
+                                        <option value="컨텍터스">컨텍터스</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">중분류</label>
+                                    <select class="filter-select" id="filterCategory2">
+                                        <option value="">전체</option>
+                                        <option value="코오롱">코오롱</option>
+                                        <option value="저스트코">저스트코</option>
+                                        <option value="다락">다락</option>
+                                        <option value="관리건물">관리건물</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">소분류</label>
+                                    <select class="filter-select" id="filterCategory3">
+                                        <option value="">전체</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">세금계산서</label>
+                                    <select class="filter-select" id="filterTax">
+                                        <option value="">전체</option>
+                                        <option value="발행완료">발행완료</option>
+                                        <option value="미발행">미발행</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">입금상태</label>
+                                    <select class="filter-select" id="filterCashflow">
+                                        <option value="">전체</option>
+                                        <option value="미입금">미입금</option>
+                                        <option value="입금완료">입금완료</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 하단: 검색바만 -->
+                    <div class="estimate-filter-bottom">
+                        <div class="filter-group estimate-filter-search-only">
+                            <label class="filter-label">검색</label>
+                            <div class="estimate-filter-search-row">
+                                <input type="text" class="filter-input" id="filterSearch" placeholder="코드, 건물명, 공사명, 담당자, 도급사 검색">
+                                <button type="button" class="btn btn-primary btn-sm" id="filterSearchBtn">검색</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="estimateDatePickerPanel" class="estimate-filter-date-picker-panel" style="display: none;"></div>
+            </div>
+
+            <!-- 테이블: 페이지 전체(메인 영역) 스크롤 + thead sticky -->
+            <div class="table-section">
+                <div class="table-container estimate-project-table-scroll">
+                    <table class="estimate-list-table">
+                        <thead>
+                            <tr>
+                                <th>상태</th>
+                                <th>대분류</th>
+                                <th>중분류</th>
+                                <th>소분류</th>
+                                <th>건물명</th>
+                                <th>공사명</th>
+                                <th>매출액 / 매입액</th>
+                                <th>수금액 / 이체액 / 차인지급액</th>
+                                <th>도급사</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- 데이터가 여기에 들어갑니다 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="estimate-table-pagination" id="estimateTablePagination" role="navigation" aria-label="프로젝트 목록 페이지" style="display: none;">
+                    <div class="estimate-pagination-info" id="estimatePaginationInfo"></div>
+                    <div class="estimate-pagination-controls" id="estimatePaginationControls"></div>
+                </div>
+            </div>
+            </div>
+            <!-- 견적서 관리 섹션 끝 -->
+
+            <!-- 경영실적관리 섹션 -->
+            <div id="page-performance" class="page-section" style="display: none;">
+                <div class="page-header">
+                    <div class="page-header-left" style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                        <h1 class="page-title" style="margin: 0;">경영실적관리</h1>
+                        <div class="header-filters" style="display: flex; flex-wrap: nowrap; align-items: center; gap: 12px;">
+                            <div class="estimate-filter-presets performance-mode-tabs" style="margin-bottom: 0;">
+                                <button type="button" class="btn-filter-preset performance-mode-btn" data-mode="all" onclick="switchPerformancePeriodMode('all')">전체</button>
+
+                                <span class="estimate-filter-popover-anchor" id="performanceMonthAnchor">
+                                    <input type="hidden" id="performanceFilterMonth" value="">
+                                    <button type="button" class="btn-filter-preset performance-mode-btn active" data-mode="month" onclick="switchPerformancePeriodMode('month')">월별</button>
+                                    <div id="performanceFilterMonthWrap" class="estimate-filter-popover-panel estimate-filter-month-panel custom-month-picker" style="display: none;">
+                                        <div class="cmp-month-view" id="perfCmpMonthView">
+                                            <div class="cmp-year-nav">
+                                                <button type="button" class="cmp-icon-btn" id="perfCmpYearPrev" aria-label="이전 연도">‹</button>
+                                                <button type="button" class="cmp-year-label-btn" id="perfCmpYearOpenGrid" aria-label="연도 목록 열기">2026년</button>
+                                                <button type="button" class="cmp-icon-btn" id="perfCmpYearNext" aria-label="다음 연도">›</button>
+                                            </div>
+                                            <div class="cmp-month-grid" id="perfCmpMonthGrid" role="listbox" aria-label="월 선택"></div>
+                                            <div class="cmp-footer">
+                                                <button type="button" class="cmp-text-btn" id="perfCmpMonthClear">지우기</button>
+                                                <button type="button" class="cmp-text-btn" id="perfCmpMonthThis">이번 달</button>
+                                            </div>
+                                        </div>
+                                        <div class="cmp-year-view" id="perfCmpYearView" hidden>
+                                            <div class="cmp-year-page-nav">
+                                                <button type="button" class="cmp-icon-btn" id="perfCmpYearPagePrev" aria-label="이전 연도 구간">‹</button>
+                                                <span class="cmp-year-page-label" id="perfCmpYearPageLabel">2024–2035</span>
+                                                <button type="button" class="cmp-icon-btn" id="perfCmpYearPageNext" aria-label="다음 연도 구간">›</button>
+                                            </div>
+                                            <div class="cmp-year-grid" id="perfCmpYearGrid" role="grid" aria-label="연도 선택"></div>
+                                            <button type="button" class="cmp-back-btn" id="perfCmpBackToMonths">월 선택으로</button>
+                                        </div>
+                                    </div>
+                                </span>
+
+                                <span class="estimate-filter-popover-anchor" id="performanceRangeAnchor">
+                                    <button type="button" class="btn-filter-preset performance-mode-btn" data-mode="range" onclick="switchPerformancePeriodMode('range')">기간별</button>
+
+                                    <!-- 기간별: 프로젝트관리와 동일하게 버튼 아래 팝오버 -->
+                                    <div id="performanceRangeWrap" class="estimate-filter-popover-panel estimate-filter-custom-range" style="display: none;">
+                                        <div class="estimate-filter-range-field">
+                                            <label class="filter-label" for="performanceDateFrom" style="margin-bottom: 0;">시작</label>
+                                            <input type="hidden" id="performanceDateFrom" value="">
+                                            <button type="button" class="filter-date-display" id="performanceDateFromBtn" aria-label="시작 날짜 선택" title="시작 날짜 선택">날짜 선택</button>
+                                        </div>
+                                        <div class="estimate-filter-range-field">
+                                            <label class="filter-label" for="performanceDateTo" style="margin-bottom: 0;">종료</label>
+                                            <input type="hidden" id="performanceDateTo" value="">
+                                            <button type="button" class="filter-date-display" id="performanceDateToBtn" aria-label="종료 날짜 선택" title="종료 날짜 선택">날짜 선택</button>
+                                        </div>
+                                    </div>
+                                </span>
+                            </div>
+                            <label class="performance-sga-toggle" for="performanceSgaToggle">
+                                <span class="performance-sga-toggle-label">판관비 반영</span>
+                                <input type="checkbox" id="performanceSgaToggle" onchange="switchPerformanceSgaMode(this.checked ? 'include' : 'exclude')">
+                                <span class="performance-sga-toggle-slider" aria-hidden="true"></span>
+                                <span class="performance-sga-toggle-state" id="performanceSgaToggleState">OFF</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI 카드 -->
+                <div class="kpi-grid" id="performanceKpiGrid">
+                    <div class="kpi-card revenue">
+                        <div class="kpi-label">총 매출액</div>
+                        <div class="kpi-value" id="kpiRevenue">0원</div>
+                    </div>
+                    <div class="kpi-card profit">
+                        <div class="kpi-label" id="kpiProfitLabel">순수익</div>
+                        <div class="kpi-value" id="kpiProfit">0원</div>
+                    </div>
+                    <div class="kpi-card margin">
+                        <div class="kpi-label" id="kpiMarginLabel">수익률</div>
+                        <div class="kpi-value" id="kpiMargin">0%</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-label">평균단가(공사 제외)</div>
+                        <div class="kpi-value" id="kpiAverage">0원</div>
+                    </div>
+                    <div class="kpi-card" id="kpiSgaCard">
+                        <div class="kpi-label">판관비</div>
+                        <div class="kpi-value" id="kpiSga">0원</div>
+                    </div>
+                </div>
+
+                <div class="chart-section" style="padding-bottom: 0; box-shadow: none; background: transparent;">
+                    <div class="section-title" style="margin-bottom: 8px;">월별 진행 건수 및 평균 단가 흐름</div>
+                    <p style="font-size: 13px; color: var(--gray-600); margin: 0;">집계·필터 기준: <strong>매출발행일</strong>. 매입에는 사업소득 금액이 포함됩니다.</p>
+                </div>
+
+                <!-- 테이블 -->
+                <div class="table-section">
+                    <!-- 월별 모드: 월별 추이 + 월별 분류별 -->
+                    <div id="perf-panel-monthly">
+                        <div class="tabs performance-right-tabs">
+                            <div class="tabs-left">
+                                <button class="tab active" type="button" data-tab="perf-right-monthly" onclick="switchPerformanceRightTab('monthly')">월별</button>
+                                <button class="tab" type="button" data-tab="perf-right-category" onclick="switchPerformanceRightTab('category')">분류별</button>
+                            </div>
+                        </div>
+                        <div class="tab-content">
+                            <div class="tab-panel active" id="perf-right-panel-monthly">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>월</th>
+                                            <th class="text-right">건수</th>
+                                            <th class="text-right">매출</th>
+                                            <th class="text-right">매입</th>
+                                            <th class="text-right" id="performanceSgaHeader">판관비</th>
+                                            <th class="text-right">순수익</th>
+                                            <th class="text-right">수익률</th>
+                                            <th class="text-right">평균단가(공사 제외)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="performanceMonthlyTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-panel" id="perf-right-panel-category">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>월</th>
+                                            <th>대분류</th>
+                                            <th>중분류</th>
+                                            <th class="text-right">건수</th>
+                                            <th class="text-right">매출</th>
+                                            <th class="text-right">매입</th>
+                                            <th class="text-right">순수익</th>
+                                            <th class="text-right">수익률</th>
+                                            <th class="text-right">평균단가(공사 제외)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="performanceCategoryMonthlyTableBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 경영실적관리: 날짜 선택 패널(프로젝트관리와 동일 UI) -->
+            <div id="performanceDatePickerPanel" class="estimate-filter-date-picker-panel" style="display: none;"></div>
+
+            <!-- 주간보고 섹션 -->
+            <div id="page-weekly" class="page-section" style="display: none;">
+                <div class="page-header">
+                    <h1 class="page-title">주간보고</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="downloadWeeklyCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 주차 정보 -->
+                <div class="week-info" style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                    <div style="font-size: 14px; color: var(--gray-600); margin-bottom: 8px;">기준 주차</div>
+                    <div style="font-size: 24px; font-weight: 700; color: var(--primary);" id="weeklyWeekInfo">금주(03/24~03/30)</div>
+                </div>
+
+                <!-- 전주 완료 건 -->
+                <div style="background: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                        <i class="fas fa-history" style="color: var(--gray-700); font-size: 20px;"></i>
+                        <div style="font-size: 18px; font-weight: 600;">전주 완료 건</div>
+                        <span style="background: var(--gray-700); color: white; padding: 4px 12px; border-radius: 12px; font-size: 14px; font-weight: 600;" id="weeklyPrevCompleteCount">0</span>
+                    </div>
+                    <ul id="weeklyPrevCompleteList" style="list-style: none; padding: 0;">
+                        <li style="text-align: center; padding: 40px; color: var(--gray-500);">
+                            <i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px;"></i>
+                            <p>완료된 건이 없습니다</p>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 금주 완료 건 -->
+                <div style="background: white; padding: 24px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                        <i class="fas fa-check-circle" style="color: var(--success); font-size: 20px;"></i>
+                        <div style="font-size: 18px; font-weight: 600;">금주 완료 건</div>
+                        <span style="background: var(--success); color: white; padding: 4px 12px; border-radius: 12px; font-size: 14px; font-weight: 600;" id="weeklyCompleteCount">0</span>
+                    </div>
+                    <ul id="weeklyCompleteList" style="list-style: none; padding: 0;">
+                        <li style="text-align: center; padding: 40px; color: var(--gray-500);">
+                            <i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px;"></i>
+                            <p>완료된 건이 없습니다</p>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <!-- 미수금 섹션 -->
+            <div id="page-unpaid" class="page-section" style="display: none;">
+                <div class="page-header" style="align-items: flex-start;">
+                    <div style="min-width: 0;">
+                        <h1 class="page-title">미수금 관리</h1>
+                        <p style="font-size: 13px; color: var(--gray-600); margin: 8px 0 0; max-width: 640px;">대분류 <strong>B2C</strong>, 입금상태 <strong>미수·부분</strong>, 그리고 프로젝트 <strong>매출 내역</strong>에 유효한 매출일자가 있을 때만 표시합니다. 날짜는 매출 내역 중 가장 늦은 일자입니다. 매출일자가 없으면 목록에 나오지 않습니다.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="downloadUnpaidCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 요약 카드 -->
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 32px;">
+                    <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                        <div style="font-size: 14px; color: var(--gray-600); margin-bottom: 8px;">미수 건수</div>
+                        <div style="font-size: 28px; font-weight: 700; color: var(--warning);" id="unpaidCount">0건</div>
+                    </div>
+                    <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                        <div style="font-size: 14px; color: var(--gray-600); margin-bottom: 8px;">총 미수금</div>
+                        <div style="font-size: 28px; font-weight: 700; color: var(--primary);" id="totalUnpaid">0원</div>
+                    </div>
+                </div>
+
+                <!-- 미수금 테이블 -->
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>순번</th>
+                                <th>매출일자</th>
+                                <th>건물명</th>
+                                <th>공사명</th>
+                                <th class="text-right">매출금액(vat별도)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unpaidTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                                    미수금 내역이 없습니다
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 업체정보관리 섹션 -->
+            <div id="page-contractors" class="page-section" style="display: none;">
+                <div class="page-header">
+                    <h1 class="page-title">업체정보관리</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="downloadContractorCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                        <button class="btn btn-primary" onclick="openContractorPanel()">
+                            <i class="fas fa-plus"></i>
+                            업체 등록
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 목록 테이블 -->
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>번호</th>
+                                <th>업체명</th>
+                                <th>전화번호</th>
+                                <th>사업자등록증</th>
+                                <th>통장사본</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contractorTableBody">
+                            <!-- 데이터가 여기에 들어갑니다 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 업체정보 슬라이드 패널 오버레이 -->
+            <div class="panel-overlay" id="contractorPanelOverlay" onclick="closeContractorPanel()"></div>
+
+            <!-- 업체정보 슬라이드 패널 -->
+            <div class="slide-panel contractor-panel" id="contractorSlidePanel">
+                <div class="panel-header contractor-panel-header">
+                    <div class="panel-title-wrap">
+                        <span class="panel-title" id="contractorPanelTitle">업체 등록</span>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveContractor()">
+                        <i class="fas fa-save"></i> 저장
+                    </button>
+                    <button type="button" class="panel-close" onclick="closeContractorPanel()" aria-label="닫기">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="panel-body contractor-panel-body">
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="contractorName">업체명 <span class="required">*</span></label>
+                        <input type="text" class="form-input" id="contractorName" placeholder="업체명을 입력하세요">
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="contractorPhone">전화번호</label>
+                        <input type="tel" class="form-input" id="contractorPhone" placeholder="010-1234-5678">
+                    </div>
+                    <div class="panel-form-section-label">첨부 서류</div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label">사업자등록증</label>
+                        <div class="file-upload file-upload-box">
+                            <input type="file" id="businessLicense" style="display: none;" accept="image/*,.pdf" onchange="updateContractorFileName('businessLicense')">
+                            <button type="button" class="file-button" onclick="document.getElementById('businessLicense').click()">
+                                <i class="fas fa-file-alt"></i> 파일 선택
+                            </button>
+                            <span class="file-name" id="businessLicenseName">선택한 파일 없음</span>
+                        </div>
+                    </div>
+
+                    <div class="panel-form-row">
+                        <label class="panel-form-label">통장사본</label>
+                        <div class="file-upload file-upload-box">
+                            <input type="file" id="bankAccount" style="display: none;" accept="image/*,.pdf" onchange="updateContractorFileName('bankAccount')">
+                            <button type="button" class="file-button" onclick="document.getElementById('bankAccount').click()">
+                                <i class="fas fa-university"></i> 파일 선택
+                            </button>
+                            <span class="file-name" id="bankAccountName">선택한 파일 없음</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 업체 상세 슬라이드 패널 (행 클릭 시) -->
+            <div class="panel-overlay" id="contractorDetailOverlay" onclick="closeContractorDetailPanel()"></div>
+            <div class="slide-panel contractor-panel contractor-detail-panel" id="contractorDetailSlidePanel">
+                <div class="panel-header contractor-panel-header">
+                    <div class="panel-title-wrap">
+                        <span class="panel-title-icon"><i class="fas fa-building"></i></span>
+                        <span class="panel-title">업체 상세</span>
+                    </div>
+                    <button type="button" class="panel-close" onclick="closeContractorDetailPanel()" aria-label="닫기">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="panel-body contractor-panel-body" id="contractorDetailBody">
+                    <!-- JS에서 채움 -->
+                </div>
+                <div class="panel-actions contractor-panel-actions" id="contractorDetailActions">
+                    <button type="button" class="btn-cancel" onclick="closeContractorDetailPanel()">닫기</button>
+                    <button type="button" class="btn btn-secondary" id="contractorDetailEditBtn">수정</button>
+                    <button type="button" class="btn btn-primary" style="background: var(--danger);" id="contractorDetailDeleteBtn">삭제</button>
+                </div>
+            </div>
+
+            <!-- 경비지출관리 섹션 -->
+            <div id="page-expenses" class="page-section" style="display: none;">
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <h1 class="page-title">경비지출관리</h1>
+                        <select class="filter-select expense-month-select" id="expenseMonthFilter" onchange="onExpenseMonthChange()" title="월별 보기 (사용일시 기준)">
+                            <option value="">전체</option>
+                            <!-- 옵션은 JS에서 동적 생성 -->
+                        </select>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="downloadExpenseCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                        <button class="btn btn-primary" onclick="openExpensePanel()">
+                            <i class="fas fa-plus"></i>
+                            경비 등록
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 목록 테이블 -->
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>번호</th>
+                                <th>구분</th>
+                                <th>사용일시</th>
+                                <th>사용건물</th>
+                                <th>사용목적</th>
+                                <th class="text-right">결제금액</th>
+                                <th>사진</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody">
+                            <!-- 데이터가 여기에 들어갑니다 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 판관비관리 섹션 -->
+            <div id="page-sga" class="page-section" style="display: none;">
+                <div class="page-header">
+                    <div class="page-header-left">
+                        <h1 class="page-title">판관비관리</h1>
+                        <select class="filter-select expense-month-select" id="sgaMonthFilter" onchange="onSgaMonthChange()" title="월별 보기 (지출일자 기준)">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="downloadSgaCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                        <button class="btn btn-primary" onclick="openSgaPanel()">
+                            <i class="fas fa-plus"></i>
+                            판관비 등록
+                        </button>
+                    </div>
+                </div>
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>번호</th>
+                                <th>지출일자</th>
+                                <th>계정과목</th>
+                                <th class="text-right">금액(vat별도)</th>
+                                <th class="sga-memo-cell"><span class="sga-memo-text">메모</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="sgaTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 경비지출 슬라이드 패널 오버레이 -->
+            <div class="panel-overlay" id="expensePanelOverlay" onclick="closeExpensePanel()"></div>
+
+            <!-- 경비지출 슬라이드 패널 -->
+            <div class="slide-panel expense-panel" id="expenseSlidePanel">
+                <div class="panel-header expense-panel-header">
+                    <div class="panel-title-wrap">
+                        <span class="panel-title" id="expensePanelTitle">경비 등록</span>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveExpense()">
+                        <i class="fas fa-save"></i> 저장
+                    </button>
+                    <button type="button" class="panel-close" onclick="closeExpensePanel()" aria-label="닫기">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="panel-body expense-panel-body" onmousedown="var t=event.target,i=document.getElementById('expenseUsageDate');if(i&&t.id!=='expenseUsageDate'&&!t.closest('label[for=expenseUsageDate]'))i.blur();">
+                    <div class="panel-form-row">
+                        <label class="panel-form-label">구분 <span class="required">*</span></label>
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" id="expenseTypeCard" name="expensePaymentType" value="카드사용" checked>
+                                <label for="expenseTypeCard">카드사용</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="expenseTypeTransfer" name="expensePaymentType" value="계좌이체">
+                                <label for="expenseTypeTransfer">계좌이체</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="expenseAmount">결제 금액 <span class="required">*</span></label>
+                        <input type="number" class="form-input" id="expenseAmount" placeholder="0" min="0">
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="expenseBuilding">사용건물</label>
+                        <input type="text" class="form-input" id="expenseBuilding" placeholder="사용건물을 입력하세요">
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label">사용일시 <span class="required">*</span></label>
+                        <input type="date" class="form-input" id="expenseUsageDate" onclick="if(this.showPicker) this.showPicker()">
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="expensePurpose">사용목적</label>
+                        <input type="text" class="form-input" id="expensePurpose" placeholder="사용목적을 입력하세요">
+                    </div>
+                    <div class="panel-form-section-label">첨부</div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label">영수증 / 사진</label>
+                        <div class="file-upload file-upload-box">
+                            <input type="file" id="expenseReceipt" style="display: none;" accept="image/*,.pdf" multiple onchange="updateExpenseFileName()">
+                            <button type="button" class="file-button" onclick="document.getElementById('expenseReceipt').click()">
+                                <i class="fas fa-file-image"></i> 파일 선택 (복수 가능)
+                            </button>
+                            <span class="file-name" id="expenseReceiptName">선택한 파일 없음</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 경비 상세 슬라이드 패널 (행 클릭 시) -->
+            <div class="panel-overlay" id="expenseDetailOverlay" onclick="closeExpenseDetailPanel()"></div>
+            <div class="slide-panel expense-panel expense-detail-panel" id="expenseDetailSlidePanel">
+                <div class="panel-header expense-panel-header">
+                    <div class="panel-title-wrap">
+                        <span class="panel-title-icon"><i class="fas fa-receipt"></i></span>
+                        <span class="panel-title">경비 상세</span>
+                    </div>
+                    <button type="button" class="panel-close" onclick="closeExpenseDetailPanel()" aria-label="닫기">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="panel-body expense-panel-body" id="expenseDetailBody">
+                    <!-- JS에서 채움 -->
+                </div>
+                <div class="panel-actions expense-panel-actions" id="expenseDetailActions">
+                    <button type="button" class="btn-cancel" onclick="closeExpenseDetailPanel()">닫기</button>
+                    <button type="button" class="btn btn-secondary" id="expenseDetailEditBtn">수정</button>
+                    <button type="button" class="btn btn-primary" style="background: var(--danger);" id="expenseDetailDeleteBtn">삭제</button>
+                </div>
+            </div>
+
+            <!-- 판관비 상세 슬라이드 패널 (행 클릭 시) -->
+            <div class="panel-overlay" id="sgaDetailOverlay" onclick="closeSgaDetailPanel()"></div>
+            <div class="slide-panel expense-panel expense-detail-panel" id="sgaDetailSlidePanel">
+                <div class="panel-header expense-panel-header">
+                    <div class="panel-title-wrap">
+                        <span class="panel-title-icon"><i class="fas fa-briefcase"></i></span>
+                        <span class="panel-title">판관비 상세</span>
+                    </div>
+                    <button type="button" class="panel-close" onclick="closeSgaDetailPanel()" aria-label="닫기">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="panel-body expense-panel-body" id="sgaDetailBody">
+                    <!-- JS에서 채움 -->
+                </div>
+                <div class="panel-actions expense-panel-actions" id="sgaDetailActions">
+                    <button type="button" class="btn-cancel" onclick="closeSgaDetailPanel()">닫기</button>
+                    <button type="button" class="btn btn-secondary" id="sgaDetailEditBtn">수정</button>
+                    <button type="button" class="btn btn-primary" style="background: var(--danger);" id="sgaDetailDeleteBtn">삭제</button>
+                </div>
+            </div>
+
+            <div class="panel-overlay" id="sgaPanelOverlay" onclick="closeSgaPanel()"></div>
+            <div class="slide-panel expense-panel" id="sgaSlidePanel">
+                <div class="panel-header expense-panel-header">
+                    <div class="panel-title-wrap">
+                        <span class="panel-title" id="sgaPanelTitle">판관비 등록</span>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="saveSgaExpense()">
+                        <i class="fas fa-save"></i> 저장
+                    </button>
+                    <button type="button" class="panel-close" onclick="closeSgaPanel()" aria-label="닫기">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="panel-body expense-panel-body">
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="sgaDate">지출일자 <span class="required">*</span></label>
+                        <input type="date" class="form-input" id="sgaDate">
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="sgaCategory">계정과목 <span class="required">*</span></label>
+                        <input type="text" class="form-input" id="sgaCategory" placeholder="예: 임대료, 통신비, 인건비">
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="sgaAmount">금액(vat별도) <span class="required">*</span></label>
+                        <input type="number" class="form-input" id="sgaAmount" placeholder="0" min="0">
+                    </div>
+                    <div class="panel-form-row">
+                        <label class="panel-form-label" for="sgaMemo">메모</label>
+                        <input type="text" class="form-input" id="sgaMemo" placeholder="메모를 입력하세요">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 관리자설정 섹션 -->
+            <div id="page-users" class="page-section" style="display: none;">
+                <div class="page-header">
+                    <h1 class="page-title">관리자설정</h1>
+                </div>
+
+                <div class="admin-settings-tabs">
+                    <button type="button" id="adminTabBtnAccount" class="admin-settings-tab active" onclick="switchAdminSettingsTab('account')">계정</button>
+                    <button type="button" id="adminTabBtnFilterValues" class="admin-settings-tab" onclick="switchAdminSettingsTab('filter-values')">필터값</button>
+                    <div class="admin-settings-tabs-spacer"></div>
+                    <button id="adminAddAccountBtn" class="btn btn-primary" onclick="openAddUserModal()">
+                        <i class="fas fa-plus"></i>
+                        계정 추가
+                    </button>
+                </div>
+
+                <div id="adminSettingsTabAccount" class="tab-panel active">
+                    <!-- 사용자 목록 -->
+                    <div class="table-section">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>이름</th>
+                                    <th>아이디</th>
+                                    <th>역할</th>
+                                    <th>상태</th>
+                                    <th style="width: 150px; text-align: center;">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="adminSettingsTabFilterValues" class="tab-panel">
+                <!-- 대/중/소분류 필터값 (프로젝트 등록/검색 드롭다운) -->
+                <div class="filter-section" style="margin-top: 24px;">
+                    <div class="table-header" style="margin-bottom: 12px;">
+                        <div class="table-title">필터값 - 분류(대/중/소)</div>
+                        <p style="font-size: 13px; color: var(--gray-600); margin-top: 8px; line-height: 1.5;">
+                            대분류·중분류·소분류 드롭다운 값을 여기서 추가·삭제하고, 활성/비활성으로 노출 여부를 정합니다.
+                            비활성 항목은 새로 선택할 수 없으며, 이미 저장된 값은 (비활성)으로 표시됩니다. 사용 중인 항목은 삭제할 수 없습니다.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 28px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">대분류</div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;">
+                            <input type="text" id="category1MasterInput" class="filter-input" style="max-width: 320px;" placeholder="대분류 이름 입력" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();addMasterItem('1');}">
+                            <button type="button" class="btn btn-primary" onclick="addMasterItem('1')">
+                                <i class="fas fa-plus"></i> 추가
+                            </button>
+                        </div>
+                        <div class="table-section">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>이름</th>
+                                        <th style="width: 100px; text-align: center;">상태</th>
+                                        <th style="width: 200px; text-align: center;">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category1MasterTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 28px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">중분류</div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;">
+                            <input type="text" id="category2MasterInput" class="filter-input" style="max-width: 320px;" placeholder="중분류 이름 입력" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();addMasterItem('2');}">
+                            <button type="button" class="btn btn-primary" onclick="addMasterItem('2')">
+                                <i class="fas fa-plus"></i> 추가
+                            </button>
+                        </div>
+                        <div class="table-section">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>이름</th>
+                                        <th style="width: 100px; text-align: center;">상태</th>
+                                        <th style="width: 200px; text-align: center;">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category2MasterTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 8px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">소분류</div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;">
+                            <input type="text" id="category3MasterInput" class="filter-input" style="max-width: 320px;" placeholder="소분류 이름 입력" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();addMasterItem('3');}">
+                            <button type="button" class="btn btn-primary" onclick="addMasterItem('3')">
+                                <i class="fas fa-plus"></i> 추가
+                            </button>
+                        </div>
+                        <div class="table-section">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>이름</th>
+                                        <th style="width: 100px; text-align: center;">상태</th>
+                                        <th style="width: 200px; text-align: center;">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category3MasterTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 로그인 페이지(오버레이) -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+            <div class="login-card-header">
+                <div id="loginTitle" class="login-title">로그인</div>
+            </div>
+
+            <form id="loginForm" class="login-form">
+                <div class="login-field">
+                    <label class="form-label" for="loginUserId">아이디</label>
+                    <input type="text" id="loginUserId" class="form-input" placeholder="아이디 입력">
+                </div>
+
+                <div class="login-field">
+                    <label class="form-label" for="loginPassword">비밀번호</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="비밀번호 입력">
+                </div>
+
+                <div class="login-field" id="loginConfirmWrap" style="display:none;">
+                    <label class="form-label" for="loginPasswordConfirm">비밀번호 확인</label>
+                    <input type="password" id="loginPasswordConfirm" class="form-input" placeholder="비밀번호 확인">
+                </div>
+
+                <div id="loginError" class="login-error" style="display:none;"></div>
+
+                <div class="login-actions">
+                    <button type="submit" id="loginSubmitBtn" class="btn btn-primary">로그인</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="src/js/app.js"></script>
+
+    <!-- 슬라이드 패널 오버레이 -->
+    <div class="panel-overlay" id="panelOverlay" onclick="closePanel()"></div>
+
+    <!-- 슬라이드 패널 -->
+    <div class="slide-panel" id="slidePanel">
+        <div class="panel-header">
+            <div class="panel-title" id="panelTitle">프로젝트 상세</div>
+            <div class="panel-header-actions" id="panelActions">
+                <button class="btn-save" id="btnSave" onclick="saveChanges()" style="display: none;">
+                    <i class="fas fa-save"></i> 저장
+                </button>
+                <button class="btn-cancel" id="btnCancel" onclick="cancelEdit()" style="display: none;">
+                    <i class="fas fa-times"></i> 취소
+                </button>
+            </div>
+            <button class="panel-close" onclick="closePanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-body view-mode" id="panelBody">
+            <!-- 내용이 동적으로 들어갑니다 -->
+        </div>
+        <div class="panel-bottom-save" id="panelBottomSaveBar" style="display:none;">
+            <button class="btn-save" id="btnBottomSave" onclick="saveChanges()">
+                <i class="fas fa-save"></i> 저장
+            </button>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>반듯한시공 - 로그인</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body class="dark-mode">
+    <div class="login-overlay active">
+        <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+            <div class="login-card-header">
+                <div id="loginTitle" class="login-title">로그인</div>
+            </div>
+
+            <form id="loginForm" class="login-form">
+                <div class="login-field">
+                    <label class="form-label" for="loginUserId">아이디</label>
+                    <input type="text" id="loginUserId" class="form-input" placeholder="아이디 입력">
+                </div>
+
+                <div class="login-field">
+                    <label class="form-label" for="loginPassword">비밀번호</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="비밀번호 입력">
+                </div>
+
+                <div class="login-field" id="loginConfirmWrap" style="display:none;">
+                    <label class="form-label" for="loginPasswordConfirm">비밀번호 확인</label>
+                    <input type="password" id="loginPasswordConfirm" class="form-input" placeholder="비밀번호 확인">
+                </div>
+
+                <div id="loginError" class="login-error" style="display:none;"></div>
+
+                <div class="login-actions">
+                    <button type="submit" id="loginSubmitBtn" class="btn btn-primary">로그인</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="src/js/login.js"></script>
+</body>
+</html>
+
