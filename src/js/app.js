@@ -151,8 +151,27 @@
             }
 
             let isAuthed = false;
+            try {
+                if (
+                    window.__bpsProfileBootstrap &&
+                    typeof window.__bpsProfileBootstrap === 'object' &&
+                    window.__bpsProfileBootstrap.userId
+                ) {
+                    var bp = window.__bpsProfileBootstrap;
+                    currentUserAccessProfile.userId = String(bp.userId || '').trim();
+                    currentUserAccessProfile.name = String(bp.name || '').trim();
+                    currentUserAccessProfile.type = bp.type === 'external' ? 'external' : 'internal';
+                    currentUserAccessProfile.role = String(bp.role || '').trim();
+                    currentUserAccessProfile.contractorName = String(bp.contractorName || '').trim();
+                    currentUserAccessProfile.extraAllowedPages = Array.from(bp.extraAllowedPages || []);
+                    isAuthed = true;
+                }
+            } catch (eBoot) {
+                /* ignore */
+            }
+
             const storedAuthUserId = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
-            if (storedAuthUserId && Array.isArray(userAccounts)) {
+            if (!isAuthed && storedAuthUserId && Array.isArray(userAccounts)) {
                 const targetUser = userAccounts.find(function (u) {
                     return u && u.userId === storedAuthUserId && u.active !== false;
                 });
@@ -301,8 +320,15 @@
             const logoutBtn = document.querySelector('.logout-btn');
             if (logoutBtn) {
                 logoutBtn.addEventListener('click', function () {
-                    localStorage.removeItem(AUTH_USER_KEY);
-                    location.reload();
+                    var after = function () {
+                        localStorage.removeItem(AUTH_USER_KEY);
+                        window.location.href = 'login.html';
+                    };
+                    if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                        window.__bpsSupabase.auth.signOut().then(after).catch(after);
+                    } else {
+                        after();
+                    }
                 });
             }
         });
