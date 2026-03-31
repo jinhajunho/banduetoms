@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import crypto from 'crypto';
-import { hasUserProfilesColumn, requireAdmin } from '../_lib/adminAuth.js';
+import { requireAdmin } from '../_lib/adminAuth.js';
 
 function jsonResponse(status, body) {
     return new Response(JSON.stringify(body), {
@@ -74,6 +74,7 @@ export default {
                 auth_user_id: authUserId,
                 auth_email: email,
                 display_user_id: displayUserId,
+                name: name || displayUserId,
                 type,
                 role,
                 contractor_name: type === 'external' ? contractorName || '' : '',
@@ -81,9 +82,6 @@ export default {
                 extra_allowed_pages: extraAllowedPages,
                 password_reset_required: true,
             };
-            if (await hasUserProfilesColumn(supabaseAdmin, 'name')) {
-                row.name = name || displayUserId;
-            }
 
             const { error: insErr } = await supabaseAdmin.from('user_profiles').insert(row);
             if (insErr) {

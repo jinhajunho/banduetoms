@@ -1,6 +1,6 @@
 export const runtime = 'nodejs';
 
-import { hasUserProfilesColumn, requireAdmin } from '../_lib/adminAuth.js';
+import { requireAdmin } from '../_lib/adminAuth.js';
 const VIRTUAL_DOMAIN = 'bps-virtual.local';
 
 function jsonResponse(status, body) {
@@ -51,9 +51,7 @@ export default {
                 patch.role = String(body.role || '').trim();
             }
             if (Object.prototype.hasOwnProperty.call(body, 'name')) {
-                if (await hasUserProfilesColumn(supabaseAdmin, 'name')) {
-                    patch.name = String(body.name || '').trim();
-                }
+                patch.name = String(body.name || '').trim();
             }
             if (Object.prototype.hasOwnProperty.call(body, 'extraAllowedPages')) {
                 patch.extra_allowed_pages = Array.isArray(body.extraAllowedPages) ? body.extraAllowedPages : [];
@@ -67,9 +65,7 @@ export default {
                 if (dupErr) return jsonResponse(500, { ok: false, error: dupErr.message });
                 if (dup) return jsonResponse(409, { ok: false, error: '이미 존재하는 아이디입니다.' });
                 patch.display_user_id = nextDisplayUserId;
-                if (await hasUserProfilesColumn(supabaseAdmin, 'auth_email')) {
-                    patch.auth_email = `${nextDisplayUserId}@${VIRTUAL_DOMAIN}`;
-                }
+                patch.auth_email = `${nextDisplayUserId}@${VIRTUAL_DOMAIN}`;
             }
 
             let effType = target.type === 'external' ? 'external' : 'internal';
