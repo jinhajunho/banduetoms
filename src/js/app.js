@@ -5639,7 +5639,7 @@
                                 <button type="button" class="btn-basic-info-edit" onclick="startBasicInfoEdit()" style="${basicInfoEditMode ? 'display:none;' : ''}">수정</button>
                                 <button type="button" class="btn-basic-info-save" onclick="saveBasicInfoEdit()" style="${basicInfoEditMode ? '' : 'display:none;'}">저장</button>
                                 <button type="button" class="btn-basic-info-cancel" onclick="cancelBasicInfoEdit()" style="${basicInfoEditMode ? '' : 'display:none;'}">취소</button>
-                                <button type="button" class="btn-basic-info-cancel" onclick="deleteCurrentEstimate()" style="${basicInfoEditMode ? 'display:none;' : ''}">삭제</button>
+                                <button type="button" class="btn-basic-info-delete" onclick="deleteCurrentEstimate()" style="${basicInfoEditMode ? 'display:none;' : ''}">삭제</button>
                             </span>
                         </div>
                         <div class="basic-info-grid">

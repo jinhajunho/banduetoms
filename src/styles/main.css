@@ -3960,7 +3960,8 @@
 
         .btn-basic-info-edit,
         .btn-basic-info-save,
-        .btn-basic-info-cancel {
+        .btn-basic-info-cancel,
+        .btn-basic-info-delete {
             height: 30px;
             padding: 0 12px;
             border-radius: 7px;
@@ -3999,6 +4000,17 @@
 
         .btn-basic-info-cancel:hover {
             background: var(--gray-50);
+        }
+
+        .btn-basic-info-delete {
+            border: 1px solid #ef4444;
+            background: #ef4444;
+            color: #ffffff;
+        }
+
+        .btn-basic-info-delete:hover {
+            background: #dc2626;
+            border-color: #dc2626;
         }
 
         .detail-grid {
@@ -5904,6 +5916,17 @@
 
         body.dark-mode .btn-basic-info-cancel:hover {
             background: #333333 !important;
+        }
+
+        body.dark-mode .btn-basic-info-delete {
+            background: #7f1d1d !important;
+            border-color: #ef4444 !important;
+            color: #fecaca !important;
+        }
+
+        body.dark-mode .btn-basic-info-delete:hover {
+            background: #991b1b !important;
+            color: #ffffff !important;
         }
 
         body.dark-mode .payment-summary {
