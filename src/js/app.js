@@ -75,6 +75,11 @@
                 renderUsersTable();
                 renderCategoryMasterTables();
                 switchAdminSettingsTab('account');
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncUserAccountsFromServer().then(function () {
+                        renderUsersTable();
+                    });
+                }
             }
             if (pageName === 'unpaid') renderUnpaidData();
 
@@ -4544,6 +4549,38 @@
             });
         }
 
+        function syncUserAccountsFromServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve(false);
+            }
+            return bpsAdminApi('/api/admin/list-users', {}).then(function (r) {
+                if (!r.ok || !r.body || !Array.isArray(r.body.users)) return false;
+                const localNameMap = {};
+                userAccounts.forEach(function (u) {
+                    const uid = String(u && u.userId ? u.userId : '').trim().toLowerCase();
+                    if (!uid) return;
+                    localNameMap[uid] = String(u.name || '').trim();
+                });
+                userAccounts = r.body.users.map(function (u) {
+                    const uid = String(u.userId || '').trim().toLowerCase();
+                    const preservedName = localNameMap[uid] || uid;
+                    return {
+                        name: preservedName,
+                        userId: uid,
+                        type: u.type === 'external' ? 'external' : 'internal',
+                        role: String(u.role || '').trim(),
+                        contractorName: String(u.contractorName || '').trim(),
+                        active: u.active !== false,
+                        extraAllowedPages: Array.isArray(u.extraAllowedPages) ? u.extraAllowedPages : []
+                    };
+                });
+                persistUserAccounts();
+                return true;
+            }).catch(function () {
+                return false;
+            });
+        }
+
         function toggleAccountStatus(userId, btn) {
             const user = userAccounts.find(function (u) { return u.userId === userId; });
             if (!user || !btn) return;
@@ -4795,6 +4832,12 @@
                 showToast('계정 설정이 저장되었습니다.');
                 isCreatingAccount = false;
                 closePanel(true);
+
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncUserAccountsFromServer().then(function () {
+                        renderUsersTable();
+                    });
+                }
             }
 
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
@@ -4832,7 +4875,7 @@
                             if (r.status === 409 && creating) {
                                 alert('이미 존재하는 아이디입니다.');
                             } else {
-                                showToast(errMsg);
+                                alert(errMsg);
                             }
                             return;
                         }
@@ -8190,6 +8233,7 @@
                 addMasterItem,
                 toggleAccountStatus,
                 resetUserPassword,
+                syncUserAccountsFromServer,
             };
 
             Object.keys(expose).forEach(function (k) {
