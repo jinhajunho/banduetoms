@@ -707,6 +707,8 @@
             });
         }
 
+        // 기본 샘플 데이터는 사용하지 않고, 서버 데이터만 사용
+        estimates.splice(0, estimates.length);
         applyEstimateDefaultsAndSeed(estimates);
 
         function computeBizTaxFromGross(grossNum) {
