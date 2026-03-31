@@ -4521,19 +4521,65 @@
             openUserManagePanel('', '', '직원', 'internal', '');
         }
 
+        function bpsAdminApi(path, payload) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.reject(new Error('NO_SUPABASE'));
+            }
+            return window.__bpsSupabase.auth.getSession().then(function (res) {
+                if (res.error || !res.data || !res.data.session) {
+                    return Promise.reject(new Error('로그인이 필요합니다.'));
+                }
+                return fetch(window.location.origin + path, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: 'Bearer ' + res.data.session.access_token,
+                    },
+                    body: JSON.stringify(payload),
+                }).then(function (r) {
+                    return r.json().then(function (j) {
+                        return { ok: r.ok, status: r.status, body: j };
+                    });
+                });
+            });
+        }
+
         function toggleAccountStatus(userId, btn) {
             const user = userAccounts.find(function (u) { return u.userId === userId; });
             if (!user || !btn) return;
             const nextActive = !(user.active !== false);
-            user.active = nextActive;
-            const label = btn.querySelector('.master-state-switch-label');
-            btn.classList.toggle('is-active', nextActive);
-            btn.title = nextActive ? '비활성으로 전환' : '활성으로 전환';
-            if (label) label.textContent = nextActive ? '활성' : '비활성';
-            if (currentUserAccessProfile.userId === userId) {
-                applyRoleBasedNavigation();
+
+            function applyToggleUI() {
+                user.active = nextActive;
+                const label = btn.querySelector('.master-state-switch-label');
+                btn.classList.toggle('is-active', nextActive);
+                btn.title = nextActive ? '비활성으로 전환' : '활성으로 전환';
+                if (label) label.textContent = nextActive ? '활성' : '비활성';
+                if (currentUserAccessProfile.userId === userId) {
+                    applyRoleBasedNavigation();
+                }
+                persistUserAccounts();
             }
-            persistUserAccounts();
+
+            if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                bpsAdminApi('/api/admin/update-profile', {
+                    displayUserId: String(userId || '').trim().toLowerCase(),
+                    active: nextActive,
+                })
+                    .then(function (r) {
+                        if (!r.ok) {
+                            showToast((r.body && r.body.error) || '상태 변경에 실패했습니다.');
+                            return;
+                        }
+                        applyToggleUI();
+                    })
+                    .catch(function (e) {
+                        showToast((e && e.message) || '상태 변경에 실패했습니다.');
+                    });
+                return;
+            }
+
+            applyToggleUI();
         }
 
         function ensureUserManageHeaderSaveButton() {
@@ -4697,6 +4743,7 @@
             const contractorSelect = document.getElementById('userManageContractor');
             const accountName = String(nameInput ? nameInput.value : '').trim();
             const accountUserId = String(userIdInput ? userIdInput.value : '').trim();
+            const accountUserIdNorm = accountUserId.toLowerCase();
             const type = typeInput ? normalizeAccountType(typeInput.value) : 'internal';
             const role = roleSelect ? roleSelect.value : '';
             const contractorName = type === 'external' ? String(contractorSelect ? contractorSelect.value : '').trim() : '';
@@ -4712,6 +4759,91 @@
                 alert('외부 도급사 계정은 도급사명을 선택해야 합니다.');
                 return;
             }
+
+            function applyLocalSaveAndClose() {
+                if (isCreatingAccount) {
+                    userAccounts.push({
+                        name: accountName,
+                        userId: accountUserIdNorm,
+                        type: type,
+                        role: role,
+                        contractorName: contractorName,
+                        active: true,
+                        extraAllowedPages: cleanedExtra
+                    });
+                } else {
+                    const targetUser = userAccounts.find(function (u) { return u.userId === currentManagingAccountUserId; });
+                    if (targetUser) {
+                        targetUser.name = accountName;
+                        targetUser.type = type;
+                        targetUser.role = role;
+                        targetUser.contractorName = contractorName;
+                        targetUser.extraAllowedPages = cleanedExtra;
+                    }
+                }
+                if ((currentManagingAccountUserId && currentManagingAccountUserId === currentUserAccessProfile.userId) || (isCreatingAccount && accountUserIdNorm === currentUserAccessProfile.userId)) {
+                    currentUserAccessProfile.name = accountName;
+                    currentUserAccessProfile.type = type;
+                    currentUserAccessProfile.role = role;
+                    currentUserAccessProfile.contractorName = contractorName;
+                    currentUserAccessProfile.extraAllowedPages = cleanedExtra;
+                    applyRoleBasedNavigation();
+                }
+                renderUsersTable();
+                renderTable();
+                persistUserAccounts();
+                showToast('계정 설정이 저장되었습니다.');
+                isCreatingAccount = false;
+                closePanel(true);
+            }
+
+            if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                if (isCreatingAccount) {
+                    const duplicated = userAccounts.some(function (u) {
+                        return String(u.userId || '').toLowerCase() === accountUserIdNorm;
+                    });
+                    if (duplicated) {
+                        alert('이미 존재하는 아이디입니다.');
+                        return;
+                    }
+                }
+                (function () {
+                    var creating = isCreatingAccount;
+                    var payloadCreate = {
+                        displayUserId: accountUserIdNorm,
+                        type: type,
+                        role: role,
+                        contractorName: contractorName,
+                        extraAllowedPages: cleanedExtra,
+                    };
+                    var payloadUpdate = {
+                        displayUserId: String(currentManagingAccountUserId || '').trim().toLowerCase(),
+                        type: type,
+                        role: role,
+                        contractorName: contractorName,
+                        extraAllowedPages: cleanedExtra,
+                    };
+                    var req = creating
+                        ? bpsAdminApi('/api/admin/create-user', payloadCreate)
+                        : bpsAdminApi('/api/admin/update-profile', payloadUpdate);
+                    req.then(function (r) {
+                        if (!r.ok) {
+                            var errMsg = (r.body && r.body.error) ? r.body.error : '저장에 실패했습니다.';
+                            if (r.status === 409 && creating) {
+                                alert('이미 존재하는 아이디입니다.');
+                            } else {
+                                showToast(errMsg);
+                            }
+                            return;
+                        }
+                        applyLocalSaveAndClose();
+                    }).catch(function (e) {
+                        showToast((e && e.message) || '저장에 실패했습니다.');
+                    });
+                })();
+                return;
+            }
+
             if (isCreatingAccount) {
                 const duplicated = userAccounts.some(function (u) { return u.userId === accountUserId; });
                 if (duplicated) {
@@ -4774,7 +4906,7 @@
                                 'Content-Type': 'application/json',
                                 Authorization: 'Bearer ' + token,
                             },
-                            body: JSON.stringify({ displayUserId: uid }),
+                            body: JSON.stringify({ displayUserId: uid.toLowerCase() }),
                         });
                         var j = await res.json().catch(function () {
                             return {};
@@ -4785,7 +4917,7 @@
                         }
                         var AUTH_USER_KEY = 'bps_auth_userId';
                         var authUser = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
-                        if (authUser === uid) {
+                        if (authUser.toLowerCase() === uid.toLowerCase()) {
                             await window.__bpsSupabase.auth.signOut();
                             localStorage.removeItem(AUTH_USER_KEY);
                             window.location.href = 'login.html';
