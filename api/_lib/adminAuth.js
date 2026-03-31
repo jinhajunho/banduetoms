@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const ALLOWED = new Set(['super', 'manager', '슈퍼관리자', '관리자']);
+const ALLOWED = new Set(['super', '슈퍼관리자']);
 
 export function isAllowedAdminRole(role) {
     return ALLOWED.has(String(role || '').trim());
