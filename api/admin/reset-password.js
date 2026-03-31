@@ -23,8 +23,13 @@ function getBearerToken(request) {
 }
 
 function isAllowedRole(role) {
-  // 실제 role 값(예: super/manager/accounting/...)은 user_profiles 설계에 맞춰 조정하세요.
-  return role === 'super' || role === 'manager';
+  const r = String(role || '').trim();
+  return (
+    r === 'super' ||
+    r === 'manager' ||
+    r === '슈퍼관리자' ||
+    r === '관리자'
+  );
 }
 
 export default {

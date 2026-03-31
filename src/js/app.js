@@ -4758,7 +4758,48 @@
             if (!uid) return;
             const ok = confirm('「' + uid + '」 계정의 비밀번호를 초기화하시겠습니까?\n초기화 후 비밀번호는 로그인 페이지에서 다시 설정해야 합니다.');
             if (!ok) return;
-            // 비밀번호를 로컬 저장소에서 제거하고, 로그인 페이지에서 "비밀번호 설정" 모드가 뜨게 처리
+
+            if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                (async function () {
+                    try {
+                        const { data: sessionData, error: sessionErr } = await window.__bpsSupabase.auth.getSession();
+                        if (sessionErr || !sessionData || !sessionData.session) {
+                            showToast('로그인이 필요합니다.');
+                            return;
+                        }
+                        var token = sessionData.session.access_token;
+                        var res = await fetch(window.location.origin + '/api/admin/reset-password', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: 'Bearer ' + token,
+                            },
+                            body: JSON.stringify({ displayUserId: uid }),
+                        });
+                        var j = await res.json().catch(function () {
+                            return {};
+                        });
+                        if (!res.ok) {
+                            showToast(j.error || '비밀번호 초기화에 실패했습니다.');
+                            return;
+                        }
+                        var AUTH_USER_KEY = 'bps_auth_userId';
+                        var authUser = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
+                        if (authUser === uid) {
+                            await window.__bpsSupabase.auth.signOut();
+                            localStorage.removeItem(AUTH_USER_KEY);
+                            window.location.href = 'login.html';
+                            return;
+                        }
+                        showToast('비밀번호가 초기화되었습니다. 로그인 페이지에서 새 비밀번호를 설정하세요.');
+                    } catch (e) {
+                        showToast((e && e.message) || '비밀번호 초기화에 실패했습니다.');
+                    }
+                })();
+                return;
+            }
+
+            // Supabase 미사용(로컬 데모) 시: 로컬 저장소만 갱신
             const PASSWORDS_KEY = 'bps_user_passwords';
             const RESET_REQUIRED_KEY = 'bps_password_reset_required';
             const AUTH_USER_KEY = 'bps_auth_userId';
@@ -4772,19 +4813,17 @@
                 localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords || {}));
                 localStorage.setItem(RESET_REQUIRED_KEY, JSON.stringify(resetRequired || {}));
             } catch (e) {
-                // 저장소 파싱 실패 시에도 UX는 유지
+                /* ignore */
             }
 
-            // 현재 로그인 중인 계정이면 세션을 끊어 다음에 반드시 로그인/비밀번호 설정 흐름을 타게 처리
             try {
                 const authUser = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
                 if (authUser && authUser === uid) {
                     localStorage.removeItem(AUTH_USER_KEY);
-                    // index.html은 app.js에서 auth 없으면 login.html로 보냄
                     location.reload();
                 }
             } catch (e) {
-                // reload 실패 시 UX는 유지
+                /* ignore */
             }
             showToast('비밀번호가 초기화되었습니다. 로그인 페이지에서 새 비밀번호를 설정하세요.');
         }
