@@ -772,13 +772,18 @@
         }
 
         function upsertEstimateToServer(item) {
-            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return;
-            bpsEstimateApi('/api/estimate/upsert', { item: item })
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({ ok: true });
+            }
+            return bpsEstimateApi('/api/estimate/upsert', { item: item })
                 .then(function (r) {
-                    if (!r.ok) showToast((r.body && r.body.error) || '견적 서버 저장 실패');
+                    if (!r.ok) {
+                        return { ok: false, error: (r.body && r.body.error) || '견적 서버 저장 실패' };
+                    }
+                    return { ok: true };
                 })
-                .catch(function () {
-                    // keep local UX
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '견적 서버 저장 실패' };
                 });
         }
 
@@ -7490,7 +7495,7 @@
         }
 
         // 기본정보 탭만 저장
-        function saveBasicInfoEdit() {
+        async function saveBasicInfoEdit() {
             if (!currentEditItem) return;
 
             const editDateEl = document.getElementById('edit_date');
@@ -7533,6 +7538,11 @@
             const index = estimates.findIndex(e => e.code === currentEditItem.code);
             if (index !== -1) {
                 estimates[index] = { ...estimates[index], ...currentEditItem };
+                const remote = await upsertEstimateToServer(estimates[index]);
+                if (!remote.ok) {
+                    alert(remote.error || '견적 서버 저장 실패');
+                    return;
+                }
             }
 
             basicInfoEditMode = false;
@@ -7557,7 +7567,7 @@
         }
 
         // 사업소득 탭만 저장
-        function saveBusinessIncomeEdit() {
+        async function saveBusinessIncomeEdit() {
             if (!currentEditItem) return;
 
             // 입력 값 읽어서 derived 값(세금/실수령/지급여부 등)까지 currentEditItem에 반영
@@ -7566,6 +7576,11 @@
             const index = estimates.findIndex(e => e.code === currentEditItem.code);
             if (index !== -1) {
                 estimates[index] = { ...estimates[index], ...currentEditItem };
+                const remote = await upsertEstimateToServer(estimates[index]);
+                if (!remote.ok) {
+                    alert(remote.error || '견적 서버 저장 실패');
+                    return;
+                }
             }
 
             businessInfoEditMode = false;
@@ -7589,7 +7604,7 @@
         }
 
         // 저장
-        function saveChanges() {
+        async function saveChanges() {
             if (isSavingChanges) return;
             setSaveLoading(true);
             if (isNewEstimate) {
@@ -7662,8 +7677,13 @@
                 };
                 seedEstimateAggregates(newEstimate);
 
+                const remoteNew = await upsertEstimateToServer(newEstimate);
+                if (!remoteNew.ok) {
+                    alert(remoteNew.error || '견적 서버 저장 실패');
+                    setSaveLoading(false);
+                    return;
+                }
                 estimates.unshift(newEstimate);
-                upsertEstimateToServer(newEstimate);
                 isPanelDirty = false;
                 showToast('견적서가 등록되었습니다.');
                 closePanel(true);
@@ -7705,8 +7725,14 @@
                 // 원본 데이터 업데이트
                 const index = estimates.findIndex(e => e.code === currentEditItem.code);
                 if (index !== -1) {
-                    estimates[index] = {...currentEditItem};
-                    upsertEstimateToServer(estimates[index]);
+                    const updated = { ...currentEditItem };
+                    const remoteEdit = await upsertEstimateToServer(updated);
+                    if (!remoteEdit.ok) {
+                        alert(remoteEdit.error || '견적 서버 저장 실패');
+                        setSaveLoading(false);
+                        return;
+                    }
+                    estimates[index] = updated;
                 }
 
                 // 읽기 모드로 전환
