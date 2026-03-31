@@ -295,6 +295,9 @@
             } else {
                 showPage('dashboard'); // 기본 페이지: 대시보드
             }
+            if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                syncEstimatesFromServer();
+            }
 
             // 경영실적관리 기간 UI(월 선택/기간 선택) 초기화
             initPerformanceMonthPicker();
@@ -682,14 +685,29 @@
             { code: '2603001', date: '2026-03-03', status: '완료', category1: 'B2C', category2: '관리건물', building: '메디스타워', project: '1층 여자화장실 도어 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 220000, paidStatus: '전액', purchase: 187000, hasSales: true, hasPurchase: true, taxIssued: true }
         ];
 
-        /* 캘린더는 진행일·완료일이 있어야 표시. 구버전/샘플 행(둘 다 비어 있음)은 등록일로 하루 일정으로 맞춤 */
-        estimates.forEach(function(e) {
-            if (e.startDate || e.endDate) return;
-            var d = e.date ? String(e.date).trim().slice(0, 10) : '';
-            if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return;
-            e.startDate = d;
-            e.endDate = d;
-        });
+        function applyEstimateDefaultsAndSeed(list) {
+            (list || []).forEach(function(e) {
+                if (e.startDate || e.endDate) return;
+                var d = e.date ? String(e.date).trim().slice(0, 10) : '';
+                if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return;
+                e.startDate = d;
+                e.endDate = d;
+            });
+
+            (list || []).forEach(function (e, i) {
+                if (e.category3 === undefined) e.category3 = '지원';
+                if (!e.code || String(e.code).trim() === '') {
+                    e.code = '26' + String(100000 + i);
+                }
+                if (e.businessIncomeGross === undefined) e.businessIncomeGross = 0;
+                if (e.businessIncomeTransferDate === undefined) e.businessIncomeTransferDate = '';
+                if (e.businessIncomePaidStatus === undefined) e.businessIncomePaidStatus = '미지급';
+                if (e.salesDates === undefined) e.salesDates = [];
+                seedEstimateAggregates(e);
+            });
+        }
+
+        applyEstimateDefaultsAndSeed(estimates);
 
         function computeBizTaxFromGross(grossNum) {
             const gross = Math.max(0, Math.round(Number(grossNum) || 0));
@@ -714,17 +732,53 @@
             }
         }
 
-        estimates.forEach(function (e, i) {
-            if (e.category3 === undefined) e.category3 = '지원';
-            if (!e.code || String(e.code).trim() === '') {
-                e.code = '26' + String(100000 + i);
+        function bpsEstimateApi(path, payload) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.reject(new Error('NO_SUPABASE'));
             }
-            if (e.businessIncomeGross === undefined) e.businessIncomeGross = 0;
-            if (e.businessIncomeTransferDate === undefined) e.businessIncomeTransferDate = '';
-            if (e.businessIncomePaidStatus === undefined) e.businessIncomePaidStatus = '미지급';
-            if (e.salesDates === undefined) e.salesDates = [];
-            seedEstimateAggregates(e);
-        });
+            return window.__bpsSupabase.auth.getSession().then(function (res) {
+                if (res.error || !res.data || !res.data.session) {
+                    return Promise.reject(new Error('로그인이 필요합니다.'));
+                }
+                return fetch(window.location.origin + path, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: 'Bearer ' + res.data.session.access_token,
+                    },
+                    body: JSON.stringify(payload || {}),
+                }).then(function (r) {
+                    return r.json().then(function (j) {
+                        return { ok: r.ok, status: r.status, body: j };
+                    });
+                });
+            });
+        }
+
+        function syncEstimatesFromServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
+            return bpsEstimateApi('/api/estimate/list', {}).then(function (r) {
+                if (!r.ok || !r.body || !Array.isArray(r.body.items)) return false;
+                const list = r.body.items.map(function (x) { return { ...x }; });
+                applyEstimateDefaultsAndSeed(list);
+                estimates.splice(0, estimates.length, ...list);
+                renderTable();
+                return true;
+            }).catch(function () {
+                return false;
+            });
+        }
+
+        function upsertEstimateToServer(item) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return;
+            bpsEstimateApi('/api/estimate/upsert', { item: item })
+                .then(function (r) {
+                    if (!r.ok) showToast((r.body && r.body.error) || '견적 서버 저장 실패');
+                })
+                .catch(function () {
+                    // keep local UX
+                });
+        }
 
         function readBusinessIncomeFormIntoItem(target) {
             if (!target || (target.type !== '세금계산서' && target.type !== '사업소득')) return;
@@ -7607,6 +7661,7 @@
                 seedEstimateAggregates(newEstimate);
 
                 estimates.unshift(newEstimate);
+                upsertEstimateToServer(newEstimate);
                 isPanelDirty = false;
                 showToast('견적서가 등록되었습니다.');
                 closePanel(true);
@@ -7649,6 +7704,7 @@
                 const index = estimates.findIndex(e => e.code === currentEditItem.code);
                 if (index !== -1) {
                     estimates[index] = {...currentEditItem};
+                    upsertEstimateToServer(estimates[index]);
                 }
 
                 // 읽기 모드로 전환
