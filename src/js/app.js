@@ -4710,11 +4710,11 @@
                             <div class="user-manage-card-desc">비밀번호는 로그인 페이지에서 본인이 직접 설정/입력합니다.</div>
                             <div class="panel-form-row">
                                 <label class="panel-form-label">이름</label>
-                                <input type="text" class="form-input" id="userManageName" value="${escapeHtmlAttr(name || '')}" ${isCreatingAccount ? '' : 'readonly'}>
+                                <input type="text" class="form-input" id="userManageName" value="${escapeHtmlAttr(name || '')}">
                             </div>
                             <div class="panel-form-row">
                                 <label class="panel-form-label">아이디</label>
-                                <input type="text" class="form-input" id="userManageUserId" value="${escapeHtmlAttr(userId || '')}" ${isCreatingAccount ? '' : 'readonly'}>
+                                <input type="text" class="form-input" id="userManageUserId" value="${escapeHtmlAttr(userId || '')}">
                             </div>
                         </div>
 
@@ -4813,6 +4813,7 @@
                     const targetUser = userAccounts.find(function (u) { return u.userId === currentManagingAccountUserId; });
                     if (targetUser) {
                         targetUser.name = accountName;
+                        targetUser.userId = accountUserIdNorm;
                         targetUser.type = type;
                         targetUser.role = role;
                         targetUser.contractorName = contractorName;
@@ -4850,6 +4851,15 @@
                         alert('이미 존재하는 아이디입니다.');
                         return;
                     }
+                } else {
+                    const duplicatedOnEdit = userAccounts.some(function (u) {
+                        const uid = String(u.userId || '').toLowerCase();
+                        return uid === accountUserIdNorm && uid !== String(currentManagingAccountUserId || '').toLowerCase();
+                    });
+                    if (duplicatedOnEdit) {
+                        alert('이미 존재하는 아이디입니다.');
+                        return;
+                    }
                 }
                 (function () {
                     var creating = isCreatingAccount;
@@ -4863,7 +4873,8 @@
                     };
                     var payloadUpdate = {
                         name: accountName,
-                        displayUserId: String(currentManagingAccountUserId || '').trim().toLowerCase(),
+                        originalDisplayUserId: String(currentManagingAccountUserId || '').trim().toLowerCase(),
+                        displayUserId: accountUserIdNorm,
                         type: type,
                         role: role,
                         contractorName: contractorName,
@@ -4891,14 +4902,14 @@
             }
 
             if (isCreatingAccount) {
-                const duplicated = userAccounts.some(function (u) { return u.userId === accountUserId; });
+                const duplicated = userAccounts.some(function (u) { return String(u.userId || '').toLowerCase() === accountUserIdNorm; });
                 if (duplicated) {
                     alert('이미 존재하는 아이디입니다.');
                     return;
                 }
                 userAccounts.push({
                     name: accountName,
-                    userId: accountUserId,
+                    userId: accountUserIdNorm,
                     type: type,
                     role: role,
                     contractorName: contractorName,
@@ -4909,14 +4920,16 @@
                 const targetUser = userAccounts.find(function (u) { return u.userId === currentManagingAccountUserId; });
                 if (targetUser) {
                     targetUser.name = accountName;
+                    targetUser.userId = accountUserIdNorm;
                     targetUser.type = type;
                     targetUser.role = role;
                     targetUser.contractorName = contractorName;
                     targetUser.extraAllowedPages = cleanedExtra;
                 }
             }
-            if ((currentManagingAccountUserId && currentManagingAccountUserId === currentUserAccessProfile.userId) || (isCreatingAccount && accountUserId === currentUserAccessProfile.userId)) {
+            if ((currentManagingAccountUserId && currentManagingAccountUserId === currentUserAccessProfile.userId) || (isCreatingAccount && accountUserIdNorm === currentUserAccessProfile.userId)) {
                 currentUserAccessProfile.name = accountName;
+                currentUserAccessProfile.userId = accountUserIdNorm;
                 currentUserAccessProfile.type = type;
                 currentUserAccessProfile.role = role;
                 currentUserAccessProfile.contractorName = contractorName;
