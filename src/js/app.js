@@ -787,6 +787,41 @@
                 });
         }
 
+        function deleteEstimateFromServer(code) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({ ok: true });
+            }
+            return bpsEstimateApi('/api/estimate/delete', { code: String(code || '').trim() })
+                .then(function (r) {
+                    if (!r.ok) {
+                        return { ok: false, error: (r.body && r.body.error) || '견적 서버 삭제 실패' };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '견적 서버 삭제 실패' };
+                });
+        }
+
+        async function deleteCurrentEstimate() {
+            if (!currentEditItem || !currentEditItem.code) return;
+            const code = String(currentEditItem.code).trim();
+            const ok = confirm('견적 ' + code + ' 을(를) 삭제하시겠습니까?');
+            if (!ok) return;
+
+            const remote = await deleteEstimateFromServer(code);
+            if (!remote.ok) {
+                alert(remote.error || '견적 서버 삭제 실패');
+                return;
+            }
+
+            const idx = estimates.findIndex(function (e) { return String(e.code || '') === code; });
+            if (idx !== -1) estimates.splice(idx, 1);
+            closePanel(true);
+            renderTable();
+            showToast('견적이 삭제되었습니다.');
+        }
+
         function readBusinessIncomeFormIntoItem(target) {
             if (!target || (target.type !== '세금계산서' && target.type !== '사업소득')) return;
             const d = document.getElementById('biz_transfer_date');
@@ -5604,6 +5639,7 @@
                                 <button type="button" class="btn-basic-info-edit" onclick="startBasicInfoEdit()" style="${basicInfoEditMode ? 'display:none;' : ''}">수정</button>
                                 <button type="button" class="btn-basic-info-save" onclick="saveBasicInfoEdit()" style="${basicInfoEditMode ? '' : 'display:none;'}">저장</button>
                                 <button type="button" class="btn-basic-info-cancel" onclick="cancelBasicInfoEdit()" style="${basicInfoEditMode ? '' : 'display:none;'}">취소</button>
+                                <button type="button" class="btn-basic-info-cancel" onclick="deleteCurrentEstimate()" style="${basicInfoEditMode ? 'display:none;' : ''}">삭제</button>
                             </span>
                         </div>
                         <div class="basic-info-grid">
@@ -8302,6 +8338,7 @@
                 startBusinessIncomeEdit,
                 cancelBusinessIncomeEdit,
                 saveBusinessIncomeEdit,
+                deleteCurrentEstimate,
                 editRow,
                 saveEditedRow,
                 cancelEditRow,
