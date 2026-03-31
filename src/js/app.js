@@ -8126,3 +8126,76 @@
                 document.getElementById('sidebar').classList.add('collapsed');
             }
         });
+
+        // ============================================================
+        // Vite(ESM) 번들링 대응: index.html의 인라인 onclick에서 호출되는
+        // 함수들은 window 전역에 노출되어야 합니다.
+        // ============================================================
+        try {
+            const expose = {
+                // 네비/레이아웃
+                toggleSidebar,
+                showPage,
+                toggleDashboardTheme,
+
+                // 대시보드
+                dashboardChangeMonth,
+                closeDashboardEventModal,
+                closeDashboardDayEventsModal,
+
+                // 견적/프로젝트
+                downloadEstimateCSV,
+                openNewEstimate,
+                closePanel,
+                openPanel,
+                openPanelFromRow,
+                saveChanges,
+                cancelEdit,
+
+                // 경영실적
+                switchPerformancePeriodMode,
+                switchPerformanceRightTab,
+
+                // 주간/미수금
+                downloadWeeklyCSV,
+                downloadUnpaidCSV,
+
+                // 업체
+                downloadContractorCSV,
+                openContractorPanel,
+                closeContractorPanel,
+                saveContractor,
+                closeContractorDetailPanel,
+
+                // 경비
+                downloadExpenseCSV,
+                openExpensePanel,
+                closeExpensePanel,
+                saveExpense,
+                closeExpenseDetailPanel,
+
+                // 판관비
+                downloadSgaCSV,
+                openSgaPanel,
+                closeSgaPanel,
+                saveSgaExpense,
+                closeSgaDetailPanel,
+
+                // 관리자설정
+                switchAdminSettingsTab,
+                openAddUserModal,
+                openUserManagePanelById,
+                switchUserManageTab,
+                updateUserManagePanelByType,
+                addMasterItem,
+                toggleAccountStatus,
+                resetUserPassword,
+            };
+
+            Object.keys(expose).forEach(function (k) {
+                const v = expose[k];
+                if (typeof v === 'function') window[k] = v;
+            });
+        } catch (e) {
+            // ignore
+        }
