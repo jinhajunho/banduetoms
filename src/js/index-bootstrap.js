@@ -26,6 +26,7 @@ function mapDbRoleToUi(role) {
 async function main() {
     if (!supabaseUrl || !supabaseAnon) {
         await import('./app.js');
+        window.dispatchEvent(new Event('DOMContentLoaded'));
         return;
     }
 
@@ -55,6 +56,7 @@ async function main() {
             return;
         }
         await import('./app.js');
+        window.dispatchEvent(new Event('DOMContentLoaded'));
         return;
     }
 
@@ -84,6 +86,7 @@ async function main() {
             return;
         }
         await import('./app.js');
+        window.dispatchEvent(new Event('DOMContentLoaded'));
         return;
     }
 
@@ -100,6 +103,7 @@ async function main() {
     };
 
     await import('./app.js');
+    window.dispatchEvent(new Event('DOMContentLoaded'));
 }
 
 await main();
