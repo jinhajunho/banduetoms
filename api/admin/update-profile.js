@@ -57,9 +57,9 @@ export default {
 
             if (Object.prototype.hasOwnProperty.call(body, 'contractorName')) {
                 const c = String(body.contractorName || '').trim();
-                patch.contractor_name = effType === 'external' ? c || null : null;
+                patch.contractor_name = effType === 'external' ? c || '' : '';
             } else if (Object.prototype.hasOwnProperty.call(body, 'type') && effType === 'internal') {
-                patch.contractor_name = null;
+                patch.contractor_name = '';
             }
 
             if (Object.keys(patch).length === 0) {

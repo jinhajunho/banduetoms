@@ -75,7 +75,7 @@ export default {
                 display_user_id: displayUserId,
                 type,
                 role,
-                contractor_name: type === 'external' ? contractorName || null : null,
+                contractor_name: type === 'external' ? contractorName || '' : '',
                 active: true,
                 extra_allowed_pages: extraAllowedPages,
                 password_reset_required: true,
