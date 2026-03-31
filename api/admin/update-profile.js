@@ -1,6 +1,6 @@
 export const runtime = 'nodejs';
 
-import { requireAdmin } from '../_lib/adminAuth.js';
+import { hasUserProfilesColumn, requireAdmin } from '../_lib/adminAuth.js';
 
 function jsonResponse(status, body) {
     return new Response(JSON.stringify(body), {
@@ -45,6 +45,11 @@ export default {
             }
             if (Object.prototype.hasOwnProperty.call(body, 'role')) {
                 patch.role = String(body.role || '').trim();
+            }
+            if (Object.prototype.hasOwnProperty.call(body, 'name')) {
+                if (await hasUserProfilesColumn(supabaseAdmin, 'name')) {
+                    patch.name = String(body.name || '').trim();
+                }
             }
             if (Object.prototype.hasOwnProperty.call(body, 'extraAllowedPages')) {
                 patch.extra_allowed_pages = Array.isArray(body.extraAllowedPages) ? body.extraAllowedPages : [];

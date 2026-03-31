@@ -4563,7 +4563,8 @@
                 });
                 userAccounts = r.body.users.map(function (u) {
                     const uid = String(u.userId || '').trim().toLowerCase();
-                    const preservedName = localNameMap[uid] || uid;
+                    const serverName = String(u.name || '').trim();
+                    const preservedName = serverName || localNameMap[uid] || uid;
                     return {
                         name: preservedName,
                         userId: uid,
@@ -4853,6 +4854,7 @@
                 (function () {
                     var creating = isCreatingAccount;
                     var payloadCreate = {
+                        name: accountName,
                         displayUserId: accountUserIdNorm,
                         type: type,
                         role: role,
@@ -4860,6 +4862,7 @@
                         extraAllowedPages: cleanedExtra,
                     };
                     var payloadUpdate = {
+                        name: accountName,
                         displayUserId: String(currentManagingAccountUserId || '').trim().toLowerCase(),
                         type: type,
                         role: role,

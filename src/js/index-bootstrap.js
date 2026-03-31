@@ -68,7 +68,7 @@ async function main() {
 
     const { data: profile, error: profileErr } = await supabase
         .from('user_profiles')
-        .select('display_user_id, type, role, contractor_name, active, extra_allowed_pages')
+        .select('*')
         .eq('auth_user_id', session.user.id)
         .maybeSingle();
 
@@ -93,7 +93,7 @@ async function main() {
     const uid = String(profile.display_user_id || displayId || '').trim();
     window.__bpsProfileBootstrap = {
         userId: uid,
-        name: uid,
+        name: String(profile.name || uid).trim(),
         type: profile.type === 'external' ? 'external' : 'internal',
         role: mapDbRoleToUi(profile.role),
         contractorName: String(profile.contractor_name || '').trim(),

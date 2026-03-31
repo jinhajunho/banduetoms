@@ -22,7 +22,7 @@ export default {
             const { supabaseAdmin } = admin;
             const { data, error } = await supabaseAdmin
                 .from('user_profiles')
-                .select('display_user_id, type, role, contractor_name, active, extra_allowed_pages')
+                .select('*')
                 .order('display_user_id', { ascending: true });
 
             if (error) return jsonResponse(500, { ok: false, error: error.message });
@@ -30,6 +30,7 @@ export default {
             const users = (data || []).map(function (r) {
                 return {
                     userId: String(r.display_user_id || '').trim(),
+                    name: String(r.name || r.display_user_id || '').trim(),
                     type: r.type === 'external' ? 'external' : 'internal',
                     role: String(r.role || '').trim(),
                     contractorName: String(r.contractor_name || '').trim(),

@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import crypto from 'crypto';
-import { requireAdmin } from '../_lib/adminAuth.js';
+import { hasUserProfilesColumn, requireAdmin } from '../_lib/adminAuth.js';
 
 function jsonResponse(status, body) {
     return new Response(JSON.stringify(body), {
@@ -25,6 +25,7 @@ export default {
             const { supabaseAdmin } = admin;
             const body = await request.json().catch(() => ({}));
             const displayUserId = String(body.displayUserId || '').trim().toLowerCase();
+            const name = String(body.name || '').trim();
             const type = body.type === 'external' ? 'external' : 'internal';
             const role = String(body.role || '').trim();
             const contractorName = String(body.contractorName || '').trim();
@@ -80,6 +81,9 @@ export default {
                 extra_allowed_pages: extraAllowedPages,
                 password_reset_required: true,
             };
+            if (await hasUserProfilesColumn(supabaseAdmin, 'name')) {
+                row.name = name || displayUserId;
+            }
 
             const { error: insErr } = await supabaseAdmin.from('user_profiles').insert(row);
             if (insErr) {

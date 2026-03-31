@@ -70,3 +70,17 @@ export async function requireAdmin(request) {
         return { error: jsonResponse(500, { ok: false, error: e?.message || String(e) }) };
     }
 }
+
+export async function hasUserProfilesColumn(supabaseAdmin, columnName) {
+    const c = String(columnName || '').trim();
+    if (!c) return false;
+    const { data, error } = await supabaseAdmin
+        .from('information_schema.columns')
+        .select('column_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', 'user_profiles')
+        .eq('column_name', c)
+        .maybeSingle();
+    if (error) return false;
+    return !!data;
+}
