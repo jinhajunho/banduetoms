@@ -8268,6 +8268,18 @@
                 openPanelFromRow,
                 saveChanges,
                 cancelEdit,
+                openEstimateEditor,
+                saveNewEstimateFromSteps,
+                startBasicInfoEdit,
+                cancelBasicInfoEdit,
+                saveBasicInfoEdit,
+                startBusinessIncomeEdit,
+                cancelBusinessIncomeEdit,
+                saveBusinessIncomeEdit,
+                editRow,
+                saveEditedRow,
+                cancelEditRow,
+                closePaymentRowInlines,
 
                 // 경영실적
                 switchPerformancePeriodMode,
