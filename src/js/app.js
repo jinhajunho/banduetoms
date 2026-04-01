@@ -435,9 +435,16 @@
                 if (durationDays <= 1) {
                     return { isPeriod: false, durationDays: 1, dayType: 'single' };
                 }
-                if (target === from) return { isPeriod: true, durationDays: durationDays, dayType: 'period-start' };
-                if (target === to) return { isPeriod: true, durationDays: durationDays, dayType: 'period-end' };
-                return { isPeriod: true, durationDays: durationDays, dayType: 'period-middle' };
+                const targetDate = parseYmdToUtc(target);
+                const dayOfWeek = targetDate ? targetDate.getUTCDay() : -1; // 0:일, 6:토
+                const segmentStart = target === from || dayOfWeek === 0;
+                const segmentEnd = target === to || dayOfWeek === 6;
+                if (segmentStart && segmentEnd) {
+                    return { isPeriod: true, durationDays: durationDays, dayType: 'period-segment-single' };
+                }
+                if (segmentStart) return { isPeriod: true, durationDays: durationDays, dayType: 'period-segment-start' };
+                if (segmentEnd) return { isPeriod: true, durationDays: durationDays, dayType: 'period-segment-end' };
+                return { isPeriod: true, durationDays: durationDays, dayType: 'period-segment-middle' };
             }
 
             if (start && target === start) return { isPeriod: false, durationDays: 1, dayType: 'single' };
@@ -549,9 +556,10 @@
                 dayEvents.slice(0, 4).forEach(event => {
                     const eventBar = document.createElement('div');
                     eventBar.className = 'event-bar ' + (event.status === '완료' ? 'completed' : 'progress');
-                    if (event._dayType === 'period-start') eventBar.classList.add('event-bar-period-start');
-                    else if (event._dayType === 'period-middle') eventBar.classList.add('event-bar-period-middle');
-                    else if (event._dayType === 'period-end') eventBar.classList.add('event-bar-period-end');
+                    if (event._dayType === 'period-segment-start') eventBar.classList.add('event-bar-period-segment-start');
+                    else if (event._dayType === 'period-segment-middle') eventBar.classList.add('event-bar-period-segment-middle');
+                    else if (event._dayType === 'period-segment-end') eventBar.classList.add('event-bar-period-segment-end');
+                    else if (event._dayType === 'period-segment-single') eventBar.classList.add('event-bar-period-segment-single');
                     const eventTitle = (event.building ? event.building + ' - ' : '') + event.project;
                     eventBar.innerHTML = '<span class="event-title">' + eventTitle + '</span>';
                     eventBar.onclick = () => showDashboardEventModal(event);

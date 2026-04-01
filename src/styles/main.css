@@ -2185,6 +2185,8 @@
             align-items: center;
             gap: 6px;
             color: white;
+            position: relative;
+            z-index: 2;
         }
 
         .event-bar .event-title {
@@ -2200,23 +2202,33 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .event-bar-period-start {
+        .event-bar-period-segment-start {
             border-top-right-radius: 0;
             border-bottom-right-radius: 0;
+            width: calc(100% + 8px);
         }
 
-        .event-bar-period-middle {
+        .event-bar-period-segment-middle {
             border-radius: 0;
+            margin-left: -8px;
+            width: calc(100% + 16px);
         }
 
-        .event-bar-period-end {
+        .event-bar-period-segment-end {
             border-top-left-radius: 0;
             border-bottom-left-radius: 0;
+            margin-left: -8px;
+            width: calc(100% + 8px);
         }
 
-        .event-bar-period-start:hover,
-        .event-bar-period-middle:hover,
-        .event-bar-period-end:hover {
+        .event-bar-period-segment-single {
+            border-radius: 4px;
+        }
+
+        .event-bar-period-segment-start:hover,
+        .event-bar-period-segment-middle:hover,
+        .event-bar-period-segment-end:hover,
+        .event-bar-period-segment-single:hover {
             transform: none;
         }
 
