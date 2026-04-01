@@ -77,6 +77,12 @@
                     syncSgaFromServer();
                 }
             }
+            if (pageName === 'contractors') {
+                renderContractorTable();
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncContractorsFromServer();
+                }
+            }
             if (pageName === 'users') {
                 renderUsersTable();
                 renderCategoryMasterTables();
@@ -305,6 +311,7 @@
                 syncEstimatesFromServer();
                 syncExpensesFromServer();
                 syncSgaFromServer();
+                syncContractorsFromServer();
             }
 
             // 경영실적관리 기간 UI(월 선택/기간 선택) 초기화
@@ -969,6 +976,85 @@
                 })
                 .catch(function (e) {
                     return { ok: false, error: (e && e.message) || '판관비 서버 삭제 실패' };
+                });
+        }
+
+        function syncContractorsFromServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
+            return bpsAuthedPost('/api/contractor', { action: 'list' }).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true || !Array.isArray(r.body.items)) {
+                    return false;
+                }
+                const list = r.body.items.map(function (x) {
+                    return { ...x };
+                });
+                contractors.splice(0, contractors.length, ...list);
+                renderContractorTable();
+                return true;
+            }).catch(function () {
+                return false;
+            });
+        }
+
+        function upsertContractorToServer(item) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({
+                    ok: false,
+                    error:
+                        '로그인(Supabase) 정보가 없어 서버에 저장할 수 없습니다. 페이지를 새로고침한 뒤 다시 로그인해 주세요.',
+                });
+            }
+            var id = item && item.id != null ? Number(item.id) : NaN;
+            if (!item || !Number.isFinite(id)) {
+                return Promise.resolve({ ok: false, error: '저장할 업체 데이터가 올바르지 않습니다.' });
+            }
+            var payloadWrapper = { action: 'upsert', item: item };
+            var maxBytes = 4 * 1024 * 1024 - 80 * 1024;
+            if (bpsUtf8ByteLength(JSON.stringify(payloadWrapper)) > maxBytes) {
+                return Promise.resolve({
+                    ok: false,
+                    error:
+                        '첨부 파일(data URL) 때문에 요청 크기가 너무 큽니다. 이미지·PDF 용량을 줄이거나 해상도를 낮춘 뒤 다시 저장해 주세요.',
+                });
+            }
+            return bpsAuthedPost('/api/contractor', payloadWrapper)
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        var msg = (r.body && r.body.error) || '업체 서버 저장 실패';
+                        if (r.body && r.body._rawSnippet) {
+                            msg += ' — ' + r.body._rawSnippet;
+                        } else if (r.status) {
+                            msg += ' (HTTP ' + r.status + ')';
+                        }
+                        return { ok: false, error: msg };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '업체 서버 저장 실패' };
+                });
+        }
+
+        function deleteContractorFromServer(id) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({
+                    ok: false,
+                    error: '로그인(Supabase) 정보가 없어 서버에서 삭제할 수 없습니다.',
+                });
+            }
+            var nid = Number(id);
+            if (!Number.isFinite(nid)) {
+                return Promise.resolve({ ok: false, error: '삭제할 항목이 올바르지 않습니다.' });
+            }
+            return bpsAuthedPost('/api/contractor', { action: 'delete', id: nid })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        return { ok: false, error: (r.body && r.body.error) || '업체 서버 삭제 실패' };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '업체 서버 삭제 실패' };
                 });
         }
 
@@ -2636,35 +2722,47 @@
                         next.bankFileName = bankNew.name;
                         next.bankMimeType = bankNew.type;
                     }
-                    contractors[index] = next;
-                    alert('업체 정보가 수정되었습니다.');
-                    contractorEditingId = null;
-                    finish();
-                } else {
-                    const newContractor = {
-                        id: contractors.length > 0 ? Math.max.apply(null, contractors.map(function(c) {
-                            return c.id;
-                        })) + 1 : 1,
-                        name: name,
-                        phone: phone,
-                        date: new Date().toISOString().slice(0, 10),
-                        hasLicense: !!licenseNew,
-                        hasBankAccount: !!bankNew
-                    };
-                    if (licenseNew) {
-                        newContractor.licenseDataUrl = licenseNew.dataUrl;
-                        newContractor.licenseFileName = licenseNew.name;
-                        newContractor.licenseMimeType = licenseNew.type;
-                    }
-                    if (bankNew) {
-                        newContractor.bankDataUrl = bankNew.dataUrl;
-                        newContractor.bankFileName = bankNew.name;
-                        newContractor.bankMimeType = bankNew.type;
+                    upsertContractorToServer(next).then(function (remote) {
+                        if (!remote.ok) {
+                            alert(remote.error || '업체 서버 저장 실패');
+                            return;
+                        }
+                        contractors[index] = next;
+                        alert('업체 정보가 수정되었습니다.');
+                        contractorEditingId = null;
+                        finish();
+                    });
+                    return;
+                }
+                const newContractor = {
+                    id: contractors.length > 0 ? Math.max.apply(null, contractors.map(function(c) {
+                        return c.id;
+                    })) + 1 : 1,
+                    name: name,
+                    phone: phone,
+                    date: new Date().toISOString().slice(0, 10),
+                    hasLicense: !!licenseNew,
+                    hasBankAccount: !!bankNew
+                };
+                if (licenseNew) {
+                    newContractor.licenseDataUrl = licenseNew.dataUrl;
+                    newContractor.licenseFileName = licenseNew.name;
+                    newContractor.licenseMimeType = licenseNew.type;
+                }
+                if (bankNew) {
+                    newContractor.bankDataUrl = bankNew.dataUrl;
+                    newContractor.bankFileName = bankNew.name;
+                    newContractor.bankMimeType = bankNew.type;
+                }
+                upsertContractorToServer(newContractor).then(function (remote) {
+                    if (!remote.ok) {
+                        alert(remote.error || '업체 서버 저장 실패');
+                        return;
                     }
                     contractors.push(newContractor);
                     alert('업체가 등록되었습니다.');
                     finish();
-                }
+                });
             });
         }
 
@@ -2699,10 +2797,16 @@
             if (!contractor) return;
 
             if (!confirm(`${contractor.name} 업체를 삭제하시겠습니까?`)) return;
-            contractors = contractors.filter(c => c.id !== id);
-            renderContractorTable();
-            closeContractorPanel();
-            alert('삭제되었습니다.');
+            deleteContractorFromServer(id).then(function (remote) {
+                if (!remote.ok) {
+                    alert(remote.error || '업체 서버 삭제 실패');
+                    return;
+                }
+                contractors = contractors.filter(c => c.id !== id);
+                renderContractorTable();
+                closeContractorPanel();
+                alert('삭제되었습니다.');
+            });
         }
 
         // 폼 초기화
@@ -2844,6 +2948,9 @@
         window.addEventListener('hashchange', function() {
             if (window.location.hash === '#contractors') {
                 renderContractorTable();
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncContractorsFromServer();
+                }
             } else if (window.location.hash === '#expenses') {
                 fillExpenseMonthFilter();
                 renderExpenseTable();
