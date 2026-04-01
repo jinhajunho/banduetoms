@@ -308,10 +308,16 @@
                 showPage('dashboard'); // 기본 페이지: 대시보드
             }
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
-                syncEstimatesFromServer();
                 syncExpensesFromServer();
                 syncSgaFromServer();
                 syncContractorsFromServer();
+                Promise.all([syncEstimatesFromServer(), syncCategoryMastersFromServer()]).then(function () {
+                    syncCategoryMastersFromEstimates();
+                    renderCategoryMasterTables();
+                    if (typeof refreshCategoryFilterOptionsAll === 'function') {
+                        refreshCategoryFilterOptionsAll();
+                    }
+                });
             }
 
             // 경영실적관리 기간 UI(월 선택/기간 선택) 초기화
@@ -1170,6 +1176,65 @@
                 if (c3 && !category3Master.some(function (m) { return m.name === c3; })) category3Master.push({ name: c3, active: true });
             });
         }
+
+        function applyCategorySettingsPayload(p) {
+            if (!p || typeof p !== 'object') return;
+            ['1', '2', '3'].forEach(function (k) {
+                var arr = p[k];
+                if (!Array.isArray(arr) || arr.length === 0) return;
+                var target = getMasterArray(k);
+                target.length = 0;
+                arr.forEach(function (item) {
+                    if (item && item.name) {
+                        target.push({ name: String(item.name), active: item.active !== false });
+                    }
+                });
+            });
+        }
+
+        function syncCategoryMastersFromServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
+            return bpsAuthedPost('/api/category', { action: 'list' }).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true || !r.body.payload) {
+                    return false;
+                }
+                applyCategorySettingsPayload(r.body.payload);
+                return true;
+            }).catch(function () {
+                return false;
+            });
+        }
+
+        function upsertCategoryMastersToServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({
+                    ok: false,
+                    error: '로그인(Supabase) 정보가 없어 분류 마스터를 저장할 수 없습니다.',
+                });
+            }
+            var payload = {
+                '1': category1Master.map(function (m) {
+                    return { name: m.name, active: m.active !== false };
+                }),
+                '2': category2Master.map(function (m) {
+                    return { name: m.name, active: m.active !== false };
+                }),
+                '3': category3Master.map(function (m) {
+                    return { name: m.name, active: m.active !== false };
+                }),
+            };
+            return bpsAuthedPost('/api/category', { action: 'upsert', payload: payload })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        return { ok: false, error: (r.body && r.body.error) || '분류 마스터 서버 저장 실패' };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '분류 마스터 서버 저장 실패' };
+                });
+        }
+
         syncCategoryMastersFromEstimates();
 
         var currentUserAccessProfile = {
@@ -1286,6 +1351,9 @@
             if (document.getElementById('panelBody') && currentEditItem) {
                 renderPanelContent(currentEditItem);
             }
+            upsertCategoryMastersToServer().then(function (remote) {
+                if (!remote.ok) alert(remote.error || '분류 마스터 서버 저장 실패');
+            });
         }
 
         function toggleMasterActive(key, name) {
@@ -1298,6 +1366,9 @@
             if (document.getElementById('panelBody') && currentEditItem) {
                 renderPanelContent(currentEditItem);
             }
+            upsertCategoryMastersToServer().then(function (remote) {
+                if (!remote.ok) alert(remote.error || '분류 마스터 서버 저장 실패');
+            });
         }
 
         function removeMasterItem(key, name) {
@@ -1316,6 +1387,9 @@
             if (document.getElementById('panelBody') && currentEditItem) {
                 renderPanelContent(currentEditItem);
             }
+            upsertCategoryMastersToServer().then(function (remote) {
+                if (!remote.ok) alert(remote.error || '분류 마스터 서버 저장 실패');
+            });
         }
 
         function refreshCategory1FilterOptions() {
