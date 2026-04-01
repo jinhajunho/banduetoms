@@ -831,39 +831,12 @@
             document.getElementById('bankAccountName').textContent = '선택한 파일 없음';
         }
 
-        // 이미지 보기
         function viewImage(type, id) {
             const contractor = contractors.find(c => c.id === id);
             if (!contractor) return;
 
             const imageType = type === 'license' ? '사업자등록증' : '통장사본';
-            
-            // 실제로는 서버에 저장된 이미지 URL을 사용해야 하지만,
-            // 데모를 위해 샘플 이미지를 표시합니다
-            const modal = document.createElement('div');
-            modal.className = 'image-modal active';
-            modal.innerHTML = `
-                <div class="image-modal-content">
-                    <div class="image-modal-header">
-                        <div class="image-modal-title">
-                            <i class="fas fa-image"></i> ${imageType} - ${contractor.name}
-                        </div>
-                        <button class="image-modal-close" onclick="this.closest('.image-modal').remove()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="image-modal-body">
-                        <img src="https://via.placeholder.com/600x800/E5E7EB/6B7280?text=${encodeURIComponent(imageType)}" 
-                             alt="${imageType}">
-                    </div>
-                </div>
-            `;
-            modal.onclick = function(e) {
-                if (e.target === modal) {
-                    modal.remove();
-                }
-            };
-            document.body.appendChild(modal);
+            alert('저장된 첨부 파일이 없습니다.\n' + contractor.name + ' · ' + imageType);
         }
 
         // 초기 렌더링

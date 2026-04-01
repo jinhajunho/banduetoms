@@ -668,30 +668,7 @@
             });
         })();
 
-        // 실제 데이터 (CSV 기반)
-        const estimates = [
-            { code: '2603043', date: '2026-03-11', status: '견적', category1: 'B2B', category2: '코오롱', building: '개별-성남', project: '정수기 트레이 설치', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 423500, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603041', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '코오롱', building: '개별-성남', project: '정수기 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 127600, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603039', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '코오롱', building: '개별-서울', project: '유리 부착물 제거', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 127600, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603037', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '저스트코', building: '서울파이낸스센터', project: '8층 팬트리 수전 수리', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 176000, paidStatus: '미수', purchase: 176000, hasSales: true, hasPurchase: true, taxIssued: true },
-            { code: '2603035', date: '2026-03-10', status: '진행', category1: 'B2B', category2: '다락', building: '선유도점', project: '조명 제어 수리', manager: '방준호', type: '세금계산서', contractor: '강서집수리', revenue: 330000, paidStatus: '미수', purchase: 291500, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603033', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '여의도 3관', project: '사무실 도어락 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 390500, paidStatus: '미수', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603031', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '안마의자 설치 도어 탈부착', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 294800, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603029', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '복합거점-울산', project: '탕비실 싱크대 문짝 고장', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 271700, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603027', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '노동조합 현판 제작', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 478500, paidStatus: '부분', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603023', date: '2026-03-09', status: '보류', category1: 'B2B', category2: '코오롱', building: '그랜드센트럴', project: '10층 플랜터박스 제작 설치', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 0, paidStatus: '해당없음', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603021', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: 'TV 전원선 연장 및 몰딩', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 233200, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
-            { code: '2603019', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '복합거점-인천', project: '호텔링 11층 천장 텍스 교체', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 851400, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
-            { code: '2603017', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '복합거점-부산', project: '9층 레이아웃 변경 작업', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 817300, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
-            { code: '2603015', date: '2026-03-09', status: '진행', category1: 'B2B', category2: '코오롱', building: '그랜드센트럴', project: '2층 락커장 설치', manager: '방준호', type: '세금계산서', contractor: '바른시공', revenue: 1994300, paidStatus: '미수', purchase: 1687500, hasSales: false, hasPurchase: true, taxIssued: false },
-            { code: '2603013', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '외창 쎈텐지 작업', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 2972200, paidStatus: '전액', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: true },
-            { code: '2603011', date: '2026-03-09', status: '완료', category1: '컨텍터스', category2: '관리건물', building: '신라빌딩', project: '문틀 고정 공사', manager: '방준호', type: '자체인력', contractor: '영진인프라', revenue: 0, paidStatus: '해당없음', purchase: 0, hasSales: false, hasPurchase: false, taxIssued: false },
-            { code: '2603009', date: '2026-03-05', status: '완료', category1: 'B2B', category2: '저스트코', building: '더피나클강남', project: '시트지 보수', manager: '방준호', type: '세금계산서', contractor: '소나무P&G', revenue: 0, paidStatus: '해당없음', purchase: 550000, hasSales: false, hasPurchase: true, taxIssued: false },
-            { code: '2603007', date: '2026-03-05', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '사인 변경 요청', manager: '방준호', type: '세금계산서', contractor: '바른시공', revenue: 0, paidStatus: '해당없음', purchase: 154000, hasSales: false, hasPurchase: true, taxIssued: false },
-            { code: '2603005', date: '2026-03-04', status: '완료', category1: 'B2B', category2: '코오롱', building: '코오롱', project: '비상벨 설치 자재 구매', manager: '방준호', type: '사업소득', contractor: '솔트', revenue: 0, paidStatus: '해당없음', purchase: 22000, hasSales: false, hasPurchase: true, taxIssued: false },
-            { code: '2603003', date: '2026-03-03', status: '완료', category1: '컨텍터스', category2: '관리건물', building: '동화프라자', project: '도어보수 2건', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 484000, paidStatus: '부분', purchase: 440000, hasSales: false, hasPurchase: false, taxIssued: true },
-            { code: '2603001', date: '2026-03-03', status: '완료', category1: 'B2C', category2: '관리건물', building: '메디스타워', project: '1층 여자화장실 도어 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 220000, paidStatus: '전액', purchase: 187000, hasSales: true, hasPurchase: true, taxIssued: true }
-        ];
+        const estimates = [];
 
         function applyEstimateDefaultsAndSeed(list) {
             (list || []).forEach(function(e) {
@@ -715,8 +692,6 @@
             });
         }
 
-        // 기본 샘플 데이터는 사용하지 않고, 서버 데이터만 사용
-        estimates.splice(0, estimates.length);
         applyEstimateDefaultsAndSeed(estimates);
 
         // 경비 (`POST /api/expense` + body.action → `expense_records`).
@@ -2399,11 +2374,7 @@
         // ========================================
         
         // 업체 데이터
-        let contractors = [
-            { id: 1, name: '영진인프라', phone: '010-1234-5678', date: '2026-01-15', hasLicense: true, hasBankAccount: true },
-            { id: 2, name: '바른시공', phone: '010-2345-6789', date: '2026-01-20', hasLicense: true, hasBankAccount: false },
-            { id: 3, name: '강서집수리', phone: '010-3456-7890', date: '2026-02-01', hasLicense: false, hasBankAccount: true }
-        ];
+        let contractors = [];
 
         let contractorEditingId = null;
 
@@ -2810,7 +2781,6 @@
             document.body.removeChild(link);
         }
 
-        // 업체 첨부파일 보기 (저장된 data URL 우선, 없으면 데모용 플레이스홀더)
         function viewContractorImage(type, id) {
             const contractor = contractors.find(c => c.id === id);
             if (!contractor) return;
@@ -2827,25 +2797,20 @@
                     }], '첨부파일');
                     return;
                 }
-            } else {
-                if (!contractor.hasBankAccount) return;
-                if (contractor.bankDataUrl) {
-                    openAttachmentListModal([{
-                        name: contractor.bankFileName || ((contractor.name || '업체') + '_' + imageType),
-                        type: contractor.bankMimeType || 'image/png',
-                        data: contractor.bankDataUrl,
-                        date: contractor.date || new Date().toISOString().slice(0, 10)
-                    }], '첨부파일');
-                    return;
-                }
+                alert('저장된 사업자등록증 파일이 없습니다.');
+                return;
             }
-            const file = {
-                name: (contractor.name || '업체') + '_' + imageType + '.png',
-                type: 'image/png',
-                data: getLocalPlaceholderImageDataUrl(imageType),
-                date: contractor.date || new Date().toISOString().slice(0, 10)
-            };
-            openAttachmentListModal([file], '첨부파일');
+            if (!contractor.hasBankAccount) return;
+            if (contractor.bankDataUrl) {
+                openAttachmentListModal([{
+                    name: contractor.bankFileName || ((contractor.name || '업체') + '_' + imageType),
+                    type: contractor.bankMimeType || 'image/png',
+                    data: contractor.bankDataUrl,
+                    date: contractor.date || new Date().toISOString().slice(0, 10)
+                }], '첨부파일');
+                return;
+            }
+            alert('저장된 통장사본 파일이 없습니다.');
         }
 
         function downloadContractorImage(type, id) {
@@ -2872,26 +2837,7 @@
                 document.body.removeChild(a);
                 return;
             }
-            const fileName = (contractor.name || '업체') + '_' + imageType + '.png';
-            const src = getLocalPlaceholderImageDataUrl(imageType);
-            const a = document.createElement('a');
-            a.href = src;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        function getLocalPlaceholderImageDataUrl(labelText) {
-            const safeText = String(labelText || '첨부파일');
-            const svg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
-                    <rect width="800" height="1000" fill="#f3f4f6"/>
-                    <rect x="48" y="48" width="704" height="904" rx="16" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
-                    <text x="400" y="510" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" fill="#6b7280">${safeText}</text>
-                </svg>
-            `.trim();
-            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+            alert('다운로드할 파일이 없습니다. (' + imageType + ')');
         }
 
         // 업체정보 페이지 표시 시 테이블 렌더링
@@ -3490,8 +3436,8 @@
             if (receipts.length === 0) return;
             const files = receipts.map(function(item, idx) {
                 const dataUrl = item && (item.dataUrl || item);
-                let src = typeof dataUrl === 'string' ? dataUrl : (dataUrl && dataUrl.dataUrl);
-                if (!src) src = getLocalPlaceholderImageDataUrl('영수증 사진');
+                const src = typeof dataUrl === 'string' ? dataUrl : (dataUrl && dataUrl.dataUrl);
+                if (!src) return null;
                 const isPdf = src.indexOf('data:application/pdf') === 0;
                 const defaultName = '영수증_' + (idx + 1) + (isPdf ? '.pdf' : '.png');
                 return {
@@ -3500,7 +3446,11 @@
                     data: src,
                     date: expense.date || new Date().toISOString().slice(0, 10)
                 };
-            });
+            }).filter(Boolean);
+            if (files.length === 0) {
+                alert('저장된 영수증 이미지가 없습니다.');
+                return;
+            }
             openAttachmentListModal(files, '첨부파일');
         }
 
@@ -7822,11 +7772,9 @@
             }
         }
 
-        // 세금계산서 파일 보기 (기존 데이터)
         function viewTaxFile(type, name) {
             const fileName = `${type === 'sales' ? '매출' : '매입'}_세금계산서_${name}.pdf`;
-            // 샘플 이미지 표시
-            viewFileModal(fileName, 'https://via.placeholder.com/600x800/E5E7EB/6B7280?text=' + encodeURIComponent(fileName), 'image/png');
+            alert('저장된 세금계산서 파일이 없습니다.\n(' + fileName + ')');
         }
 
         // 파일 미리보기 모달
@@ -8181,13 +8129,15 @@
             isEditMode = true;
             isNewEstimate = false;
             currentStep = 1;
-            
-            // 기존 품목 데이터 로드 (임시 데이터)
-            itemRows = [
-                { name: '타일 시공', quantity: 50, unit: '장', price: 10000, amount: 500000 },
-                { name: '접착제', quantity: 5, unit: '통', price: 8000, amount: 40000 }
-            ];
-            
+
+            itemRows = [{
+                name: '',
+                quantity: 1,
+                unit: '',
+                price: 0,
+                amount: 0
+            }];
+
             renderEstimateEditor();
             
             document.getElementById('panelOverlay').classList.add('active');

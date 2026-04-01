@@ -501,19 +501,7 @@
     </div>
 
     <script>
-        // 견적서 데이터 (estimate.html과 동일)
-        const estimates = [
-            { code: '2603043', date: '2026-03-11', status: '견적', category1: 'B2B', category2: '코오롱', building: '개별-성남', project: '정수기 트레이 설치', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 423500, paidStatus: '미수', purchase: 0, startDate: null, completeDate: null },
-            { code: '2603041', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '코오롱', building: '개별-성남', project: '정수기 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 127600, paidStatus: '미수', purchase: 0, startDate: '2026-03-10', completeDate: '2026-03-10' },
-            { code: '2603039', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '코오롱', building: '개별-서울', project: '유리 부착물 제거', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 127600, paidStatus: '미수', purchase: 0, startDate: '2026-03-10', completeDate: '2026-03-10' },
-            { code: '2603037', date: '2026-03-10', status: '완료', category1: 'B2B', category2: '저스트코', building: '서울파이낸스센터', project: '8층 팬트리 수전 수리', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 176000, paidStatus: '미수', purchase: 176000, startDate: '2026-03-10', completeDate: '2026-03-10' },
-            { code: '2603035', date: '2026-03-10', status: '진행', category1: 'B2B', category2: '다락', building: '선유도점', project: '조명 제어 수리', manager: '방준호', type: '세금계산서', contractor: '강서집수리', revenue: 330000, paidStatus: '미수', purchase: 291500, startDate: '2026-03-16', completeDate: null },
-            { code: '2603033', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '여의도 3관', project: '사무실 도어락 보수', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 390500, paidStatus: '미수', purchase: 0, startDate: '2026-03-09', completeDate: '2026-03-09' },
-            { code: '2603031', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '안마의자 설치 도어 탈부착', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 294800, paidStatus: '전액', purchase: 0, startDate: '2026-03-09', completeDate: '2026-03-09' },
-            { code: '2603029', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '복합거점-울산', project: '탕비실 싱크대 문짝 고장', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 271700, paidStatus: '전액', purchase: 0, startDate: '2026-03-06', completeDate: '2026-03-06' },
-            { code: '2603027', date: '2026-03-09', status: '완료', category1: 'B2B', category2: '코오롱', building: '콜센터-영등포', project: '노동조합 현판 제작', manager: '방준호', type: '세금계산서', contractor: '영진인프라', revenue: 478500, paidStatus: '부분', purchase: 0, startDate: '2026-03-09', completeDate: '2026-03-09' },
-            { code: '2603015', date: '2026-03-09', status: '진행', category1: 'B2B', category2: '코오롱', building: '그랜드센트럴', project: '2층 락커장 설치', manager: '방준호', type: '세금계산서', contractor: '바른시공', revenue: 1994300, paidStatus: '미수', purchase: 1687500, startDate: '2026-03-09', completeDate: null }
-        ];
+        const estimates = [];
 
         // 현재 주의 시작일과 종료일 계산
         function getCurrentWeekRange() {

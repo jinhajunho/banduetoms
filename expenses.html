@@ -955,38 +955,11 @@
             document.getElementById('receiptName').textContent = '선택한 파일 없음';
         }
 
-        // 이미지 보기
         function viewExpenseImage(id) {
             const expense = expenses.find(e => e.id === id);
             if (!expense) return;
             if (!expense.hasReceipt) return;
-
-            // 실제로는 서버에 저장된 이미지 URL을 사용해야 하지만,
-            // 데모를 위해 샘플 이미지를 표시합니다
-            const modal = document.createElement('div');
-            modal.className = 'image-modal active';
-            modal.innerHTML = `
-                <div class="image-modal-content">
-                    <div class="image-modal-header">
-                        <div class="image-modal-title">
-                            <i class="fas fa-image"></i> 영수증 사진 - ${expense.purpose || '경비 지출'}
-                        </div>
-                        <button class="image-modal-close" onclick="this.closest('.image-modal').remove()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="image-modal-body">
-                        <img src="https://via.placeholder.com/600x800/E5E7EB/6B7280?text=${encodeURIComponent('영수증 사진')}" 
-                             alt="영수증 사진">
-                    </div>
-                </div>
-            `;
-            modal.onclick = function(e) {
-                if (e.target === modal) {
-                    modal.remove();
-                }
-            };
-            document.body.appendChild(modal);
+            alert('저장된 영수증 이미지가 없습니다.');
         }
 
         // CSV 다운로드
