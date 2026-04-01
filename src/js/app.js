@@ -719,10 +719,10 @@
         estimates.splice(0, estimates.length);
         applyEstimateDefaultsAndSeed(estimates);
 
-        // 경비 (`/api/expense/*` → 서버에서 `expense_records` 동기화, 견적 API와 동일 패턴).
+        // 경비 (`POST /api/expense` + body.action → `expense_records`).
         let expenses = [];
 
-        // 판관비 (`/api/sga/*` → `sga_records`)
+        // 판관비 (`POST /api/sga` + body.action → `sga_records`)
         let sgaExpenses = [];
 
         function computeBizTaxFromGross(grossNum) {
@@ -801,7 +801,7 @@
 
         function syncEstimatesFromServer() {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
-            return bpsEstimateApi('/api/estimate/list', {}).then(function (r) {
+            return bpsEstimateApi('/api/estimate', { action: 'list' }).then(function (r) {
                 if (!r.ok || !r.body || !Array.isArray(r.body.items)) return false;
                 const list = r.body.items.map(function (x) { return { ...x }; });
                 applyEstimateDefaultsAndSeed(list);
@@ -817,7 +817,7 @@
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.resolve({ ok: true });
             }
-            return bpsEstimateApi('/api/estimate/upsert', { item: item })
+            return bpsEstimateApi('/api/estimate', { action: 'upsert', item: item })
                 .then(function (r) {
                     if (!r.ok) {
                         return { ok: false, error: (r.body && r.body.error) || '견적 서버 저장 실패' };
@@ -833,7 +833,7 @@
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.resolve({ ok: true });
             }
-            return bpsEstimateApi('/api/estimate/delete', { code: String(code || '').trim() })
+            return bpsEstimateApi('/api/estimate', { action: 'delete', code: String(code || '').trim() })
                 .then(function (r) {
                     if (!r.ok) {
                         return { ok: false, error: (r.body && r.body.error) || '견적 서버 삭제 실패' };
@@ -847,7 +847,7 @@
 
         function syncExpensesFromServer() {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
-            return bpsAuthedPost('/api/expense/list', {}).then(function (r) {
+            return bpsAuthedPost('/api/expense', { action: 'list' }).then(function (r) {
                 if (!r.ok || !r.body || r.body.ok !== true || !Array.isArray(r.body.items)) {
                     return false;
                 }
@@ -875,7 +875,7 @@
             if (!item || !Number.isFinite(id)) {
                 return Promise.resolve({ ok: false, error: '저장할 경비 데이터가 올바르지 않습니다.' });
             }
-            var payloadWrapper = { item: item };
+            var payloadWrapper = { action: 'upsert', item: item };
             var maxBytes = 4 * 1024 * 1024 - 80 * 1024;
             if (bpsUtf8ByteLength(JSON.stringify(payloadWrapper)) > maxBytes) {
                 return Promise.resolve({
@@ -884,7 +884,7 @@
                         '영수증·첨부 파일(data URL) 때문에 요청 크기가 너무 큽니다. 사진·PDF를 빼거나 장당 용량을 줄인 뒤 다시 저장해 주세요.',
                 });
             }
-            return bpsAuthedPost('/api/expense/upsert', payloadWrapper)
+            return bpsAuthedPost('/api/expense', payloadWrapper)
                 .then(function (r) {
                     if (!r.ok || !r.body || r.body.ok !== true) {
                         var msg = (r.body && r.body.error) || '경비 서버 저장 실패';
@@ -913,7 +913,7 @@
             if (!Number.isFinite(nid)) {
                 return Promise.resolve({ ok: false, error: '삭제할 항목이 올바르지 않습니다.' });
             }
-            return bpsAuthedPost('/api/expense/delete', { id: nid })
+            return bpsAuthedPost('/api/expense', { action: 'delete', id: nid })
                 .then(function (r) {
                     if (!r.ok || !r.body || r.body.ok !== true) {
                         return { ok: false, error: (r.body && r.body.error) || '경비 서버 삭제 실패' };
@@ -927,7 +927,7 @@
 
         function syncSgaFromServer() {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
-            return bpsAuthedPost('/api/sga/list', {}).then(function (r) {
+            return bpsAuthedPost('/api/sga', { action: 'list' }).then(function (r) {
                 if (!r.ok || !r.body || r.body.ok !== true || !Array.isArray(r.body.items)) {
                     return false;
                 }
@@ -956,7 +956,7 @@
             if (!item || !Number.isFinite(id)) {
                 return Promise.resolve({ ok: false, error: '저장할 판관비 데이터가 올바르지 않습니다.' });
             }
-            return bpsAuthedPost('/api/sga/upsert', { item: item })
+            return bpsAuthedPost('/api/sga', { action: 'upsert', item: item })
                 .then(function (r) {
                     if (!r.ok || !r.body || r.body.ok !== true) {
                         var msg = (r.body && r.body.error) || '판관비 서버 저장 실패';
@@ -985,7 +985,7 @@
             if (!Number.isFinite(nid)) {
                 return Promise.resolve({ ok: false, error: '삭제할 항목이 올바르지 않습니다.' });
             }
-            return bpsAuthedPost('/api/sga/delete', { id: nid })
+            return bpsAuthedPost('/api/sga', { action: 'delete', id: nid })
                 .then(function (r) {
                     if (!r.ok || !r.body || r.body.ok !== true) {
                         return { ok: false, error: (r.body && r.body.error) || '판관비 서버 삭제 실패' };
