@@ -66,6 +66,9 @@
             if (pageName === 'expenses') {
                 fillExpenseMonthFilter();
                 renderExpenseTable();
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncExpensesFromServer();
+                }
             }
             if (pageName === 'sga') {
                 fillSgaMonthFilter();
@@ -297,6 +300,7 @@
             }
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                 syncEstimatesFromServer();
+                syncExpensesFromServer();
             }
 
             // 경영실적관리 기간 UI(월 선택/기간 선택) 초기화
@@ -711,6 +715,9 @@
         estimates.splice(0, estimates.length);
         applyEstimateDefaultsAndSeed(estimates);
 
+        // 경비 (`/api/expense/*` → 서버에서 `expense_records` 동기화, 견적 API와 동일 패턴).
+        let expenses = [];
+
         function computeBizTaxFromGross(grossNum) {
             const gross = Math.max(0, Math.round(Number(grossNum) || 0));
             const tax3 = Math.round(gross * 0.03);
@@ -734,7 +741,15 @@
             }
         }
 
-        function bpsEstimateApi(path, payload) {
+        function bpsUtf8ByteLength(str) {
+            if (typeof str !== 'string') return 0;
+            if (typeof TextEncoder !== 'undefined') {
+                return new TextEncoder().encode(str).length;
+            }
+            return unescape(encodeURIComponent(str)).length;
+        }
+
+        function bpsAuthedPost(path, payload) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.reject(new Error('NO_SUPABASE'));
             }
@@ -750,11 +765,31 @@
                     },
                     body: JSON.stringify(payload || {}),
                 }).then(function (r) {
-                    return r.json().then(function (j) {
+                    return r.text().then(function (text) {
+                        var j = null;
+                        try {
+                            j = text && text.length ? JSON.parse(text) : {};
+                        } catch (e) {
+                            j = {
+                                ok: false,
+                                error:
+                                    '서버 응답이 JSON이 아닙니다 (HTTP ' +
+                                    r.status +
+                                    '). /api 경로·최신 배포·로그인 세션을 확인해 주세요.',
+                                _rawSnippet: text ? String(text).replace(/\s+/g, ' ').slice(0, 180) : '',
+                            };
+                        }
+                        if (!r.ok && j && !j.error && typeof j.message === 'string') {
+                            j = { ...j, error: j.message };
+                        }
                         return { ok: r.ok, status: r.status, body: j };
                     });
                 });
             });
+        }
+
+        function bpsEstimateApi(path, payload) {
+            return bpsAuthedPost(path, payload);
         }
 
         function syncEstimatesFromServer() {
@@ -800,6 +835,112 @@
                 })
                 .catch(function (e) {
                     return { ok: false, error: (e && e.message) || '견적 서버 삭제 실패' };
+                });
+        }
+
+        function syncExpensesFromServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
+            return bpsAuthedPost('/api/expense/list', {}).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true || !Array.isArray(r.body.items)) {
+                    return false;
+                }
+                const list = r.body.items.map(function (x) {
+                    return { ...x };
+                });
+                expenses.splice(0, expenses.length, ...list);
+                fillExpenseMonthFilter();
+                renderExpenseTable();
+                return true;
+            }).catch(function () {
+                return false;
+            });
+        }
+
+        async function verifyExpenseRowOnServer(savedId) {
+            var id = Number(savedId);
+            if (!Number.isFinite(id)) {
+                return { ok: false, error: '저장된 경비 식별자가 올바르지 않습니다.' };
+            }
+            var synced = await syncExpensesFromServer();
+            if (!synced) {
+                return {
+                    ok: false,
+                    error:
+                        '서버 목록을 다시 불러오지 못했습니다. 네트워크·로그인·/api/expense 배포를 확인한 뒤 새로고침해 보세요.',
+                };
+            }
+            var found = expenses.some(function (e) {
+                return Number(e && e.id) === id;
+            });
+            if (!found) {
+                return {
+                    ok: false,
+                    error:
+                        '저장 응답은 성공이었지만 서버 목록에 이 경비가 없습니다. Supabase의 expense_records 테이블·Vercel 환경 변수·최신 배포를 확인해 주세요.',
+                };
+            }
+            return { ok: true };
+        }
+
+        function upsertExpenseToServer(item) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({
+                    ok: false,
+                    error:
+                        '로그인(Supabase) 정보가 없어 서버에 저장할 수 없습니다. 페이지를 새로고침한 뒤 다시 로그인해 주세요.',
+                });
+            }
+            var id = item && item.id != null ? Number(item.id) : NaN;
+            if (!item || !Number.isFinite(id)) {
+                return Promise.resolve({ ok: false, error: '저장할 경비 데이터가 올바르지 않습니다.' });
+            }
+            var payloadWrapper = { item: item };
+            var maxBytes = 4 * 1024 * 1024 - 80 * 1024;
+            if (bpsUtf8ByteLength(JSON.stringify(payloadWrapper)) > maxBytes) {
+                return Promise.resolve({
+                    ok: false,
+                    error:
+                        '영수증·첨부 파일(data URL) 때문에 요청 크기가 너무 큽니다. 사진·PDF를 빼거나 장당 용량을 줄인 뒤 다시 저장해 주세요.',
+                });
+            }
+            return bpsAuthedPost('/api/expense/upsert', payloadWrapper)
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        var msg = (r.body && r.body.error) || '경비 서버 저장 실패';
+                        if (r.body && r.body._rawSnippet) {
+                            msg += ' — ' + r.body._rawSnippet;
+                        } else if (r.status) {
+                            msg += ' (HTTP ' + r.status + ')';
+                        }
+                        return { ok: false, error: msg };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '경비 서버 저장 실패' };
+                });
+        }
+
+        function deleteExpenseFromServer(id) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({
+                    ok: false,
+                    error: '로그인(Supabase) 정보가 없어 서버에서 삭제할 수 없습니다.',
+                });
+            }
+            var nid = Number(id);
+            if (!Number.isFinite(nid)) {
+                return Promise.resolve({ ok: false, error: '삭제할 항목이 올바르지 않습니다.' });
+            }
+            return bpsAuthedPost('/api/expense/delete', { id: nid })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        return { ok: false, error: (r.body && r.body.error) || '경비 서버 삭제 실패' };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '경비 서버 삭제 실패' };
                 });
         }
 
@@ -2108,12 +2249,13 @@
                     ? `<span class="table-amount-chip ${salesAmountChipClass}">${item.revenue.toLocaleString()}원</span>`
                     : `<span class="table-amount-dash">-</span>`;
                 const cashflowCellHtml = canSeeMonetary ? renderCashflowTripleCell(item) : '<span class="table-amount-dash">-</span>';
+                const codeJs = JSON.stringify(String(item.code != null ? item.code : ''));
                 const statusCellHtml = canSeeMonetary
-                    ? `<button type="button" class="badge ${statusBadgeClass} status-popover-trigger" onclick="openStatusPopover(event, '${item.code}')">${item.status}</button>`
+                    ? `<button type="button" class="badge ${statusBadgeClass} status-popover-trigger" onclick="openStatusPopover(event, ${codeJs})">${item.status}</button>`
                     : `<span class="badge ${statusBadgeClass}">${item.status}</span>`;
 
                 return `
-                    <tr class="table-row-clickable" onclick="openPanelFromRow(event, '${item.code}')" data-code="${item.code}">
+                    <tr class="table-row-clickable" data-code="${escapeHtmlAttr(String(item.code != null ? item.code : ''))}">
                         <td onclick="event.stopPropagation()">
                             ${statusCellHtml}
                         </td>
@@ -2154,6 +2296,34 @@
                 currentStatus = tab.dataset.status;
                 renderTable();
             });
+        });
+
+        // 프로젝트 목록 행 클릭 → 상세 슬라이드 (인라인 onclick 대신 위임: ESM/CSP 환경에서 안정적)
+        document.addEventListener('click', function (e) {
+            const tb = document.getElementById('tableBody');
+            if (!tb) return;
+            const tr = e.target && e.target.closest && e.target.closest('tr.table-row-clickable[data-code]');
+            if (!tr || !tb.contains(tr)) return;
+            if (e.target.closest('.status-popover-trigger') || e.target.closest('.status-popover-root')) return;
+            const code = tr.getAttribute('data-code');
+            if (code != null && code !== '') openPanel(code);
+        });
+
+        // 경비 목록 행 클릭 → 상세 슬라이드 (window.openExpenseDetailPanel 불필요)
+        document.addEventListener('click', function (e) {
+            const tb = document.getElementById('expenseTableBody');
+            if (!tb || !e.target || !tb.contains(e.target)) return;
+            const fileEl = e.target.closest('.expense-row-file-link');
+            if (fileEl && tb.contains(fileEl)) {
+                e.preventDefault();
+                var fid = parseInt(fileEl.getAttribute('data-expense-id'), 10);
+                if (Number.isFinite(fid)) viewExpenseImage(fid, 0);
+                return;
+            }
+            const tr = e.target.closest('tr.table-row-clickable[data-expense-id]');
+            if (!tr || !tb.contains(tr)) return;
+            var eid = parseInt(tr.getAttribute('data-expense-id'), 10);
+            if (Number.isFinite(eid)) openExpenseDetailPanel(eid);
         });
 
         // 필터 변경
@@ -2663,6 +2833,9 @@
             } else if (window.location.hash === '#expenses') {
                 fillExpenseMonthFilter();
                 renderExpenseTable();
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncExpensesFromServer();
+                }
             } else if (window.location.hash === '#sga') {
                 fillSgaMonthFilter();
                 renderSgaTable();
@@ -2673,13 +2846,6 @@
         // 경비지출관리 JavaScript
         // ========================================
         
-        // 경비 데이터
-        let expenses = [
-            { id: 1, type: '계좌이체', date: '2026-03-10', building: '서울파이낸스센터', purpose: '자재 구매', hasReceipt: true, amount: 250000 },
-            { id: 2, type: '카드사용', date: '2026-03-09', building: '코오롱 본사', purpose: '식사비', hasReceipt: true, amount: 45000 },
-            { id: 3, type: '계좌이체', date: '2026-03-08', building: '', purpose: '교통비', hasReceipt: false, amount: 30000 }
-        ];
-
         let expenseEditingId = null;
         let sgaEditingId = null;
         let sgaExpenses = [
@@ -2967,14 +3133,14 @@
             tbody.innerHTML = filtered.map((item, index) => {
                 const n = getExpenseReceipts(item).length;
                 return `
-                <tr class="table-row-clickable" data-expense-id="${item.id}" onclick="openExpenseDetailPanel(${item.id})">
+                <tr class="table-row-clickable" data-expense-id="${item.id}">
                     <td>${index + 1}</td>
                     <td><span class="badge ${item.type === '계좌이체' ? 'badge-transfer' : 'badge-card'}">${item.type}</span></td>
                     <td>${item.date}</td>
                     <td>${item.building || '-'}</td>
                     <td>${item.purpose || '-'}</td>
                     <td class="text-right">${item.amount.toLocaleString()}원</td>
-                    <td><span class="file-link" onclick="event.stopPropagation(); viewExpenseImage(${item.id}, 0)" style="color: var(--success); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${n})</span></td>
+                    <td><span class="file-link expense-row-file-link" data-expense-id="${item.id}" style="color: var(--success); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${n})</span></td>
                 </tr>
             `;
             }).join('');
@@ -2999,44 +3165,72 @@
                 return;
             }
 
-            function doSave(receiptsArray) {
-                if (expenseEditingId) {
-                    const index = expenses.findIndex(e => e.id === expenseEditingId);
-                    if (index !== -1) {
+            function runAfterSave(receiptsArray) {
+                async function finishSave() {
+                    if (expenseEditingId) {
+                        const index = expenses.findIndex(e => e.id === expenseEditingId);
+                        if (index === -1) return;
                         const existing = getExpenseReceipts(expenses[index]);
                         const merged = receiptsArray.length ? [...existing, ...receiptsArray] : existing;
-                        expenses[index] = {
+                        const updated = {
                             ...expenses[index],
                             type,
                             date,
                             building,
                             purpose,
                             amount,
-                            receipts: merged
+                            receipts: merged,
                         };
+                        const remote = await upsertExpenseToServer(updated);
+                        if (!remote.ok) {
+                            alert(remote.error || '경비 서버 저장 실패');
+                            return;
+                        }
+                        var checkEdit = await verifyExpenseRowOnServer(updated.id);
+                        if (!checkEdit.ok) {
+                            alert(checkEdit.error);
+                            return;
+                        }
+                        alert('경비 내역이 수정되었습니다. (서버 목록과 일치함을 확인했습니다)');
+                        expenseEditingId = null;
+                    } else {
+                        var maxId = 0;
+                        expenses.forEach(function (e) {
+                            var n = Number(e && e.id);
+                            if (Number.isFinite(n) && n > maxId) maxId = n;
+                        });
+                        const newExpense = {
+                            id: maxId + 1,
+                            type,
+                            date,
+                            building,
+                            purpose,
+                            amount,
+                            receipts: receiptsArray || [],
+                        };
+                        const remote = await upsertExpenseToServer(newExpense);
+                        if (!remote.ok) {
+                            alert(remote.error || '경비 서버 저장 실패');
+                            return;
+                        }
+                        var checkNew = await verifyExpenseRowOnServer(newExpense.id);
+                        if (!checkNew.ok) {
+                            alert(checkNew.error);
+                            return;
+                        }
+                        alert('경비가 등록되었습니다. (서버 목록과 일치함을 확인했습니다)');
                     }
-                    alert('경비 내역이 수정되었습니다.');
-                    expenseEditingId = null;
-                } else {
-                    const newExpense = {
-                        id: expenses.length > 0 ? Math.max(...expenses.map(e => e.id)) + 1 : 1,
-                        type,
-                        date,
-                        building,
-                        purpose,
-                        amount,
-                        receipts: receiptsArray || []
-                    };
-                    expenses.unshift(newExpense);
-                    alert('경비가 등록되었습니다.');
+                    closeExpensePanel();
+                    fillExpenseMonthFilter();
+                    renderExpenseTable();
                 }
-                closeExpensePanel();
-                fillExpenseMonthFilter();
-                renderExpenseTable();
+                finishSave().catch(function (e) {
+                    alert((e && e.message) || '경비 저장 중 오류가 발생했습니다.');
+                });
             }
 
             if (files.length === 0) {
-                doSave([]);
+                runAfterSave([]);
                 return;
             }
             let read = 0;
@@ -3046,7 +3240,7 @@
                 reader.onload = function() {
                     results[i] = { dataUrl: reader.result, name: file.name || '영수증' };
                     read++;
-                    if (read === files.length) doSave(results);
+                    if (read === files.length) runAfterSave(results);
                 };
                 reader.readAsDataURL(file);
             });
@@ -3076,11 +3270,16 @@
 
         // 삭제
         function deleteExpense(id) {
-            if (confirm('이 경비 내역을 삭제하시겠습니까?')) {
+            if (!confirm('이 경비 내역을 삭제하시겠습니까?')) return;
+            deleteExpenseFromServer(id).then(function (remote) {
+                if (!remote.ok) {
+                    alert(remote.error || '경비 서버 삭제 실패');
+                    return;
+                }
                 expenses = expenses.filter(e => e.id !== id);
                 renderExpenseTable();
                 alert('삭제되었습니다.');
-            }
+            });
         }
 
         // 폼 초기화
@@ -3110,9 +3309,26 @@
                 <div class="panel-form-row"><span class="detail-label">결제금액</span><span class="detail-value">${expense.amount.toLocaleString()}원</span></div>
                 <div class="panel-form-row">
                     <span class="detail-label">사진</span>
-                    <span class="detail-value">${(function(){ const n = getExpenseReceipts(expense).length; return n ? `<span class="file-link" onclick="viewExpenseImage(${expense.id}, 0)" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${n})</span>` : '보기 (0)'; })()}</span>
+                    <span class="detail-value expense-detail-photo-cell"></span>
                 </div>
             `;
+            (function () {
+                const photoCell = body.querySelector('.expense-detail-photo-cell');
+                if (!photoCell) return;
+                const n = getExpenseReceipts(expense).length;
+                if (!n) {
+                    photoCell.textContent = '보기 (0)';
+                    return;
+                }
+                const span = document.createElement('span');
+                span.className = 'file-link';
+                span.style.cssText = 'color: var(--primary); cursor: pointer;';
+                span.innerHTML = '<i class="fas fa-image"></i> 보기 (' + n + ')';
+                span.addEventListener('click', function () {
+                    viewExpenseImage(id, 0);
+                });
+                photoCell.appendChild(span);
+            })();
             if (editBtn) { editBtn.onclick = function() { closeExpenseDetailPanel(); editExpense(id); }; }
             if (deleteBtn) { deleteBtn.onclick = function() { if (confirm('이 경비 내역을 삭제하시겠습니까?')) { closeExpenseDetailPanel(); deleteExpense(id); } }; }
             document.getElementById('expenseDetailOverlay').classList.add('active');
@@ -5556,7 +5772,10 @@
 
         // 프로젝트 상세 열기 (가운데 모달로 표시)
         function openPanel(code) {
-            const item = estimates.find(e => e.code === code);
+            const c = String(code == null ? '' : code).trim();
+            const item = estimates.find(function (e) {
+                return String(e && e.code != null ? e.code : '').trim() === c;
+            });
             if (!item) return;
 
             currentEditItem = {...item};
@@ -6564,7 +6783,9 @@
         function switchPanelTab(event, tabId) {
             document.querySelectorAll('.panel-tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.new-estimate-tab').forEach(tab => tab.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            const ev = event != null ? event : window.event;
+            const cur = ev && ev.currentTarget;
+            if (cur && cur.classList) cur.classList.add('active');
 
             // 패널 재렌더링 시 활성 탭 유지
             activePanelTabId = tabId;
@@ -8215,24 +8436,31 @@
         }
 
         function openStatusPopover(event, code) {
-            event.stopPropagation();
-            const trigger = event.currentTarget;
+            const ev = event != null ? event : window.event;
+            if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
+            const trigger = ev && ev.currentTarget;
             if (!trigger) return;
-            const item = estimates.find(e => e.code === code);
+            const c = String(code == null ? '' : code).trim();
+            const item = estimates.find(function (e) {
+                return String(e && e.code != null ? e.code : '').trim() === c;
+            });
             if (!item) return;
             const root = getStatusPopoverRoot();
             const currentCode = root.getAttribute('data-code');
-            if (root.classList.contains('active') && currentCode === code) {
+            if (root.classList.contains('active') && currentCode === c) {
                 closeStatusPopover();
                 return;
             }
 
-            root.setAttribute('data-code', code);
+            const esc = function (s) {
+                return JSON.stringify(String(s == null ? '' : s));
+            };
+            root.setAttribute('data-code', c);
             root.innerHTML = `
-                <button type="button" class="status-popover-item estimate ${item.status === '견적' ? 'selected' : ''}" onclick="changeStatus('${code}', '견적')"><span class="status-color"></span>견적</button>
-                <button type="button" class="status-popover-item progress ${item.status === '진행' ? 'selected' : ''}" onclick="changeStatus('${code}', '진행')"><span class="status-color"></span>진행</button>
-                <button type="button" class="status-popover-item complete ${item.status === '완료' ? 'selected' : ''}" onclick="changeStatus('${code}', '완료')"><span class="status-color"></span>완료</button>
-                <button type="button" class="status-popover-item hold ${item.status === '보류' ? 'selected' : ''}" onclick="changeStatus('${code}', '보류')"><span class="status-color"></span>보류</button>
+                <button type="button" class="status-popover-item estimate ${item.status === '견적' ? 'selected' : ''}" onclick="changeStatus(${esc(c)}, ${esc('견적')})"><span class="status-color"></span>견적</button>
+                <button type="button" class="status-popover-item progress ${item.status === '진행' ? 'selected' : ''}" onclick="changeStatus(${esc(c)}, ${esc('진행')})"><span class="status-color"></span>진행</button>
+                <button type="button" class="status-popover-item complete ${item.status === '완료' ? 'selected' : ''}" onclick="changeStatus(${esc(c)}, ${esc('완료')})"><span class="status-color"></span>완료</button>
+                <button type="button" class="status-popover-item hold ${item.status === '보류' ? 'selected' : ''}" onclick="changeStatus(${esc(c)}, ${esc('보류')})"><span class="status-color"></span>보류</button>
             `;
             root.classList.add('active');
 
@@ -8265,7 +8493,10 @@
 
         // 상태 변경
         function changeStatus(code, newStatus) {
-            const item = estimates.find(e => e.code === code);
+            const c = String(code == null ? '' : code).trim();
+            const item = estimates.find(function (e) {
+                return String(e && e.code != null ? e.code : '').trim() === c;
+            });
             if (item) {
                 item.status = newStatus;
                 renderTable();
@@ -8275,9 +8506,12 @@
 
         // 테이블 행 클릭으로 패널 열기
         function openPanelFromRow(event, code) {
-            // 상태 드롭다운 클릭은 무시
-            if (event.target.closest('.status-popover-trigger') || event.target.closest('.status-popover-root')) {
-                return;
+            const ev = event != null ? event : window.event;
+            const t = ev && ev.target;
+            if (t && typeof t.closest === 'function') {
+                if (t.closest('.status-popover-trigger') || t.closest('.status-popover-root')) {
+                    return;
+                }
             }
             openPanel(code);
         }
@@ -8332,6 +8566,30 @@
                 cancelEdit,
                 openEstimateEditor,
                 saveNewEstimateFromSteps,
+                switchNewEstimateTab,
+                switchPanelTab,
+                removeItemRow,
+                removeItemRowStep,
+                addSalesRow,
+                addPaymentRow,
+                addPurchaseRow,
+                addTransferRow,
+                onFinanceRowClick,
+                togglePaymentRowInline,
+                deleteRow,
+                goEstimatePage,
+                openStatusPopover,
+                showFileList,
+                handleMultiFileSelect,
+                viewSavedRowFiles,
+                viewCurrentAttachmentFile,
+                downloadCurrentAttachmentFile,
+                applySameFromSourceToFinanceModal,
+                closeFinanceRowModal,
+                saveFinanceRowModal,
+                confirmDeleteFinanceRow,
+                closeSalesSamePickerModal,
+                applySelectedSalesSame,
                 startBasicInfoEdit,
                 cancelBasicInfoEdit,
                 saveBasicInfoEdit,
@@ -8347,6 +8605,7 @@
                 // 경영실적
                 switchPerformancePeriodMode,
                 switchPerformanceRightTab,
+                switchPerformanceSgaMode,
 
                 // 주간/미수금
                 downloadWeeklyCSV,
@@ -8358,6 +8617,9 @@
                 closeContractorPanel,
                 saveContractor,
                 closeContractorDetailPanel,
+                openContractorDetailPanel,
+                viewContractorImage,
+                updateContractorFileName,
 
                 // 경비
                 downloadExpenseCSV,
@@ -8365,6 +8627,12 @@
                 closeExpensePanel,
                 saveExpense,
                 closeExpenseDetailPanel,
+                openExpenseDetailPanel,
+                viewExpenseImage,
+                onExpenseMonthChange,
+                editExpense,
+                deleteExpense,
+                updateExpenseFileName,
 
                 // 판관비
                 downloadSgaCSV,
@@ -8372,6 +8640,8 @@
                 closeSgaPanel,
                 saveSgaExpense,
                 closeSgaDetailPanel,
+                openSgaDetailPanel,
+                onSgaMonthChange,
 
                 // 관리자설정
                 switchAdminSettingsTab,
@@ -8380,6 +8650,8 @@
                 switchUserManageTab,
                 updateUserManagePanelByType,
                 addMasterItem,
+                toggleMasterActive,
+                removeMasterItem,
                 toggleAccountStatus,
                 resetUserPassword,
                 syncUserAccountsFromServer,
@@ -8390,5 +8662,5 @@
                 if (typeof v === 'function') window[k] = v;
             });
         } catch (e) {
-            // ignore
+            console.error('bps window expose 실패 — 인라인 onclick이 동작하지 않을 수 있습니다.', e);
         }
