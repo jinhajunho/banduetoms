@@ -107,16 +107,17 @@
             display: block;
             object-fit: contain;
             flex-shrink: 0;
+            border-radius: 18px;
         }
 
         .site-logo--sidebar {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
         }
 
         .site-logo--login {
-            width: 64px;
-            height: 64px;
+            width: 96px;
+            height: 96px;
         }
 
         .logo-label {
@@ -6741,11 +6742,12 @@
         }
 
         .login-brand-logo-wrap {
-            width: 64px;
-            height: 64px;
+            width: 96px;
+            height: 96px;
             margin: 0 auto 14px;
-            border-radius: 16px;
-            background: transparent;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             display: flex;
             align-items: center;
             justify-content: center;
