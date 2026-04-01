@@ -2187,6 +2187,8 @@
             color: white;
             position: relative;
             z-index: 2;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .event-bar .event-title {
