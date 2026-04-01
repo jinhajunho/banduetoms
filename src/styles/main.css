@@ -2243,17 +2243,17 @@
         .calendar-day-events {
             flex: 1;
             min-height: 0;
-            overflow-y: auto;
-            padding-right: 2px;
+            overflow: hidden;
+            padding-right: 0;
         }
 
         .calendar-day-events::-webkit-scrollbar {
-            width: 6px;
+            width: 0;
+            height: 0;
         }
 
         .calendar-day-events::-webkit-scrollbar-thumb {
-            background: rgba(107, 114, 128, 0.45);
-            border-radius: 999px;
+            background: transparent;
         }
 
         .calendar-more-btn {
