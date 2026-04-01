@@ -384,6 +384,7 @@
         let dashboardCalendarYear = new Date().getFullYear();
         let dashboardCalendarMonth = new Date().getMonth();
         let dashboardCalendarFilter = 'all';
+        let dashboardCalendarSearchTerm = '';
 
         function getDashboardEvents() {
             return estimates.map(e => ({
@@ -392,6 +393,7 @@
                 building: e.building || '',
                 project: e.project || '',
                 manager: e.manager || '',
+                contractor: e.contractor || '',
                 status: e.status || '견적',
                 startDate: e.startDate || '',
                 endDate: e.endDate || '',
@@ -402,6 +404,58 @@
 
         function normalizeYmd(value) {
             return value ? String(value).trim().slice(0, 10) : '';
+        }
+
+        function parseYmdToUtc(value) {
+            const ymd = normalizeYmd(value);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+            const parts = ymd.split('-').map(Number);
+            return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+        }
+
+        function daysBetweenInclusive(fromYmd, toYmd) {
+            const a = parseYmdToUtc(fromYmd);
+            const b = parseYmdToUtc(toYmd);
+            if (!a || !b) return 1;
+            const diff = Math.round((b.getTime() - a.getTime()) / 86400000);
+            return Math.max(1, diff + 1);
+        }
+
+        function getEventRangeMetaForDate(event, dateStr) {
+            const target = normalizeYmd(dateStr);
+            const start = normalizeYmd(event.startDate);
+            const end = normalizeYmd(event.endDate);
+            if (!target) return null;
+
+            if (start && end) {
+                const from = start <= end ? start : end;
+                const to = start <= end ? end : start;
+                if (target < from || target > to) return null;
+                const durationDays = daysBetweenInclusive(from, to);
+                if (durationDays <= 1) {
+                    return { isPeriod: false, durationDays: 1, dayType: 'single' };
+                }
+                if (target === from) return { isPeriod: true, durationDays: durationDays, dayType: 'period-start' };
+                if (target === to) return { isPeriod: true, durationDays: durationDays, dayType: 'period-end' };
+                return { isPeriod: true, durationDays: durationDays, dayType: 'period-middle' };
+            }
+
+            if (start && target === start) return { isPeriod: false, durationDays: 1, dayType: 'single' };
+            if (end && target === end) return { isPeriod: false, durationDays: 1, dayType: 'single' };
+            return null;
+        }
+
+        function matchesDashboardSearch(event) {
+            const q = String(dashboardCalendarSearchTerm || '').trim().toLowerCase();
+            if (!q) return true;
+            const text = [
+                event.code || '',
+                event.building || '',
+                event.project || '',
+                event.manager || '',
+                event.contractor || '',
+            ].join(' ').toLowerCase();
+            return text.includes(q);
         }
 
         function isDateInRange(dateStr, startDate, endDate) {
@@ -421,27 +475,36 @@
 
         function getDashboardEventsForDate(dateStr) {
             return getDashboardEvents().reduce((acc, event) => {
-                const isStartDate = !!event.startDate && normalizeYmd(event.startDate) === normalizeYmd(dateStr);
-                const isEndDate = !!event.endDate && normalizeYmd(event.endDate) === normalizeYmd(dateStr);
-                const isInPeriod = isDateInRange(dateStr, event.startDate, event.endDate);
+                const rangeMeta = getEventRangeMetaForDate(event, dateStr);
                 const hasCalendarAnchor = !!(event.startDate || event.endDate);
                 let shouldShow = false;
 
-                if (!hasCalendarAnchor) {
+                if (!hasCalendarAnchor || !rangeMeta) {
                     shouldShow = false;
                 } else if (dashboardCalendarFilter === '진행') {
-                    shouldShow = (isInPeriod || isStartDate) && event.status !== '완료';
+                    shouldShow = event.status !== '완료';
                 } else if (dashboardCalendarFilter === '완료') {
-                    shouldShow = (isInPeriod || isEndDate) && event.status === '완료';
+                    shouldShow = event.status === '완료';
                 } else {
-                    shouldShow = isInPeriod || isStartDate || isEndDate;
+                    shouldShow = true;
                 }
 
-                if (shouldShow) {
-                    acc.push(event);
+                if (shouldShow && matchesDashboardSearch(event)) {
+                    acc.push({
+                        ...event,
+                        _isPeriod: rangeMeta.isPeriod,
+                        _durationDays: rangeMeta.durationDays,
+                        _dayType: rangeMeta.dayType,
+                    });
                 }
                 return acc;
-            }, []);
+            }, []).sort((a, b) => {
+                if (a._isPeriod !== b._isPeriod) return a._isPeriod ? -1 : 1;
+                if (a._durationDays !== b._durationDays) return b._durationDays - a._durationDays;
+                const aa = (a.building || '') + ' ' + (a.project || '');
+                const bb = (b.building || '') + ' ' + (b.project || '');
+                return aa.localeCompare(bb, 'ko');
+            });
         }
 
         function renderDashboardCalendar() {
@@ -483,9 +546,12 @@
                 const eventsContainer = document.createElement('div');
                 eventsContainer.className = 'calendar-day-events';
                 const dayEvents = getDashboardEventsForDate(dateStr);
-                dayEvents.forEach(event => {
+                dayEvents.slice(0, 4).forEach(event => {
                     const eventBar = document.createElement('div');
                     eventBar.className = 'event-bar ' + (event.status === '완료' ? 'completed' : 'progress');
+                    if (event._dayType === 'period-start') eventBar.classList.add('event-bar-period-start');
+                    else if (event._dayType === 'period-middle') eventBar.classList.add('event-bar-period-middle');
+                    else if (event._dayType === 'period-end') eventBar.classList.add('event-bar-period-end');
                     const eventTitle = (event.building ? event.building + ' - ' : '') + event.project;
                     eventBar.innerHTML = '<span class="event-title">' + eventTitle + '</span>';
                     eventBar.onclick = () => showDashboardEventModal(event);
@@ -672,6 +738,24 @@
                     renderDashboardCalendar();
                 };
             });
+
+            const searchInput = document.getElementById('dashboardCalendarSearch');
+            const clearBtn = document.getElementById('dashboardCalendarSearchClear');
+            if (searchInput) {
+                searchInput.value = dashboardCalendarSearchTerm;
+                searchInput.oninput = function () {
+                    dashboardCalendarSearchTerm = this.value || '';
+                    renderDashboardCalendar();
+                };
+            }
+            if (clearBtn) {
+                clearBtn.onclick = function () {
+                    dashboardCalendarSearchTerm = '';
+                    if (searchInput) searchInput.value = '';
+                    renderDashboardCalendar();
+                    if (searchInput) searchInput.focus();
+                };
+            }
         }
 
         (function initDashboardModal() {
