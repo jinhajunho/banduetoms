@@ -2146,7 +2146,7 @@
             min-height: 100px;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow: visible;
         }
 
 
@@ -2243,7 +2243,8 @@
         .calendar-day-events {
             flex: 1;
             min-height: 0;
-            overflow: hidden;
+            overflow-x: visible;
+            overflow-y: hidden;
             padding-right: 0;
         }
 
