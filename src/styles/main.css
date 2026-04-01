@@ -3365,13 +3365,15 @@
             color: var(--gray-900);
         }
 
-        #expenseDetailSlidePanel .expense-detail-panel-header {
+        #expenseDetailSlidePanel .expense-detail-panel-header,
+        #sgaDetailSlidePanel .expense-detail-panel-header {
             display: flex !important;
             align-items: center !important;
             gap: 12px !important;
         }
 
-        #expenseDetailSlidePanel .expense-detail-panel-header .panel-title-wrap {
+        #expenseDetailSlidePanel .expense-detail-panel-header .panel-title-wrap,
+        #sgaDetailSlidePanel .expense-detail-panel-header .panel-title-wrap {
             margin-right: auto !important;
         }
 

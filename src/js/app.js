@@ -2936,7 +2936,6 @@
             if (!item) return;
             const body = document.getElementById('sgaDetailBody');
             const editBtn = document.getElementById('sgaDetailEditBtn');
-            const deleteBtn = document.getElementById('sgaDetailDeleteBtn');
             if (!body) return;
             body.innerHTML =
                 '<div class="panel-form-row"><span class="detail-label">지출일자</span><span class="detail-value">' + (item.date || '-') + '</span></div>' +
@@ -2947,14 +2946,6 @@
                 editBtn.onclick = function() {
                     closeSgaDetailPanel();
                     editSgaExpense(id);
-                };
-            }
-            if (deleteBtn) {
-                deleteBtn.onclick = function() {
-                    if (confirm('해당 판관비를 삭제하시겠습니까?')) {
-                        closeSgaDetailPanel();
-                        deleteSgaExpense(id, true);
-                    }
                 };
             }
             const overlay = document.getElementById('sgaDetailOverlay');
@@ -2977,6 +2968,21 @@
                 const dateInput = document.getElementById('sgaDate');
                 if (dateInput) dateInput.valueAsDate = new Date();
             }
+            var delBtn = document.getElementById('sgaPanelDeleteBtn');
+            if (delBtn) {
+                if (sgaEditingId) {
+                    delBtn.style.display = '';
+                    delBtn.setAttribute('aria-hidden', 'false');
+                    var eid = sgaEditingId;
+                    delBtn.onclick = function () {
+                        deleteSgaExpense(eid);
+                    };
+                } else {
+                    delBtn.style.display = 'none';
+                    delBtn.setAttribute('aria-hidden', 'true');
+                    delBtn.onclick = null;
+                }
+            }
             const overlay = document.getElementById('sgaPanelOverlay');
             const panel = document.getElementById('sgaSlidePanel');
             if (overlay) overlay.classList.add('active');
@@ -2988,6 +2994,12 @@
             const panel = document.getElementById('sgaSlidePanel');
             if (overlay) overlay.classList.remove('active');
             if (panel) panel.classList.remove('active');
+            var delBtn = document.getElementById('sgaPanelDeleteBtn');
+            if (delBtn) {
+                delBtn.style.display = 'none';
+                delBtn.setAttribute('aria-hidden', 'true');
+                delBtn.onclick = null;
+            }
             resetSgaForm();
         }
 
@@ -3105,6 +3117,7 @@
                 fillSgaMonthFilter();
                 renderSgaTable();
                 renderPerformanceData();
+                closeSgaPanel();
                 alert('삭제되었습니다.');
             });
         }

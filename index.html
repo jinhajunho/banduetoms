@@ -836,34 +836,36 @@
                 </div>
             </div>
 
-            <!-- 판관비 상세 슬라이드 패널 (행 클릭 시) -->
+            <!-- 판관비 상세 중앙 모달 (행 클릭 시) -->
             <div class="panel-overlay" id="sgaDetailOverlay" onclick="closeSgaDetailPanel()"></div>
-            <div class="slide-panel expense-panel expense-detail-panel" id="sgaDetailSlidePanel">
-                <div class="panel-header expense-panel-header">
+            <div class="slide-panel expense-panel expense-detail-panel expense-center-modal" id="sgaDetailSlidePanel">
+                <div class="panel-header expense-panel-header expense-detail-panel-header">
                     <div class="panel-title-wrap">
                         <span class="panel-title-icon"><i class="fas fa-briefcase"></i></span>
                         <span class="panel-title">판관비 상세</span>
                     </div>
-                    <button type="button" class="panel-close" onclick="closeSgaDetailPanel()" aria-label="닫기">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <div class="expense-detail-header-trailing">
+                        <button type="button" class="btn btn-secondary btn-sm" id="sgaDetailEditBtn">수정</button>
+                        <button type="button" class="panel-close" onclick="closeSgaDetailPanel()" aria-label="닫기">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="panel-body expense-panel-body" id="sgaDetailBody">
                     <!-- JS에서 채움 -->
                 </div>
-                <div class="panel-actions expense-panel-actions" id="sgaDetailActions">
-                    <button type="button" class="btn-cancel" onclick="closeSgaDetailPanel()">닫기</button>
-                    <button type="button" class="btn btn-secondary" id="sgaDetailEditBtn">수정</button>
-                    <button type="button" class="btn btn-primary" style="background: var(--danger);" id="sgaDetailDeleteBtn">삭제</button>
-                </div>
             </div>
 
+            <!-- 판관비 등록·수정 중앙 모달 -->
             <div class="panel-overlay" id="sgaPanelOverlay" onclick="closeSgaPanel()"></div>
-            <div class="slide-panel expense-panel" id="sgaSlidePanel">
+            <div class="slide-panel expense-panel expense-center-modal" id="sgaSlidePanel">
                 <div class="panel-header expense-panel-header">
                     <div class="panel-title-wrap">
                         <span class="panel-title" id="sgaPanelTitle">판관비 등록</span>
                     </div>
+                    <button type="button" class="btn btn-sm expense-panel-header-delete" id="sgaPanelDeleteBtn" style="display: none;" aria-hidden="true">
+                        삭제
+                    </button>
                     <button type="button" class="btn btn-primary btn-sm" onclick="saveSgaExpense()">
                         <i class="fas fa-save"></i> 저장
                     </button>
