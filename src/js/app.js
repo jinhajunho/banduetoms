@@ -403,7 +403,32 @@
         }
 
         function normalizeYmd(value) {
-            return value ? String(value).trim().slice(0, 10) : '';
+            if (!value) return '';
+            const raw = String(value).trim();
+            if (!raw) return '';
+
+            // ISO(YYYY-MM-DD...) 우선 처리
+            const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+
+            // 단일 자리 월/일(YYYY-M-D)도 허용
+            const loose = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (loose) {
+                const y = loose[1];
+                const m = String(Number(loose[2])).padStart(2, '0');
+                const d = String(Number(loose[3])).padStart(2, '0');
+                return y + '-' + m + '-' + d;
+            }
+
+            // Date 파싱 가능 문자열 fallback
+            const dt = new Date(raw);
+            if (!isNaN(dt.getTime())) {
+                const y = dt.getFullYear();
+                const m = String(dt.getMonth() + 1).padStart(2, '0');
+                const d = String(dt.getDate()).padStart(2, '0');
+                return y + '-' + m + '-' + d;
+            }
+            return '';
         }
 
         function parseYmdToUtc(value) {
