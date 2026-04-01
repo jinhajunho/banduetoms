@@ -73,6 +73,9 @@
             if (pageName === 'sga') {
                 fillSgaMonthFilter();
                 renderSgaTable();
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncSgaFromServer();
+                }
             }
             if (pageName === 'users') {
                 renderUsersTable();
@@ -301,6 +304,7 @@
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                 syncEstimatesFromServer();
                 syncExpensesFromServer();
+                syncSgaFromServer();
             }
 
             // 경영실적관리 기간 UI(월 선택/기간 선택) 초기화
@@ -718,6 +722,9 @@
         // 경비 (`/api/expense/*` → 서버에서 `expense_records` 동기화, 견적 API와 동일 패턴).
         let expenses = [];
 
+        // 판관비 (`/api/sga/*` → `sga_records`)
+        let sgaExpenses = [];
+
         function computeBizTaxFromGross(grossNum) {
             const gross = Math.max(0, Math.round(Number(grossNum) || 0));
             const tax3 = Math.round(gross * 0.03);
@@ -915,6 +922,78 @@
                 })
                 .catch(function (e) {
                     return { ok: false, error: (e && e.message) || '경비 서버 삭제 실패' };
+                });
+        }
+
+        function syncSgaFromServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
+            return bpsAuthedPost('/api/sga/list', {}).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true || !Array.isArray(r.body.items)) {
+                    return false;
+                }
+                const list = r.body.items.map(function (x) {
+                    return { ...x };
+                });
+                sgaExpenses.splice(0, sgaExpenses.length, ...list);
+                fillSgaMonthFilter();
+                renderSgaTable();
+                renderPerformanceData();
+                return true;
+            }).catch(function () {
+                return false;
+            });
+        }
+
+        function upsertSgaToServer(item) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({
+                    ok: false,
+                    error:
+                        '로그인(Supabase) 정보가 없어 서버에 저장할 수 없습니다. 페이지를 새로고침한 뒤 다시 로그인해 주세요.',
+                });
+            }
+            var id = item && item.id != null ? Number(item.id) : NaN;
+            if (!item || !Number.isFinite(id)) {
+                return Promise.resolve({ ok: false, error: '저장할 판관비 데이터가 올바르지 않습니다.' });
+            }
+            return bpsAuthedPost('/api/sga/upsert', { item: item })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        var msg = (r.body && r.body.error) || '판관비 서버 저장 실패';
+                        if (r.body && r.body._rawSnippet) {
+                            msg += ' — ' + r.body._rawSnippet;
+                        } else if (r.status) {
+                            msg += ' (HTTP ' + r.status + ')';
+                        }
+                        return { ok: false, error: msg };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '판관비 서버 저장 실패' };
+                });
+        }
+
+        function deleteSgaFromServer(id) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve({
+                    ok: false,
+                    error: '로그인(Supabase) 정보가 없어 서버에서 삭제할 수 없습니다.',
+                });
+            }
+            var nid = Number(id);
+            if (!Number.isFinite(nid)) {
+                return Promise.resolve({ ok: false, error: '삭제할 항목이 올바르지 않습니다.' });
+            }
+            return bpsAuthedPost('/api/sga/delete', { id: nid })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        return { ok: false, error: (r.body && r.body.error) || '판관비 서버 삭제 실패' };
+                    }
+                    return { ok: true };
+                })
+                .catch(function (e) {
+                    return { ok: false, error: (e && e.message) || '판관비 서버 삭제 실패' };
                 });
         }
 
@@ -2813,6 +2892,9 @@
             } else if (window.location.hash === '#sga') {
                 fillSgaMonthFilter();
                 renderSgaTable();
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    syncSgaFromServer();
+                }
             }
         });
 
@@ -2822,11 +2904,6 @@
         
         let expenseEditingId = null;
         let sgaEditingId = null;
-        let sgaExpenses = [
-            { id: 1, date: '2026-03-01', category: '임대료', amount: 850000, memo: '' },
-            { id: 2, date: '2026-03-05', category: '통신비', amount: 120000, memo: '' },
-            { id: 3, date: '2026-03-08', category: '소모품비', amount: 95000, memo: '' }
-        ];
 
         function renderSgaTable() {
             const tbody = document.getElementById('sgaTableBody');
@@ -2941,19 +3018,59 @@
                 return;
             }
 
-            if (sgaEditingId) {
-                const idx = sgaExpenses.findIndex(function(item) { return item.id === sgaEditingId; });
-                if (idx !== -1) {
-                    sgaExpenses[idx] = { ...sgaExpenses[idx], date: date, category: category, amount: amount, memo: memo };
-                }
-            } else {
-                const nextId = sgaExpenses.length ? Math.max(...sgaExpenses.map(function(item) { return item.id; })) + 1 : 1;
-                sgaExpenses.unshift({ id: nextId, date: date, category: category, amount: amount, memo: memo });
+            function afterSave() {
+                closeSgaPanel();
+                fillSgaMonthFilter();
+                renderSgaTable();
+                renderPerformanceData();
             }
-            closeSgaPanel();
-            fillSgaMonthFilter();
-            renderSgaTable();
-            renderPerformanceData();
+
+            if (sgaEditingId) {
+                const idx = sgaExpenses.findIndex(function (item) {
+                    return item.id === sgaEditingId;
+                });
+                if (idx === -1) return;
+                const updated = {
+                    ...sgaExpenses[idx],
+                    date: date,
+                    category: category,
+                    amount: amount,
+                    memo: memo,
+                };
+                upsertSgaToServer(updated).then(function (remote) {
+                    if (!remote.ok) {
+                        alert(remote.error || '판관비 서버 저장 실패');
+                        return;
+                    }
+                    sgaExpenses[idx] = updated;
+                    sgaEditingId = null;
+                    afterSave();
+                    alert('판관비 내역이 수정되었습니다.');
+                });
+                return;
+            }
+
+            var maxId = 0;
+            sgaExpenses.forEach(function (e) {
+                var n = Number(e && e.id);
+                if (Number.isFinite(n) && n > maxId) maxId = n;
+            });
+            const newItem = {
+                id: maxId + 1,
+                date: date,
+                category: category,
+                amount: amount,
+                memo: memo,
+            };
+            upsertSgaToServer(newItem).then(function (remote) {
+                if (!remote.ok) {
+                    alert(remote.error || '판관비 서버 저장 실패');
+                    return;
+                }
+                sgaExpenses.unshift(newItem);
+                afterSave();
+                alert('판관비가 등록되었습니다.');
+            });
         }
 
         function editSgaExpense(id) {
@@ -2972,13 +3089,24 @@
         }
 
         function deleteSgaExpense(id, skipConfirm) {
-            const item = sgaExpenses.find(function(row) { return row.id === id; });
+            const item = sgaExpenses.find(function (row) {
+                return row.id === id;
+            });
             if (!item) return;
             if (!skipConfirm && !confirm('해당 판관비를 삭제하시겠습니까?')) return;
-            sgaExpenses = sgaExpenses.filter(function(row) { return row.id !== id; });
-            fillSgaMonthFilter();
-            renderSgaTable();
-            renderPerformanceData();
+            deleteSgaFromServer(id).then(function (remote) {
+                if (!remote.ok) {
+                    alert(remote.error || '판관비 서버 삭제 실패');
+                    return;
+                }
+                sgaExpenses = sgaExpenses.filter(function (row) {
+                    return row.id !== id;
+                });
+                fillSgaMonthFilter();
+                renderSgaTable();
+                renderPerformanceData();
+                alert('삭제되었습니다.');
+            });
         }
 
         // 경비 영수증 목록 (복수). receipts: [{ dataUrl, name }]. 구버전 호환: hasReceipt/receiptDataUrl -> receipts
