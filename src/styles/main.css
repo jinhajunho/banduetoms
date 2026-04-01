@@ -2205,20 +2205,19 @@
         .event-bar-period-segment-start {
             border-top-right-radius: 0;
             border-bottom-right-radius: 0;
-            width: calc(100% + 8px);
+            margin-right: -16px;
         }
 
         .event-bar-period-segment-middle {
             border-radius: 0;
-            margin-left: -8px;
-            width: calc(100% + 16px);
+            margin-left: -16px;
+            margin-right: -16px;
         }
 
         .event-bar-period-segment-end {
             border-top-left-radius: 0;
             border-bottom-left-radius: 0;
-            margin-left: -8px;
-            width: calc(100% + 8px);
+            margin-left: -16px;
         }
 
         .event-bar-period-segment-single {
