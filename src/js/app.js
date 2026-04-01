@@ -1146,25 +1146,10 @@
             return '<div class="table-amount-pair table-cashflow-triple">' + payHtml + '<span class="table-amount-slash">/</span>' + xferHtml + '<span class="table-amount-slash">/</span>' + netHtml + '</div>';
         }
 
-        /** 대/중/소분류 마스터 { name, active } — 관리자설정 > 필터값 탭에서 관리 */
-        let category1Master = [
-            { name: 'B2B', active: true },
-            { name: 'B2C', active: true },
-            { name: '컨텍터스', active: true }
-        ];
-        let category2Master = [
-            { name: '코오롱', active: true },
-            { name: '저스트코', active: true },
-            { name: '다락', active: true },
-            { name: '관리건물', active: true }
-        ];
-        let category3Master = [
-            { name: '강남', active: true },
-            { name: '강서', active: true },
-            { name: '파견', active: true },
-            { name: '지원', active: true },
-            { name: '공사', active: true }
-        ];
+        /** 대/중/소분류 마스터 — 기본 목록은 DB(category_settings) 시드 또는 서버 동기화로 채움 */
+        let category1Master = [];
+        let category2Master = [];
+        let category3Master = [];
 
         function syncCategoryMastersFromEstimates() {
             estimates.forEach(function (e) {
@@ -1181,7 +1166,7 @@
             if (!p || typeof p !== 'object') return;
             ['1', '2', '3'].forEach(function (k) {
                 var arr = p[k];
-                if (!Array.isArray(arr) || arr.length === 0) return;
+                if (!Array.isArray(arr)) return;
                 var target = getMasterArray(k);
                 target.length = 0;
                 arr.forEach(function (item) {
