@@ -18,7 +18,10 @@
             </button>
             
             <a href="#dashboard" class="logo" onclick="showPage('dashboard'); return false;">
-                <span class="logo-icon"><i class="fas fa-tools"></i></span>
+                <span class="logo-icon">
+                    <img src="/logo.png" alt="" class="site-logo site-logo--sidebar" width="40" height="40" decoding="async"
+                        onerror="this.onerror=null;this.src='/logo.svg';">
+                </span>
                 <span class="logo-label">반듯한시공</span>
             </a>
             <nav class="nav-menu">
@@ -1008,36 +1011,9 @@
         </div>
     </div>
 
-    <!-- 로그인 페이지(오버레이) -->
+    <!-- 로그인 페이지(오버레이) — 마크업은 public/partials/login-panel.html 단일 소스, JS가 주입 -->
     <div id="loginOverlay" class="login-overlay">
-        <div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-            <div class="login-card-header">
-                <div id="loginTitle" class="login-title">로그인</div>
-            </div>
-
-            <form id="loginForm" class="login-form">
-                <div class="login-field">
-                    <label class="form-label" for="loginUserId">아이디</label>
-                    <input type="text" id="loginUserId" class="form-input" placeholder="아이디 입력">
-                </div>
-
-                <div class="login-field">
-                    <label class="form-label" for="loginPassword">비밀번호</label>
-                    <input type="password" id="loginPassword" class="form-input" placeholder="비밀번호 입력">
-                </div>
-
-                <div class="login-field" id="loginConfirmWrap" style="display:none;">
-                    <label class="form-label" for="loginPasswordConfirm">비밀번호 확인</label>
-                    <input type="password" id="loginPasswordConfirm" class="form-input" placeholder="비밀번호 확인">
-                </div>
-
-                <div id="loginError" class="login-error" style="display:none;"></div>
-
-                <div class="login-actions">
-                    <button type="submit" id="loginSubmitBtn" class="btn btn-primary">로그인</button>
-                </div>
-            </form>
-        </div>
+        <div id="loginPanelMount"></div>
     </div>
 
     <script type="module" src="/src/js/index-bootstrap.js"></script>

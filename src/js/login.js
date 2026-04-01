@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { ensureLoginPanelMounted } from './login-panel-loader.js';
 
 const VIRTUAL_DOMAIN = 'bps-virtual.local';
 const AUTH_USER_KEY = 'bps_auth_userId';
@@ -78,7 +79,13 @@ function loadUserAccounts() {
     return Array.isArray(stored) && stored.length ? stored : defUserAccounts;
 }
 
-function run() {
+async function run() {
+    try {
+        await ensureLoginPanelMounted();
+    } catch (e) {
+        console.error(e);
+    }
+
     const loginForm = document.getElementById('loginForm');
     const loginUserInput = document.getElementById('loginUserId');
     const loginPassword = document.getElementById('loginPassword');

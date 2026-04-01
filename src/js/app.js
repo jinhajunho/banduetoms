@@ -109,10 +109,20 @@
         }
 
         // 페이지 로드 시 URL 해시 확인
-        window.addEventListener('DOMContentLoaded', function() {
+        window.addEventListener('DOMContentLoaded', async function() {
             // ========================================
-            // 로컬 로그인(데모용) 오버레이
+            // 로컬 로그인(오버레이) — 마크업은 public/partials/login-panel.html 에서 주입
             // ========================================
+            try {
+                const mount = document.getElementById('loginPanelMount');
+                if (mount && !document.getElementById('loginForm')) {
+                    const { ensureLoginPanelMounted } = await import('./login-panel-loader.js');
+                    await ensureLoginPanelMounted();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
             const AUTH_USER_KEY = 'bps_auth_userId';
             const PASSWORDS_KEY = 'bps_user_passwords';
             const RESET_REQUIRED_KEY = 'bps_password_reset_required';

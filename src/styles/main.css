@@ -103,6 +103,22 @@
             font-size: 26px;
         }
 
+        .site-logo {
+            display: block;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .site-logo--sidebar {
+            width: 40px;
+            height: 40px;
+        }
+
+        .site-logo--login {
+            width: 64px;
+            height: 64px;
+        }
+
         .logo-label {
             display: inline-flex;
             align-items: center;
@@ -6708,6 +6724,52 @@
 
         .login-overlay.active {
             display: flex;
+        }
+
+        #loginPanelMount {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+            width: 100%;
+            max-width: 440px;
+        }
+
+        .login-brand {
+            text-align: center;
+            color: var(--gray-100);
+        }
+
+        .login-brand-logo-wrap {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 14px;
+            border-radius: 16px;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-brand-logo-wrap .site-logo--login {
+            filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.35));
+        }
+
+        .login-brand-title {
+            font-size: 26px;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            color: #ffffff;
+            margin-bottom: 6px;
+        }
+
+        .login-brand-sub {
+            font-size: 13px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.45;
+            max-width: 380px;
+            margin: 0 auto;
         }
 
         .login-card {

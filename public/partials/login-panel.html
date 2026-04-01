@@ -1,0 +1,36 @@
+<div class="login-brand">
+    <div class="login-brand-logo-wrap">
+        <img src="/logo.png" alt="반듯한시공" class="site-logo site-logo--login" width="64" height="64" decoding="async"
+            onerror="this.onerror=null;this.src='/logo.svg';">
+    </div>
+    <div class="login-brand-title">반듯한 OMS</div>
+    <div class="login-brand-sub">OMS — Operational Management System (운영 관리 시스템)</div>
+</div>
+<div class="login-card" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="login-card-header">
+        <div id="loginTitle" class="login-title">로그인</div>
+    </div>
+
+    <form id="loginForm" class="login-form">
+        <div class="login-field">
+            <label class="form-label" for="loginUserId">아이디</label>
+            <input type="text" id="loginUserId" class="form-input" placeholder="아이디 입력">
+        </div>
+
+        <div class="login-field">
+            <label class="form-label" for="loginPassword">비밀번호</label>
+            <input type="password" id="loginPassword" class="form-input" placeholder="비밀번호 입력">
+        </div>
+
+        <div class="login-field" id="loginConfirmWrap" style="display:none;">
+            <label class="form-label" for="loginPasswordConfirm">비밀번호 확인</label>
+            <input type="password" id="loginPasswordConfirm" class="form-input" placeholder="비밀번호 확인">
+        </div>
+
+        <div id="loginError" class="login-error" style="display:none;"></div>
+
+        <div class="login-actions">
+            <button type="submit" id="loginSubmitBtn" class="btn btn-primary">로그인</button>
+        </div>
+    </form>
+</div>
