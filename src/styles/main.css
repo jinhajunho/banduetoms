@@ -6747,7 +6747,7 @@
             margin: 0 auto 14px;
             border-radius: 24px;
             background: transparent;
-            border: none;
+            border: 1px solid rgba(250, 204, 21, 0.55);
             display: flex;
             align-items: center;
             justify-content: center;
