@@ -2473,17 +2473,36 @@
             return licenseHtml + '<span style="color: var(--gray-400); margin: 0 8px;">|</span>' + bankHtml;
         }
 
-        // 슬라이드 패널 열기
         function openContractorPanel() {
             document.getElementById('contractorPanelTitle').textContent = contractorEditingId ? '업체 수정' : '업체 등록';
+            var delBtn = document.getElementById('contractorPanelDeleteBtn');
+            if (delBtn) {
+                if (contractorEditingId) {
+                    delBtn.style.display = '';
+                    delBtn.setAttribute('aria-hidden', 'false');
+                    var eid = contractorEditingId;
+                    delBtn.onclick = function () {
+                        deleteContractor(eid);
+                    };
+                } else {
+                    delBtn.style.display = 'none';
+                    delBtn.setAttribute('aria-hidden', 'true');
+                    delBtn.onclick = null;
+                }
+            }
             document.getElementById('contractorPanelOverlay').classList.add('active');
             document.getElementById('contractorSlidePanel').classList.add('active');
         }
 
-        // 슬라이드 패널 닫기
         function closeContractorPanel() {
             document.getElementById('contractorPanelOverlay').classList.remove('active');
             document.getElementById('contractorSlidePanel').classList.remove('active');
+            var delBtn = document.getElementById('contractorPanelDeleteBtn');
+            if (delBtn) {
+                delBtn.style.display = 'none';
+                delBtn.setAttribute('aria-hidden', 'true');
+                delBtn.onclick = null;
+            }
             resetContractorForm();
         }
 
@@ -2548,13 +2567,11 @@
             document.body.removeChild(link);
         }
 
-        // 업체 상세 슬라이드 패널
         function openContractorDetailPanel(id) {
             const contractor = contractors.find(c => c.id === id);
             if (!contractor) return;
             const body = document.getElementById('contractorDetailBody');
             const editBtn = document.getElementById('contractorDetailEditBtn');
-            const deleteBtn = document.getElementById('contractorDetailDeleteBtn');
             if (!body) return;
             body.innerHTML = `
                 <div class="panel-form-row"><span class="detail-label">업체명</span><span class="detail-value">${(contractor.name || '').replace(/</g, '&lt;')}</span></div>
@@ -2563,7 +2580,6 @@
                 <div class="panel-form-row"><span class="detail-label">통장사본</span><span class="detail-value">${contractor.hasBankAccount ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('bank', ${contractor.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기</span>` : '없음'}</span></div>
             `;
             if (editBtn) editBtn.onclick = function() { closeContractorDetailPanel(); editContractor(id); };
-            if (deleteBtn) deleteBtn.onclick = function() { closeContractorDetailPanel(); deleteContractor(id); };
             document.getElementById('contractorDetailOverlay').classList.add('active');
             document.getElementById('contractorDetailSlidePanel').classList.add('active');
         }
@@ -2707,16 +2723,15 @@
             openContractorPanel();
         }
 
-        // 삭제
         function deleteContractor(id) {
             const contractor = contractors.find(c => c.id === id);
             if (!contractor) return;
 
-            if (confirm(`${contractor.name} 업체를 삭제하시겠습니까?`)) {
-                contractors = contractors.filter(c => c.id !== id);
-                renderContractorTable();
-                alert('삭제되었습니다.');
-            }
+            if (!confirm(`${contractor.name} 업체를 삭제하시겠습니까?`)) return;
+            contractors = contractors.filter(c => c.id !== id);
+            renderContractorTable();
+            closeContractorPanel();
+            alert('삭제되었습니다.');
         }
 
         // 폼 초기화

@@ -603,15 +603,17 @@
                 </div>
             </div>
 
-            <!-- 업체정보 슬라이드 패널 오버레이 -->
+            <!-- 업체 등록·수정 중앙 모달 -->
             <div class="panel-overlay" id="contractorPanelOverlay" onclick="closeContractorPanel()"></div>
 
-            <!-- 업체정보 슬라이드 패널 -->
-            <div class="slide-panel contractor-panel" id="contractorSlidePanel">
-                <div class="panel-header contractor-panel-header">
+            <div class="slide-panel expense-panel expense-center-modal contractor-panel" id="contractorSlidePanel">
+                <div class="panel-header expense-panel-header">
                     <div class="panel-title-wrap">
                         <span class="panel-title" id="contractorPanelTitle">업체 등록</span>
                     </div>
+                    <button type="button" class="btn btn-sm expense-panel-header-delete" id="contractorPanelDeleteBtn" style="display: none;" aria-hidden="true">
+                        삭제
+                    </button>
                     <button type="button" class="btn btn-primary btn-sm" onclick="saveContractor()">
                         <i class="fas fa-save"></i> 저장
                     </button>
@@ -619,7 +621,7 @@
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <div class="panel-body contractor-panel-body">
+                <div class="panel-body expense-panel-body contractor-panel-body">
                     <div class="panel-form-row">
                         <label class="panel-form-label" for="contractorName">업체명 <span class="required">*</span></label>
                         <input type="text" class="form-input" id="contractorName" placeholder="업체명을 입력하세요">
@@ -653,25 +655,22 @@
                 </div>
             </div>
 
-            <!-- 업체 상세 슬라이드 패널 (행 클릭 시) -->
+            <!-- 업체 상세 중앙 모달 (행 클릭 시) -->
             <div class="panel-overlay" id="contractorDetailOverlay" onclick="closeContractorDetailPanel()"></div>
-            <div class="slide-panel contractor-panel contractor-detail-panel" id="contractorDetailSlidePanel">
-                <div class="panel-header contractor-panel-header">
+            <div class="slide-panel expense-panel expense-detail-panel expense-center-modal contractor-panel contractor-detail-panel" id="contractorDetailSlidePanel">
+                <div class="panel-header expense-panel-header expense-detail-panel-header">
                     <div class="panel-title-wrap">
-                        <span class="panel-title-icon"><i class="fas fa-building"></i></span>
                         <span class="panel-title">업체 상세</span>
                     </div>
-                    <button type="button" class="panel-close" onclick="closeContractorDetailPanel()" aria-label="닫기">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    <div class="expense-detail-header-trailing">
+                        <button type="button" class="btn btn-secondary btn-sm" id="contractorDetailEditBtn">수정</button>
+                        <button type="button" class="panel-close" onclick="closeContractorDetailPanel()" aria-label="닫기">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="panel-body contractor-panel-body" id="contractorDetailBody">
+                <div class="panel-body expense-panel-body contractor-panel-body" id="contractorDetailBody">
                     <!-- JS에서 채움 -->
-                </div>
-                <div class="panel-actions contractor-panel-actions" id="contractorDetailActions">
-                    <button type="button" class="btn-cancel" onclick="closeContractorDetailPanel()">닫기</button>
-                    <button type="button" class="btn btn-secondary" id="contractorDetailEditBtn">수정</button>
-                    <button type="button" class="btn btn-primary" style="background: var(--danger);" id="contractorDetailDeleteBtn">삭제</button>
                 </div>
             </div>
 
@@ -821,7 +820,6 @@
             <div class="slide-panel expense-panel expense-detail-panel expense-center-modal" id="expenseDetailSlidePanel">
                 <div class="panel-header expense-panel-header expense-detail-panel-header">
                     <div class="panel-title-wrap">
-                        <span class="panel-title-icon"><i class="fas fa-receipt"></i></span>
                         <span class="panel-title">경비 상세</span>
                     </div>
                     <div class="expense-detail-header-trailing">
@@ -841,7 +839,6 @@
             <div class="slide-panel expense-panel expense-detail-panel expense-center-modal" id="sgaDetailSlidePanel">
                 <div class="panel-header expense-panel-header expense-detail-panel-header">
                     <div class="panel-title-wrap">
-                        <span class="panel-title-icon"><i class="fas fa-briefcase"></i></span>
                         <span class="panel-title">판관비 상세</span>
                     </div>
                     <div class="expense-detail-header-trailing">

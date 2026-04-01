@@ -3366,14 +3366,16 @@
         }
 
         #expenseDetailSlidePanel .expense-detail-panel-header,
-        #sgaDetailSlidePanel .expense-detail-panel-header {
+        #sgaDetailSlidePanel .expense-detail-panel-header,
+        #contractorDetailSlidePanel .expense-detail-panel-header {
             display: flex !important;
             align-items: center !important;
             gap: 12px !important;
         }
 
         #expenseDetailSlidePanel .expense-detail-panel-header .panel-title-wrap,
-        #sgaDetailSlidePanel .expense-detail-panel-header .panel-title-wrap {
+        #sgaDetailSlidePanel .expense-detail-panel-header .panel-title-wrap,
+        #contractorDetailSlidePanel .expense-detail-panel-header .panel-title-wrap {
             margin-right: auto !important;
         }
 
@@ -6559,6 +6561,7 @@
 
         /* ---------- 다크: 업체/경비/판관비 상단 패널 헤더 ---------- */
         body.dark-mode #contractorSlidePanel .panel-header,
+        body.dark-mode #contractorDetailSlidePanel .panel-header,
         body.dark-mode #expenseSlidePanel .panel-header,
         body.dark-mode #expenseDetailSlidePanel .panel-header,
         body.dark-mode #sgaSlidePanel .panel-header,
