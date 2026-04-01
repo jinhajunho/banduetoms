@@ -2720,6 +2720,41 @@
             padding: 14px !important;
         }
 
+        /* 경비 등록·상세: 프로젝트 상세와 같은 중앙 모달 (단일 탭·세로 스크롤) */
+        .slide-panel.expense-center-modal {
+            right: auto !important;
+            left: 50%;
+            top: 50%;
+            width: 95vw;
+            max-width: 560px;
+            height: auto;
+            max-height: min(88vh, 680px);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .slide-panel.expense-center-modal:not(.active) {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .slide-panel.expense-center-modal.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .slide-panel.expense-center-modal .expense-panel-body {
+            max-height: min(calc(88vh - 160px), 520px);
+            overflow-y: auto;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+
 
         .panel-header {
             padding: 20px 24px;
@@ -3328,6 +3363,34 @@
         .expense-detail-panel .detail-value {
             font-size: 14px;
             color: var(--gray-900);
+        }
+
+        #expenseDetailSlidePanel .expense-detail-panel-header {
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+        }
+
+        #expenseDetailSlidePanel .expense-detail-panel-header .panel-title-wrap {
+            margin-right: auto !important;
+        }
+
+        .expense-detail-header-trailing {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .btn.expense-panel-header-delete {
+            background: var(--danger) !important;
+            color: #fff !important;
+            border: none !important;
+            font-weight: 600;
+        }
+
+        .btn.expense-panel-header-delete:hover {
+            filter: brightness(0.92);
         }
 
         .contractor-detail-panel .panel-form-row {
@@ -6495,9 +6558,65 @@
         /* ---------- 다크: 업체/경비/판관비 상단 패널 헤더 ---------- */
         body.dark-mode #contractorSlidePanel .panel-header,
         body.dark-mode #expenseSlidePanel .panel-header,
-        body.dark-mode #sgaSlidePanel .panel-header {
+        body.dark-mode #expenseDetailSlidePanel .panel-header,
+        body.dark-mode #sgaSlidePanel .panel-header,
+        body.dark-mode #sgaDetailSlidePanel .panel-header {
             background: var(--gray-100) !important;
             border-bottom-color: var(--gray-200) !important;
+        }
+
+        /* ---------- 다크: 경비 중앙 모달 (프로젝트 상세 중앙 모달과 동일 서피스·그림자) ---------- */
+        body.dark-mode .slide-panel.expense-center-modal {
+            background: var(--gray-100) !important;
+            border: 1px solid var(--gray-200) !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55) !important;
+            color: var(--dm-text) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .expense-panel-body {
+            background: var(--gray-100) !important;
+            color: var(--dm-text) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .panel-title {
+            color: var(--gray-900) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .expense-panel-header .panel-title-icon {
+            background: var(--dm-panel-2) !important;
+            color: var(--gray-900) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .expense-detail-panel .detail-label {
+            color: var(--gray-600) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .expense-detail-panel .detail-value {
+            color: var(--gray-900) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .expense-detail-panel .panel-form-row {
+            border-bottom-color: var(--gray-200) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .panel-form-section-label,
+        body.dark-mode .slide-panel.expense-center-modal .panel-form-label {
+            color: var(--gray-600) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .radio-item label {
+            color: var(--gray-900) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .btn.expense-panel-header-delete {
+            background: var(--danger) !important;
+            color: #fff !important;
+            border-color: rgba(248, 113, 113, 0.85) !important;
+        }
+
+        body.dark-mode .slide-panel.expense-center-modal .btn.expense-panel-header-delete:hover {
+            filter: brightness(1.08);
+            border-color: var(--danger) !important;
         }
 
         /* ---------- 다크: 프로젝트 상세(기본정보) 카드 ---------- */

@@ -3088,6 +3088,21 @@
             if (!expenseEditingId) {
                 setExpenseTodayDate();
             }
+            var delBtn = document.getElementById('expensePanelDeleteBtn');
+            if (delBtn) {
+                if (expenseEditingId) {
+                    delBtn.style.display = '';
+                    delBtn.setAttribute('aria-hidden', 'false');
+                    var eid = expenseEditingId;
+                    delBtn.onclick = function () {
+                        deleteExpense(eid);
+                    };
+                } else {
+                    delBtn.style.display = 'none';
+                    delBtn.setAttribute('aria-hidden', 'true');
+                    delBtn.onclick = null;
+                }
+            }
             document.getElementById('expensePanelOverlay').classList.add('active');
             document.getElementById('expenseSlidePanel').classList.add('active');
         }
@@ -3096,6 +3111,12 @@
         function closeExpensePanel() {
             document.getElementById('expensePanelOverlay').classList.remove('active');
             document.getElementById('expenseSlidePanel').classList.remove('active');
+            var delBtn = document.getElementById('expensePanelDeleteBtn');
+            if (delBtn) {
+                delBtn.style.display = 'none';
+                delBtn.setAttribute('aria-hidden', 'true');
+                delBtn.onclick = null;
+            }
             resetExpenseForm();
         }
 
@@ -3278,6 +3299,7 @@
                 }
                 expenses = expenses.filter(e => e.id !== id);
                 renderExpenseTable();
+                closeExpensePanel();
                 alert('삭제되었습니다.');
             });
         }
@@ -3299,7 +3321,6 @@
             if (!expense) return;
             const body = document.getElementById('expenseDetailBody');
             const editBtn = document.getElementById('expenseDetailEditBtn');
-            const deleteBtn = document.getElementById('expenseDetailDeleteBtn');
             if (!body) return;
             body.innerHTML = `
                 <div class="panel-form-row"><span class="detail-label">구분</span><span class="detail-value">${expense.type}</span></div>
@@ -3330,7 +3351,6 @@
                 photoCell.appendChild(span);
             })();
             if (editBtn) { editBtn.onclick = function() { closeExpenseDetailPanel(); editExpense(id); }; }
-            if (deleteBtn) { deleteBtn.onclick = function() { if (confirm('이 경비 내역을 삭제하시겠습니까?')) { closeExpenseDetailPanel(); deleteExpense(id); } }; }
             document.getElementById('expenseDetailOverlay').classList.add('active');
             document.getElementById('expenseDetailSlidePanel').classList.add('active');
         }
