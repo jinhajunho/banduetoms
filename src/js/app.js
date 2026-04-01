@@ -856,32 +856,6 @@
             });
         }
 
-        async function verifyExpenseRowOnServer(savedId) {
-            var id = Number(savedId);
-            if (!Number.isFinite(id)) {
-                return { ok: false, error: '저장된 경비 식별자가 올바르지 않습니다.' };
-            }
-            var synced = await syncExpensesFromServer();
-            if (!synced) {
-                return {
-                    ok: false,
-                    error:
-                        '서버 목록을 다시 불러오지 못했습니다. 네트워크·로그인·/api/expense 배포를 확인한 뒤 새로고침해 보세요.',
-                };
-            }
-            var found = expenses.some(function (e) {
-                return Number(e && e.id) === id;
-            });
-            if (!found) {
-                return {
-                    ok: false,
-                    error:
-                        '저장 응답은 성공이었지만 서버 목록에 이 경비가 없습니다. Supabase의 expense_records 테이블·Vercel 환경 변수·최신 배포를 확인해 주세요.',
-                };
-            }
-            return { ok: true };
-        }
-
         function upsertExpenseToServer(item) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.resolve({
@@ -3207,12 +3181,8 @@
                             alert(remote.error || '경비 서버 저장 실패');
                             return;
                         }
-                        var checkEdit = await verifyExpenseRowOnServer(updated.id);
-                        if (!checkEdit.ok) {
-                            alert(checkEdit.error);
-                            return;
-                        }
-                        alert('경비 내역이 수정되었습니다. (서버 목록과 일치함을 확인했습니다)');
+                        expenses[index] = updated;
+                        alert('경비 내역이 수정되었습니다.');
                         expenseEditingId = null;
                     } else {
                         var maxId = 0;
@@ -3234,12 +3204,8 @@
                             alert(remote.error || '경비 서버 저장 실패');
                             return;
                         }
-                        var checkNew = await verifyExpenseRowOnServer(newExpense.id);
-                        if (!checkNew.ok) {
-                            alert(checkNew.error);
-                            return;
-                        }
-                        alert('경비가 등록되었습니다. (서버 목록과 일치함을 확인했습니다)');
+                        expenses.unshift(newExpense);
+                        alert('경비가 등록되었습니다.');
                     }
                     closeExpensePanel();
                     fillExpenseMonthFilter();
