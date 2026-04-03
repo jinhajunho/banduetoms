@@ -659,6 +659,15 @@
                         </select>
                     </div>
                     <div class="header-actions">
+                        <button type="button" class="btn btn-secondary" onclick="openExpenseCsvImportPicker()" title="UTF-8 CSV. 컬럼: id,type,date,building,purpose,amount,hasReceipt">
+                            <i class="fas fa-upload"></i>
+                            CSV 업로드
+                        </button>
+                        <input type="file" id="expenseCsvImportInput" accept=".csv,text/csv" style="display: none;" onchange="onExpenseCsvImportFileChange(event)">
+                        <button type="button" class="btn btn-secondary" onclick="downloadExpenseImportTemplate()" title="type·date·amount 필수. id 비우면 신규. 영수증 있음이면 기존 id일 때만 기존 사진 유지.">
+                            <i class="fas fa-file-download"></i>
+                            업로드용 양식(CSV)
+                        </button>
                         <button class="btn btn-secondary" onclick="downloadExpenseCSV()">
                             <i class="fas fa-download"></i>
                             CSV 다운로드
@@ -688,6 +697,17 @@
                             <!-- 데이터가 여기에 들어갑니다 -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- 경비 CSV 업로드 미리보기 -->
+            <div class="modal event-modal" id="expenseImportModal" onclick="if(event.target===this) closeExpenseImportModal()">
+                <div class="modal-content expense-import-modal-content" onclick="event.stopPropagation()">
+                    <div class="modal-header">
+                        <div class="modal-title">경비 CSV 업로드</div>
+                        <button type="button" class="modal-close" onclick="closeExpenseImportModal()">&times;</button>
+                    </div>
+                    <div id="expenseImportModalBody"></div>
                 </div>
             </div>
 

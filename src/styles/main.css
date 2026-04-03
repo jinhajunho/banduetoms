@@ -3358,6 +3358,45 @@
             font-size: 12px;
         }
 
+        #expenseImportModal.modal.event-modal .modal-content.expense-import-modal-content {
+            max-width: 720px;
+            width: 92%;
+        }
+
+        .expense-import-modal-content {
+            max-width: 720px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #expenseImportModalBody {
+            overflow: auto;
+            padding: 0 4px 16px;
+            max-height: 70vh;
+        }
+
+        .expense-import-modal-summary {
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: var(--gray-700);
+        }
+
+        .expense-import-modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .expense-import-row-err {
+            color: var(--danger);
+            font-size: 12px;
+        }
+
         /* 경비 등록 패널 (업체 등록과 동일 스타일) */
         .expense-panel {
             box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);

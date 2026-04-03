@@ -4326,6 +4326,351 @@
             document.body.removeChild(link);
         }
 
+        function downloadExpenseImportTemplate() {
+            let csv = '\uFEFF';
+            csv +=
+                'id,type,date,building,purpose,amount,hasReceipt\n' +
+                ',카드사용,2026-01-15,본관,사무용품,35000,false\n';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', '경비지출_업로드양식.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        var EXPENSE_IMPORT_MAX_ROWS = 500;
+        var EXPENSE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
+
+        function normalizeExpenseImportHeaderKey(h) {
+            var s = String(h || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s/g, '');
+            var map = {
+                id: 'id',
+                type: 'type',
+                구분: 'type',
+                date: 'date',
+                사용일시: 'date',
+                building: 'building',
+                사용건물: 'building',
+                purpose: 'purpose',
+                사용목적: 'purpose',
+                amount: 'amount',
+                결제금액: 'amount',
+                금액: 'amount',
+                hasreceipt: 'hasReceipt',
+                영수증: 'hasReceipt',
+                사진: 'hasReceipt',
+            };
+            return map[s] || s;
+        }
+
+        function parseExpenseImportType(raw) {
+            var t = String(raw == null ? '' : raw).trim();
+            if (!t) return null;
+            var lower = t.toLowerCase();
+            if (t === '계좌이체' || lower === 'transfer' || lower === 'account' || t === '이체') {
+                return '계좌이체';
+            }
+            if (t === '카드사용' || lower === 'card' || t === '카드') {
+                return '카드사용';
+            }
+            return null;
+        }
+
+        function buildExpenseItemForImport(rowMap, prev, explicitId) {
+            var type = parseExpenseImportType(rowMap.type);
+            if (!type) {
+                return { error: '구분(type)은 카드사용 또는 계좌이체여야 합니다.' };
+            }
+            var dateRaw = String(rowMap.date == null ? '' : rowMap.date).trim();
+            if (!dateRaw || !/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
+                return { error: '사용일시(date)는 YYYY-MM-DD 형식이어야 합니다.' };
+            }
+            var amountStr = String(rowMap.amount != null ? rowMap.amount : '')
+                .trim()
+                .replace(/,/g, '');
+            var amount = Number(amountStr);
+            if (!Number.isFinite(amount) || amount <= 0) {
+                return { error: '결제금액(amount)은 0보다 큰 숫자여야 합니다.' };
+            }
+            var building = String(rowMap.building == null ? '' : rowMap.building).trim();
+            var purpose = String(rowMap.purpose == null ? '' : rowMap.purpose).trim();
+            var hasR = parseContractorImportBool(
+                rowMap.hasReceipt != null && rowMap.hasReceipt !== '' ? rowMap.hasReceipt : ''
+            );
+            if (hasR === null) {
+                return { error: '영수증(hasReceipt)은 true/false, 있음/없음 형식이어야 합니다.' };
+            }
+            var receipts = [];
+            if (hasR && prev && getExpenseReceipts(prev).length) {
+                getExpenseReceipts(prev).forEach(function (r) {
+                    receipts.push({ dataUrl: r.dataUrl, name: r.name || '영수증' });
+                });
+            }
+            var o = {
+                id: explicitId,
+                type: type,
+                date: dateRaw,
+                building: building,
+                purpose: purpose,
+                amount: Math.round(amount),
+                receipts: receipts,
+            };
+            return { item: o };
+        }
+
+        function openExpenseCsvImportPicker() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                alert('세션을 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 로그인해 주세요.');
+                return;
+            }
+            var inp = document.getElementById('expenseCsvImportInput');
+            if (!inp) return;
+            inp.value = '';
+            inp.click();
+        }
+
+        function onExpenseCsvImportFileChange(ev) {
+            var input = ev && ev.target;
+            var file = input && input.files && input.files[0];
+            if (!file) return;
+            if (file.size > EXPENSE_IMPORT_MAX_BYTES) {
+                alert('파일이 너무 큽니다. (최대 약 2MB)');
+                input.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () {
+                var text = String(reader.result || '');
+                var res = parseAndValidateExpenseImportCsv(text);
+                input.value = '';
+                if (!res.ok) {
+                    alert(res.error || 'CSV를 읽을 수 없습니다.');
+                    return;
+                }
+                openExpenseImportModalWithResult(res);
+            };
+            reader.onerror = function () {
+                alert('파일을 읽지 못했습니다.');
+                input.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseAndValidateExpenseImportCsv(text) {
+            var rows = parseContractorCsvTextToRows(text);
+            if (!rows.length) {
+                return { ok: false, error: '데이터 행이 없습니다.' };
+            }
+            var headerCells = rows[0].map(function (h) {
+                return normalizeExpenseImportHeaderKey(h);
+            });
+            var idx = {};
+            for (var hi = 0; hi < headerCells.length; hi++) {
+                var key = headerCells[hi];
+                if (key && idx[key] === undefined) idx[key] = hi;
+            }
+            if (idx.type === undefined) {
+                return { ok: false, error: 'CSV에 type(구분) 열이 필요합니다.' };
+            }
+            if (idx.date === undefined) {
+                return { ok: false, error: 'CSV에 date(사용일시) 열이 필요합니다.' };
+            }
+            if (idx.amount === undefined) {
+                return { ok: false, error: 'CSV에 amount(결제금액) 열이 필요합니다.' };
+            }
+
+            var dataRows = rows.slice(1);
+            if (dataRows.length > EXPENSE_IMPORT_MAX_ROWS) {
+                return {
+                    ok: false,
+                    error: '한 번에 최대 ' + EXPENSE_IMPORT_MAX_ROWS + '행까지만 업로드할 수 있습니다.',
+                };
+            }
+
+            var usedExplicitIds = {};
+            var previews = [];
+            var pendingItems = [];
+            var maxExisting =
+                expenses.length > 0
+                    ? Math.max.apply(
+                          null,
+                          expenses.map(function (e) {
+                              return Number(e.id) || 0;
+                          })
+                      )
+                    : 0;
+            var autoCursor = maxExisting;
+
+            for (var ri = 0; ri < dataRows.length; ri++) {
+                var line = ri + 2;
+                var cells = dataRows[ri];
+                var rowMap = {};
+                Object.keys(idx).forEach(function (k) {
+                    rowMap[k] = cells[idx[k]] != null ? cells[idx[k]] : '';
+                });
+
+                var idCell = String(rowMap.id != null ? rowMap.id : '').trim();
+                var explicitId = null;
+                if (idCell !== '') {
+                    explicitId = Number(idCell);
+                    if (!Number.isFinite(explicitId)) {
+                        previews.push({
+                            line: line,
+                            name: parseExpenseImportType(rowMap.type) || '-',
+                            idDisp: idCell,
+                            err: 'id는 숫자여야 합니다.',
+                        });
+                        continue;
+                    }
+                    if (usedExplicitIds[explicitId]) {
+                        previews.push({
+                            line: line,
+                            name: String(rowMap.type || '').trim() || '-',
+                            idDisp: String(explicitId),
+                            err: 'CSV 안에서 id가 중복되었습니다.',
+                        });
+                        continue;
+                    }
+                    usedExplicitIds[explicitId] = true;
+                } else {
+                    do {
+                        autoCursor++;
+                    } while (usedExplicitIds[autoCursor]);
+                    explicitId = autoCursor;
+                    usedExplicitIds[explicitId] = true;
+                }
+
+                var prev = expenses.find(function (e) {
+                    return Number(e.id) === explicitId;
+                });
+                var built = buildExpenseItemForImport(rowMap, prev, explicitId);
+                if (built.error) {
+                    previews.push({
+                        line: line,
+                        name: String(rowMap.type || '').trim() || '-',
+                        idDisp: String(explicitId),
+                        err: built.error,
+                    });
+                    continue;
+                }
+                previews.push({
+                    line: line,
+                    name: built.item.type + ' ' + built.item.date + ' ' + built.item.amount + '원',
+                    idDisp: String(explicitId),
+                    err: '',
+                    mode: prev ? '수정' : '신규',
+                });
+                pendingItems.push(built.item);
+            }
+
+            var errs = previews.filter(function (p) {
+                return p.err;
+            });
+            if (errs.length) {
+                return { ok: true, previews: previews, pendingItems: null, hasErrors: true };
+            }
+            if (!pendingItems.length) {
+                return { ok: false, error: '반영할 유효 행이 없습니다.' };
+            }
+            return { ok: true, previews: previews, pendingItems: pendingItems, hasErrors: false };
+        }
+
+        function openExpenseImportModalWithResult(res) {
+            var body = document.getElementById('expenseImportModalBody');
+            var modal = document.getElementById('expenseImportModal');
+            if (!body || !modal) return;
+
+            window.__expenseImportPending = res.hasErrors ? null : res.pendingItems;
+
+            var summary =
+                '<div class="expense-import-modal-summary">' +
+                (res.hasErrors
+                    ? '<strong>오류가 있는 행을 수정한 뒤 다시 업로드해 주세요.</strong> (저장 버튼은 비활성화)'
+                    : '<strong>' +
+                      res.pendingItems.length +
+                      '건</strong>을 서버에 반영합니다. 기존 id는 수정, 빈 id는 신규 번호가 부여됩니다.') +
+                '</div>';
+
+            var table =
+                '<div class="table-section"><table><thead><tr><th>CSV행</th><th>id</th><th>내용요약</th><th>구분</th><th>결과</th></tr></thead><tbody>';
+            for (var pi = 0; pi < res.previews.length; pi++) {
+                var p = res.previews[pi];
+                table +=
+                    '<tr><td>' +
+                    p.line +
+                    '</td><td>' +
+                    escapeHtml(p.idDisp) +
+                    '</td><td>' +
+                    escapeHtml(p.name) +
+                    '</td><td>' +
+                    escapeHtml(p.mode || '-') +
+                    '</td><td class="' +
+                    (p.err ? 'expense-import-row-err' : '') +
+                    '">' +
+                    escapeHtml(p.err || 'OK') +
+                    '</td></tr>';
+            }
+            table += '</tbody></table></div>';
+
+            var actions =
+                '<div class="expense-import-modal-actions">' +
+                '<button type="button" class="btn btn-secondary" onclick="closeExpenseImportModal()">닫기</button>' +
+                '<button type="button" class="btn btn-primary" id="expenseImportConfirmBtn" onclick="confirmExpenseImport()" ' +
+                (res.hasErrors ? 'disabled' : '') +
+                '>서버에 반영</button></div>';
+
+            body.innerHTML = summary + table + actions;
+            modal.classList.add('active');
+        }
+
+        function closeExpenseImportModal() {
+            var modal = document.getElementById('expenseImportModal');
+            if (modal) modal.classList.remove('active');
+            window.__expenseImportPending = null;
+        }
+
+        function confirmExpenseImport() {
+            var pending = window.__expenseImportPending;
+            if (!pending || !pending.length) return;
+            var i = 0;
+            function step() {
+                if (i >= pending.length) {
+                    syncExpensesFromServer().then(function () {
+                        alert(pending.length + '건 반영했습니다.');
+                        closeExpenseImportModal();
+                    });
+                    return;
+                }
+                var item = pending[i];
+                upsertExpenseToServer(item).then(function (r) {
+                    if (!r.ok) {
+                        alert(
+                            '저장 실패 (목록 ' +
+                                (i + 1) +
+                '번째 / id ' +
+                                item.id +
+                                '): ' +
+                                (r.error || '')
+                        );
+                        syncExpensesFromServer();
+                        closeExpenseImportModal();
+                        return;
+                    }
+                    i++;
+                    step();
+                });
+            }
+            step();
+        }
+
         function downloadSgaCSV() {
             const month = getSgaMonthFilter();
             const filtered = month
@@ -9506,6 +9851,11 @@
 
                 // 경비
                 downloadExpenseCSV,
+                downloadExpenseImportTemplate,
+                openExpenseCsvImportPicker,
+                onExpenseCsvImportFileChange,
+                closeExpenseImportModal,
+                confirmExpenseImport,
                 openExpensePanel,
                 closeExpensePanel,
                 saveExpense,
