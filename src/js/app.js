@@ -1592,7 +1592,7 @@
             input.value = '';
             renderOneMasterTable(key);
             refreshCategoryFilterOptionsAll();
-            if (document.getElementById('panelBody') && currentEditItem) {
+            if (document.getElementById('sharedPanelBody') && currentEditItem) {
                 renderPanelContent(currentEditItem);
             }
             upsertCategoryMastersToServer().then(function (remote) {
@@ -1607,7 +1607,7 @@
             m.active = !m.active;
             renderOneMasterTable(key);
             refreshCategoryFilterOptionsAll();
-            if (document.getElementById('panelBody') && currentEditItem) {
+            if (document.getElementById('sharedPanelBody') && currentEditItem) {
                 renderPanelContent(currentEditItem);
             }
             upsertCategoryMastersToServer().then(function (remote) {
@@ -1628,7 +1628,7 @@
             if (idx !== -1) arr.splice(idx, 1);
             renderOneMasterTable(key);
             refreshCategoryFilterOptionsAll();
-            if (document.getElementById('panelBody') && currentEditItem) {
+            if (document.getElementById('sharedPanelBody') && currentEditItem) {
                 renderPanelContent(currentEditItem);
             }
             upsertCategoryMastersToServer().then(function (remote) {
@@ -4119,7 +4119,7 @@
             document.getElementById('expenseUsageDate').valueAsDate = new Date();
         }
 
-        // 슬라이드 패널 열기
+        // 경비 등록·수정 중앙 모달 열기
         function openExpensePanel() {
             document.getElementById('expensePanelTitle').textContent = expenseEditingId ? '경비 수정' : '경비 등록';
             if (!expenseEditingId) {
@@ -4144,7 +4144,7 @@
             document.getElementById('expenseSlidePanel').classList.add('active');
         }
 
-        // 슬라이드 패널 닫기
+        // 경비 등록·수정 중앙 모달 닫기
         function closeExpensePanel() {
             document.getElementById('expensePanelOverlay').classList.remove('active');
             document.getElementById('expenseSlidePanel').classList.remove('active');
@@ -6679,7 +6679,7 @@
         }
 
         function ensureUserManageHeaderSaveButton() {
-            const panelActions = document.getElementById('panelActions');
+            const panelActions = document.getElementById('sharedPanelActions');
             if (!panelActions) return null;
             let btn = document.getElementById('btnUserManageSave');
             if (!btn) {
@@ -6694,9 +6694,9 @@
         }
 
         function setUserManageHeaderActions(show) {
-            const panelActions = document.getElementById('panelActions');
-            const btnSave = document.getElementById('btnSave');
-            const btnCancel = document.getElementById('btnCancel');
+            const panelActions = document.getElementById('sharedPanelActions');
+            const btnSave = document.getElementById('sharedPanelBtnSave');
+            const btnCancel = document.getElementById('sharedPanelBtnCancel');
             const userSave = ensureUserManageHeaderSaveButton();
             if (!panelActions) return;
             if (show) {
@@ -6722,11 +6722,11 @@
         }
 
         function openUserManagePanel(name, userId, role, type, contractorName) {
-            const panelTitle = document.getElementById('panelTitle');
-            const panelBody = document.getElementById('panelBody');
-            const panelBottomSaveBar = document.getElementById('panelBottomSaveBar');
-            const overlay = document.getElementById('panelOverlay');
-            const panel = document.getElementById('slidePanel');
+            const panelTitle = document.getElementById('sharedPanelTitle');
+            const panelBody = document.getElementById('sharedPanelBody');
+            const panelBottomSaveBar = document.getElementById('sharedPanelBottomBar');
+            const overlay = document.getElementById('sharedPanelOverlay');
+            const panel = document.getElementById('sharedCenterPanel');
             if (!panelBody || !overlay || !panel) return;
 
             currentEditItem = null;
@@ -7076,7 +7076,7 @@
         let isSavingChanges = false;
 
         function getPanelSnapshot() {
-            const panelBody = document.getElementById('panelBody');
+            const panelBody = document.getElementById('sharedPanelBody');
             if (!panelBody) return '';
             const values = Array.from(panelBody.querySelectorAll('input, select, textarea')).map((el) => {
                 const key = el.id || el.name || el.className || el.tagName;
@@ -7105,7 +7105,7 @@
 
         function setSaveLoading(loading) {
             isSavingChanges = !!loading;
-            const saveButtons = [document.getElementById('btnBottomSave'), document.getElementById('btnSave')];
+            const saveButtons = [document.getElementById('sharedPanelBtnBottomSave'), document.getElementById('sharedPanelBtnSave')];
             saveButtons.forEach((btn) => {
                 if (!btn) return;
                 btn.disabled = !!loading;
@@ -7130,11 +7130,11 @@
         }
 
         document.addEventListener('input', (event) => {
-            if (!event.target || !event.target.closest || !event.target.closest('#panelBody')) return;
+            if (!event.target || !event.target.closest || !event.target.closest('#sharedPanelBody')) return;
             markPanelDirtyIfChanged();
         });
         document.addEventListener('change', (event) => {
-            if (!event.target || !event.target.closest || !event.target.closest('#panelBody')) return;
+            if (!event.target || !event.target.closest || !event.target.closest('#sharedPanelBody')) return;
             markPanelDirtyIfChanged();
         });
 
@@ -7190,16 +7190,16 @@
 
             renderPanelContent(currentEditItem);
 
-            document.getElementById('slidePanel').classList.add('project-detail-modal');
-            document.getElementById('panelOverlay').classList.add('active');
-            document.getElementById('slidePanel').classList.add('active');
+            document.getElementById('sharedCenterPanel').classList.add('project-detail-modal');
+            document.getElementById('sharedPanelOverlay').classList.add('active');
+            document.getElementById('sharedCenterPanel').classList.add('active');
         }
 
         // 신규 견적서 패널 렌더링 (탭: 기본정보, 매출정보, 매입정보)
         function renderNewEstimatePanel() {
-            document.getElementById('panelTitle').textContent =
+            document.getElementById('sharedPanelTitle').textContent =
                 currentEditItem && currentEditItem.code ? '프로젝트 등록 · ' + currentEditItem.code : '프로젝트 등록';
-            const panelBody = document.getElementById('panelBody');
+            const panelBody = document.getElementById('sharedPanelBody');
             panelBody.className = 'panel-body edit-mode';
             const isExternalContractorView = isCurrentUserExternalContractor();
             const showSalesTab = !isExternalContractorView;
@@ -7379,9 +7379,9 @@
             switchNewEstimateTab(currentStep);
 
             document.getElementById('btnEdit').style.display = 'none';
-            document.getElementById('btnSave').style.display = 'none';
-            document.getElementById('btnCancel').style.display = 'none';
-            const bottomSaveBarEl = document.getElementById('panelBottomSaveBar');
+            document.getElementById('sharedPanelBtnSave').style.display = 'none';
+            document.getElementById('sharedPanelBtnCancel').style.display = 'none';
+            const bottomSaveBarEl = document.getElementById('sharedPanelBottomBar');
             if (bottomSaveBarEl) bottomSaveBarEl.style.display = 'none';
         }
 
@@ -7506,9 +7506,9 @@
 
             renderPanelContent(item);
 
-            document.getElementById('slidePanel').classList.add('project-detail-modal');
-            document.getElementById('panelOverlay').classList.add('active');
-            document.getElementById('slidePanel').classList.add('active');
+            document.getElementById('sharedCenterPanel').classList.add('project-detail-modal');
+            document.getElementById('sharedPanelOverlay').classList.add('active');
+            document.getElementById('sharedCenterPanel').classList.add('active');
         }
 
         // 패널 내용 렌더링
@@ -7529,11 +7529,11 @@
             const codeLabel = item && item.code ? ` · ${item.code}` : '';
             const bizVals = computeBizTaxFromGross(item.businessIncomeGross);
             const profitNetTotals = getProfitNetTotalsByCode(item.code, item.revenue, item.purchase, item.businessIncomeGross);
-            document.getElementById('panelTitle').textContent = isNewEstimate
+            document.getElementById('sharedPanelTitle').textContent = isNewEstimate
                 ? ('프로젝트 등록' + (item && item.code ? ` · ${item.code}` : ''))
                 : (isEditMode ? '프로젝트 수정' + codeLabel : '프로젝트 상세' + codeLabel);
             
-            const panelBody = document.getElementById('panelBody');
+            const panelBody = document.getElementById('sharedPanelBody');
             panelBody.className = isEditMode ? 'panel-body edit-mode' : 'panel-body view-mode';
 
             panelBody.innerHTML = `
@@ -8012,9 +8012,9 @@
             // 버튼 표시/숨김
             // 상단 "수정" 버튼은 UI에서 제거됨 (index.html). 안전하게 숨김 처리만 유지.
             if (document.getElementById('btnEdit')) document.getElementById('btnEdit').style.display = 'none';
-            document.getElementById('btnSave').style.display = 'none';
-            document.getElementById('btnCancel').style.display = 'none';
-            const bottomSaveBarEl = document.getElementById('panelBottomSaveBar');
+            document.getElementById('sharedPanelBtnSave').style.display = 'none';
+            document.getElementById('sharedPanelBtnCancel').style.display = 'none';
+            const bottomSaveBarEl = document.getElementById('sharedPanelBottomBar');
             if (bottomSaveBarEl) bottomSaveBarEl.style.display = (isEditMode || isNewEstimate) ? 'flex' : 'none';
             if (isEditMode || isNewEstimate) {
                 resetPanelDirtyState();
@@ -9723,17 +9723,17 @@
             }
         }
 
-        // 슬라이드 패널 / 프로젝트 상세 모달 닫기
+        // 공용 중앙 패널(프로젝트·계정 관리 등) 닫기
         function closePanel(forceClose = false) {
             if (!forceClose && (isEditMode || isNewEstimate) && isPanelDirty) {
                 const okToClose = confirm('변경사항이 있습니다.\n저장하지 않고 닫으시겠습니까?\n\n확인: 저장하지 않고 닫기\n취소: 계속 편집');
                 if (!okToClose) return;
             }
             setUserManageHeaderActions(false);
-            document.getElementById('panelOverlay').classList.remove('active');
-            document.getElementById('slidePanel').classList.remove('active');
-            document.getElementById('slidePanel').classList.remove('project-detail-modal');
-            const bottomSaveBarEl = document.getElementById('panelBottomSaveBar');
+            document.getElementById('sharedPanelOverlay').classList.remove('active');
+            document.getElementById('sharedCenterPanel').classList.remove('active');
+            document.getElementById('sharedCenterPanel').classList.remove('project-detail-modal');
+            const bottomSaveBarEl = document.getElementById('sharedPanelBottomBar');
             if (bottomSaveBarEl) bottomSaveBarEl.style.display = 'none';
             setSaveLoading(false);
             isPanelDirty = false;
@@ -9768,15 +9768,15 @@
 
             renderEstimateEditor();
             
-            document.getElementById('panelOverlay').classList.add('active');
-            document.getElementById('slidePanel').classList.add('active');
+            document.getElementById('sharedPanelOverlay').classList.add('active');
+            document.getElementById('sharedCenterPanel').classList.add('active');
         }
 
         // 견적서 편집기 렌더링
         function renderEstimateEditor() {
-            document.getElementById('panelTitle').textContent = '프로젝트 보기/수정';
+            document.getElementById('sharedPanelTitle').textContent = '프로젝트 보기/수정';
             
-            const panelBody = document.getElementById('panelBody');
+            const panelBody = document.getElementById('sharedPanelBody');
             panelBody.className = 'panel-body edit-mode';
             
             panelBody.innerHTML = `
@@ -9810,9 +9810,9 @@
             
             // 버튼 숨김
             document.getElementById('btnEdit').style.display = 'none';
-            document.getElementById('btnSave').style.display = 'none';
-            document.getElementById('btnCancel').style.display = 'none';
-            const bottomSaveBarEl = document.getElementById('panelBottomSaveBar');
+            document.getElementById('sharedPanelBtnSave').style.display = 'none';
+            document.getElementById('sharedPanelBtnCancel').style.display = 'none';
+            const bottomSaveBarEl = document.getElementById('sharedPanelBottomBar');
             if (bottomSaveBarEl) bottomSaveBarEl.style.display = 'none';
         }
 

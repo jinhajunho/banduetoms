@@ -1,0 +1,53 @@
+﻿                <div class="page-header">
+                    <div class="page-header-left">
+                        <h1 class="page-title">경비지출관리</h1>
+                        <select class="filter-select expense-month-select" id="expenseMonthFilter" onchange="onExpenseMonthChange()" title="월별 보기 (사용일시 기준)">
+                            <option value="">전체</option>
+                            <!-- 옵션은 JS에서 동적 생성 -->
+                        </select>
+                    </div>
+                    <div class="header-actions">
+                        <button type="button" class="btn btn-secondary" onclick="openExpenseCsvImportPicker()" title="UTF-8 CSV. 컬럼: id,type,date,building,purpose,amount,hasReceipt">
+                            <i class="fas fa-upload"></i>
+                            CSV 업로드
+                        </button>
+                        <input type="file" id="expenseCsvImportInput" accept=".csv,text/csv" style="display: none;" onchange="onExpenseCsvImportFileChange(event)">
+                        <button type="button" class="btn btn-secondary" onclick="downloadExpenseImportTemplate()" title="type·date·amount 필수. id 비우면 신규. 영수증 있음이면 기존 id일 때만 기존 사진 유지.">
+                            <i class="fas fa-file-download"></i>
+                            업로드용 양식(CSV)
+                        </button>
+                        <button class="btn btn-secondary" onclick="downloadExpenseCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                        <button class="btn btn-primary" onclick="openExpensePanel()">
+                            <i class="fas fa-plus"></i>
+                            경비 등록
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 목록 테이블 -->
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>번호</th>
+                                <th>구분</th>
+                                <th>사용일시</th>
+                                <th>사용건물</th>
+                                <th>사용목적</th>
+                                <th class="text-right">결제금액</th>
+                                <th>사진</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody">
+                            <!-- 데이터가 여기에 들어갑니다 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="estimate-table-pagination" id="expenseTablePagination" role="navigation" aria-label="경비 목록 페이지" style="display: none;">
+                    <div class="estimate-pagination-info" id="expensePaginationInfo"></div>
+                    <div class="estimate-pagination-controls" id="expensePaginationControls"></div>
+                </div>
+

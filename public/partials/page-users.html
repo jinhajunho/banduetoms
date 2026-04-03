@@ -1,0 +1,112 @@
+﻿                <div class="page-header">
+                    <h1 class="page-title">관리자설정</h1>
+                </div>
+
+                <div class="admin-settings-tabs">
+                    <button type="button" id="adminTabBtnAccount" class="admin-settings-tab active" onclick="switchAdminSettingsTab('account')">계정</button>
+                    <button type="button" id="adminTabBtnFilterValues" class="admin-settings-tab" onclick="switchAdminSettingsTab('filter-values')">필터값</button>
+                    <div class="admin-settings-tabs-spacer"></div>
+                    <button id="adminAddAccountBtn" class="btn btn-primary" onclick="openAddUserModal()">
+                        <i class="fas fa-plus"></i>
+                        계정 추가
+                    </button>
+                </div>
+
+                <div id="adminSettingsTabAccount" class="tab-panel active">
+                    <!-- 사용자 목록 -->
+                    <div class="table-section">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>이름</th>
+                                    <th>아이디</th>
+                                    <th>역할</th>
+                                    <th>상태</th>
+                                    <th style="width: 150px; text-align: center;">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="adminSettingsTabFilterValues" class="tab-panel">
+                <!-- 대/중/소분류 필터값 (프로젝트 등록/검색 드롭다운) -->
+                <div class="filter-section" style="margin-top: 24px;">
+                    <div class="table-header" style="margin-bottom: 12px;">
+                        <div class="table-title">필터값 - 분류(대/중/소)</div>
+                        <p style="font-size: 13px; color: var(--gray-600); margin-top: 8px; line-height: 1.5;">
+                            대분류·중분류·소분류 드롭다운 값을 여기서 추가·삭제하고, 활성/비활성으로 노출 여부를 정합니다.
+                            비활성 항목은 새로 선택할 수 없으며, 이미 저장된 값은 (비활성)으로 표시됩니다. 사용 중인 항목은 삭제할 수 없습니다.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 28px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">대분류</div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;">
+                            <input type="text" id="category1MasterInput" class="filter-input" style="max-width: 320px;" placeholder="대분류 이름 입력" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();addMasterItem('1');}">
+                            <button type="button" class="btn btn-primary" onclick="addMasterItem('1')">
+                                <i class="fas fa-plus"></i> 추가
+                            </button>
+                        </div>
+                        <div class="table-section">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>이름</th>
+                                        <th style="width: 100px; text-align: center;">상태</th>
+                                        <th style="width: 200px; text-align: center;">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category1MasterTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 28px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">중분류</div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;">
+                            <input type="text" id="category2MasterInput" class="filter-input" style="max-width: 320px;" placeholder="중분류 이름 입력" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();addMasterItem('2');}">
+                            <button type="button" class="btn btn-primary" onclick="addMasterItem('2')">
+                                <i class="fas fa-plus"></i> 추가
+                            </button>
+                        </div>
+                        <div class="table-section">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>이름</th>
+                                        <th style="width: 100px; text-align: center;">상태</th>
+                                        <th style="width: 200px; text-align: center;">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category2MasterTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 8px;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">소분류</div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center;">
+                            <input type="text" id="category3MasterInput" class="filter-input" style="max-width: 320px;" placeholder="소분류 이름 입력" maxlength="120" onkeydown="if(event.key==='Enter'){event.preventDefault();addMasterItem('3');}">
+                            <button type="button" class="btn btn-primary" onclick="addMasterItem('3')">
+                                <i class="fas fa-plus"></i> 추가
+                            </button>
+                        </div>
+                        <div class="table-section">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>이름</th>
+                                        <th style="width: 100px; text-align: center;">상태</th>
+                                        <th style="width: 200px; text-align: center;">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="category3MasterTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                </div>
+

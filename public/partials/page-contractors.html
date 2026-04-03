@@ -1,0 +1,45 @@
+﻿                <div class="page-header">
+                    <h1 class="page-title">업체정보관리</h1>
+                    <div class="header-actions">
+                        <button type="button" class="btn btn-secondary" onclick="openContractorCsvImportPicker()" title="UTF-8 CSV. 양식 컬럼: id,name,phone,date,hasLicense,hasBankAccount">
+                            <i class="fas fa-upload"></i>
+                            CSV 업로드
+                        </button>
+                        <input type="file" id="contractorCsvImportInput" accept=".csv,text/csv" style="display: none;" onchange="onContractorCsvImportFileChange(event)">
+                        <button type="button" class="btn btn-secondary" onclick="downloadContractorImportTemplate()" title="일괄 등록용 컬럼 안내가 들어간 빈 양식입니다. name(업체명) 필수, id 비우면 신규.">
+                            <i class="fas fa-file-download"></i>
+                            업로드용 양식(CSV)
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="downloadContractorCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                        <button type="button" class="btn btn-primary" onclick="openContractorPanel()">
+                            <i class="fas fa-plus"></i>
+                            업체 등록
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 목록 테이블 -->
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>번호</th>
+                                <th>업체명</th>
+                                <th>전화번호</th>
+                                <th>사업자등록증</th>
+                                <th>통장사본</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contractorTableBody">
+                            <!-- 데이터가 여기에 들어갑니다 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="estimate-table-pagination" id="contractorTablePagination" role="navigation" aria-label="업체 목록 페이지" style="display: none;">
+                    <div class="estimate-pagination-info" id="contractorPaginationInfo"></div>
+                    <div class="estimate-pagination-controls" id="contractorPaginationControls"></div>
+                </div>
+

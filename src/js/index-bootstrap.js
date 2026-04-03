@@ -1,6 +1,6 @@
 /**
  * index.html 진입점: VITE_SUPABASE_* 필수. 세션·프로필이 있으면 app.js 로드, 없으면 login.html로 보냅니다.
- * app.js 로드 전에 partial 주입: #page-estimate(필터 바인딩), #page-performance(DOMContentLoaded에서 경영실적 UI 초기화).
+ * app.js 로드 전: 페이지 shell partials + 프로젝트 상세 중앙 모달(body). 경비/판관비 CSV·각 등록 패널은 index 유지.
  */
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -28,6 +28,20 @@ async function loadAppWithShellPartials() {
     await ensureEstimatePartialMounted();
     const { ensurePerformancePartialMounted } = await import('./performance-partial-loader.js');
     await ensurePerformancePartialMounted();
+    const { ensureWeeklyPartialMounted } = await import('./weekly-partial-loader.js');
+    await ensureWeeklyPartialMounted();
+    const { ensureUnpaidPartialMounted } = await import('./unpaid-partial-loader.js');
+    await ensureUnpaidPartialMounted();
+    const { ensureContractorPagePartialMounted } = await import('./contractor-partial-loader.js');
+    await ensureContractorPagePartialMounted();
+    const { ensureExpensePagePartialMounted } = await import('./expense-partial-loader.js');
+    await ensureExpensePagePartialMounted();
+    const { ensureSgaPagePartialMounted } = await import('./sga-partial-loader.js');
+    await ensureSgaPagePartialMounted();
+    const { ensureUsersPagePartialMounted } = await import('./users-partial-loader.js');
+    await ensureUsersPagePartialMounted();
+    const { ensureProjectDetailModalMounted } = await import('./project-detail-modal-loader.js');
+    await ensureProjectDetailModalMounted();
     await import('./app.js');
 }
 

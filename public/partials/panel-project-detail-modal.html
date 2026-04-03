@@ -1,0 +1,30 @@
+    <!-- 공용 중앙 패널: 프로젝트 상세( .project-detail-modal )·관리자 계정 관리 등이 동일 shell 사용 -->
+    <div class="panel-overlay" id="sharedPanelOverlay" onclick="closePanel()"></div>
+
+    <div class="slide-panel" id="sharedCenterPanel">
+        <div class="panel-header">
+            <div class="panel-title" id="sharedPanelTitle">프로젝트 상세</div>
+            <div class="panel-header-actions" id="sharedPanelActions">
+                <button class="btn-save" id="sharedPanelBtnSave" onclick="saveChanges()" style="display: none;">
+                    <i class="fas fa-save"></i>
+                    저장
+                </button>
+                <button class="btn-cancel" id="sharedPanelBtnCancel" onclick="cancelEdit()" style="display: none;">
+                    <i class="fas fa-times"></i>
+                    취소
+                </button>
+            </div>
+            <button class="panel-close" onclick="closePanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="panel-body view-mode" id="sharedPanelBody">
+            <!-- 내용이 동적으로 들어갑니다 -->
+        </div>
+        <div class="panel-bottom-save" id="sharedPanelBottomBar" style="display:none;">
+            <button class="btn-save" id="sharedPanelBtnBottomSave" onclick="saveChanges()">
+                <i class="fas fa-save"></i>
+                저장
+            </button>
+        </div>
+    </div>

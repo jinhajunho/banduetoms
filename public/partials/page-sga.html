@@ -1,0 +1,46 @@
+﻿                <div class="page-header">
+                    <div class="page-header-left">
+                        <h1 class="page-title">판관비관리</h1>
+                        <select class="filter-select expense-month-select" id="sgaMonthFilter" onchange="onSgaMonthChange()" title="월별 보기 (지출일자 기준)">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                    <div class="header-actions">
+                        <button type="button" class="btn btn-secondary" onclick="openSgaCsvImportPicker()" title="UTF-8 CSV. 컬럼: id,date,category,amount,memo">
+                            <i class="fas fa-upload"></i>
+                            CSV 업로드
+                        </button>
+                        <input type="file" id="sgaCsvImportInput" accept=".csv,text/csv" style="display: none;" onchange="onSgaCsvImportFileChange(event)">
+                        <button type="button" class="btn btn-secondary" onclick="downloadSgaImportTemplate()" title="date·category·amount 필수. id 비우면 신규.">
+                            <i class="fas fa-file-download"></i>
+                            업로드용 양식(CSV)
+                        </button>
+                        <button class="btn btn-secondary" onclick="downloadSgaCSV()">
+                            <i class="fas fa-download"></i>
+                            CSV 다운로드
+                        </button>
+                        <button class="btn btn-primary" onclick="openSgaPanel()">
+                            <i class="fas fa-plus"></i>
+                            판관비 등록
+                        </button>
+                    </div>
+                </div>
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>번호</th>
+                                <th>지출일자</th>
+                                <th>계정과목</th>
+                                <th class="text-right">금액(vat별도)</th>
+                                <th class="sga-memo-cell"><span class="sga-memo-text">메모</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="sgaTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="estimate-table-pagination" id="sgaTablePagination" role="navigation" aria-label="판관비 목록 페이지" style="display: none;">
+                    <div class="estimate-pagination-info" id="sgaPaginationInfo"></div>
+                    <div class="estimate-pagination-controls" id="sgaPaginationControls"></div>
+                </div>
+
