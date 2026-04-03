@@ -216,6 +216,16 @@
                 return;
             }
 
+            // ========================================
+            // 대시보드 본문 — public/partials/page-dashboard.html (로그인 통과 후·showPage 전)
+            // ========================================
+            try {
+                const { ensureDashboardPartialMounted } = await import('./dashboard-partial-loader.js');
+                await ensureDashboardPartialMounted();
+            } catch (e) {
+                console.error(e);
+            }
+
             // 로그인 UI 초기화
             if (loginOverlay && loginForm && loginUserSelect && Array.isArray(userAccounts)) {
                 const isSelectEl = loginUserSelect && String(loginUserSelect.tagName || '').toUpperCase() === 'SELECT';
@@ -3069,6 +3079,24 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        }
+
+        /** 일괄 업로드(추가 예정)용 UTF-8 BOM CSV 양식 — 헤더 + 예시 한 행 */
+        function downloadContractorImportTemplate() {
+            let csv = '\uFEFF';
+            csv +=
+                'id,name,phone,date,hasLicense,hasBankAccount\n' +
+                ',예시건설,02-1234-5678,2026-01-01,false,false\n';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', '업체정보_업로드양식.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
 
         function openContractorDetailPanel(id) {
@@ -9259,6 +9287,7 @@
 
                 // 업체
                 downloadContractorCSV,
+                downloadContractorImportTemplate,
                 openContractorPanel,
                 closeContractorPanel,
                 saveContractor,

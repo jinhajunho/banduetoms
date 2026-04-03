@@ -78,64 +78,8 @@
 
         <!-- 메인 콘텐츠 -->
         <div class="main-content">
-            <!-- 대시보드 섹션 (dashboard.html과 동일) -->
-            <div id="page-dashboard" class="page-section active">
-                <div class="dashboard-page-header">
-                    <h1 class="page-title">📅 대시보드</h1>
-                    <button type="button" class="theme-toggle" onclick="toggleDashboardTheme()" id="dashboardThemeBtn">
-                        <i class="fas fa-moon"></i> 다크모드
-                    </button>
-                </div>
-
-                <div class="calendar-container">
-                    <div class="dashboard-calendar-header">
-                        <div class="calendar-title" id="dashboardCalendarTitle">2026년 3월</div>
-                        <div class="calendar-nav">
-                            <button type="button" class="nav-btn" onclick="dashboardChangeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
-                            <button type="button" class="nav-btn" onclick="dashboardChangeMonth(1)"><i class="fas fa-chevron-right"></i></button>
-                        </div>
-                    </div>
-
-                    <div class="filter-container">
-                        <button type="button" class="filter-btn active" data-filter="all">전체</button>
-                        <button type="button" class="filter-btn" data-filter="진행">진행</button>
-                        <button type="button" class="filter-btn" data-filter="완료">완료</button>
-                        <div class="dashboard-search-wrap">
-                            <input type="text" id="dashboardCalendarSearch" class="dashboard-search-input" placeholder="캘린더 검색">
-                            <button type="button" id="dashboardCalendarSearchClear" class="dashboard-search-clear" aria-label="검색어 지우기">&times;</button>
-                        </div>
-                    </div>
-
-                    <div class="calendar-weekdays">
-                        <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
-                    </div>
-
-                    <div class="dashboard-calendar-grid-wrap">
-                        <div class="calendar-grid" id="dashboardCalendarGrid"></div>
-                        <div class="dashboard-calendar-period-overlay" id="dashboardCalendarPeriodOverlay" aria-hidden="true"></div>
-                    </div>
-                </div>
-                <!-- 일정 상세 모달 -->
-                <div class="modal event-modal" id="dashboardEventModal">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <div class="modal-title">일정 상세</div>
-                            <button type="button" class="modal-close" onclick="closeDashboardEventModal()">&times;</button>
-                        </div>
-                        <div id="dashboardEventModalBody"></div>
-                    </div>
-                </div>
-                <!-- 일자별 일정 목록 모달 -->
-                <div class="modal event-modal" id="dashboardDayEventsModal">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <div class="modal-title" id="dashboardDayEventsTitle">일정 목록</div>
-                            <button type="button" class="modal-close" onclick="closeDashboardDayEventsModal()">&times;</button>
-                        </div>
-                        <div id="dashboardDayEventsBody"></div>
-                    </div>
-                </div>
-            </div>
+            <!-- 대시보드: 마크업은 public/partials/page-dashboard.html (dashboard-partial-loader.js 주입) -->
+            <div id="page-dashboard" class="page-section active"></div>
 
             <!-- 견적서 관리 섹션 -->
             <div id="page-estimate" class="page-section" style="display: none;">
@@ -583,11 +527,15 @@
                 <div class="page-header">
                     <h1 class="page-title">업체정보관리</h1>
                     <div class="header-actions">
-                        <button class="btn btn-secondary" onclick="downloadContractorCSV()">
+                        <button type="button" class="btn btn-secondary" onclick="downloadContractorImportTemplate()" title="일괄 등록용 컬럼 안내가 들어간 빈 양식입니다. name(업체명) 필수, id 비우면 신규.">
+                            <i class="fas fa-file-download"></i>
+                            업로드용 양식(CSV)
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="downloadContractorCSV()">
                             <i class="fas fa-download"></i>
                             CSV 다운로드
                         </button>
-                        <button class="btn btn-primary" onclick="openContractorPanel()">
+                        <button type="button" class="btn btn-primary" onclick="openContractorPanel()">
                             <i class="fas fa-plus"></i>
                             업체 등록
                         </button>
