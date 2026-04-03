@@ -390,7 +390,7 @@
             }
         });
 
-        // 대시보드 캘린더 (dashboard.html과 동일)
+        // 대시보드 캘린더 (마크업은 public/partials/page-dashboard.html)
         let dashboardCalendarYear = new Date().getFullYear();
         let dashboardCalendarMonth = new Date().getMonth();
         let dashboardCalendarFilter = 'all';

@@ -1959,7 +1959,7 @@
             text-align: left;
         }
 
-        /* 대시보드 (dashboard.html 스타일) */
+        /* 대시보드 (#page-dashboard / page-dashboard partial) */
         .dashboard-page-header {
             display: flex;
             justify-content: space-between;
