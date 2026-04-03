@@ -1,6 +1,5 @@
 /**
- * index.html 진입점: Supabase 세션이 있으면 프로필을 읽어 앱에 넘기고, 없으면 login.html로 보냅니다.
- * VITE_SUPABASE_* 가 없으면 기존처럼 app.js만 로드합니다.
+ * index.html 진입점: VITE_SUPABASE_* 필수. 세션·프로필이 있으면 app.js 로드, 없으면 login.html로 보냅니다.
  */
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -25,8 +24,7 @@ function mapDbRoleToUi(role) {
 
 async function main() {
     if (!supabaseUrl || !supabaseAnon) {
-        await import('./app.js');
-        window.dispatchEvent(new Event('DOMContentLoaded'));
+        window.location.replace('login.html?needConfig=1');
         return;
     }
 

@@ -527,6 +527,11 @@
                 <div class="page-header">
                     <h1 class="page-title">업체정보관리</h1>
                     <div class="header-actions">
+                        <button type="button" class="btn btn-secondary" onclick="openContractorCsvImportPicker()" title="UTF-8 CSV. 양식 컬럼: id,name,phone,date,hasLicense,hasBankAccount">
+                            <i class="fas fa-upload"></i>
+                            CSV 업로드
+                        </button>
+                        <input type="file" id="contractorCsvImportInput" accept=".csv,text/csv" style="display: none;" onchange="onContractorCsvImportFileChange(event)">
                         <button type="button" class="btn btn-secondary" onclick="downloadContractorImportTemplate()" title="일괄 등록용 컬럼 안내가 들어간 빈 양식입니다. name(업체명) 필수, id 비우면 신규.">
                             <i class="fas fa-file-download"></i>
                             업로드용 양식(CSV)
@@ -558,6 +563,17 @@
                             <!-- 데이터가 여기에 들어갑니다 -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- 업체 CSV 업로드 미리보기 -->
+            <div class="modal event-modal" id="contractorImportModal" onclick="if(event.target===this) closeContractorImportModal()">
+                <div class="modal-content contractor-import-modal-content" onclick="event.stopPropagation()">
+                    <div class="modal-header">
+                        <div class="modal-title">업체 CSV 업로드</div>
+                        <button type="button" class="modal-close" onclick="closeContractorImportModal()">&times;</button>
+                    </div>
+                    <div id="contractorImportModalBody"></div>
                 </div>
             </div>
 
@@ -964,11 +980,6 @@
             </div>
 
         </div>
-    </div>
-
-    <!-- 로그인 페이지(오버레이) — 마크업은 public/partials/login-panel.html 단일 소스, JS가 주입 -->
-    <div id="loginOverlay" class="login-overlay">
-        <div id="loginPanelMount"></div>
     </div>
 
     <script type="module" src="/src/js/index-bootstrap.js"></script>

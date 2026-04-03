@@ -110,72 +110,7 @@
 
         // 페이지 로드 시 URL 해시 확인
         window.addEventListener('DOMContentLoaded', async function() {
-            // ========================================
-            // 로컬 로그인(오버레이) — 마크업은 public/partials/login-panel.html 에서 주입
-            // ========================================
-            try {
-                const mount = document.getElementById('loginPanelMount');
-                if (mount && !document.getElementById('loginForm')) {
-                    const { ensureLoginPanelMounted } = await import('./login-panel-loader.js');
-                    await ensureLoginPanelMounted();
-                }
-            } catch (e) {
-                console.error(e);
-            }
-
             const AUTH_USER_KEY = 'bps_auth_userId';
-            const PASSWORDS_KEY = 'bps_user_passwords';
-            const RESET_REQUIRED_KEY = 'bps_password_reset_required';
-
-            function safeParseJson(val, fallback) {
-                try {
-                    if (val === null || val === undefined) return fallback;
-                    const parsed = JSON.parse(val);
-                    return parsed != null ? parsed : fallback;
-                } catch (e) {
-                    return fallback;
-                }
-            }
-
-            const loginOverlay = document.getElementById('loginOverlay');
-            const mainContentEl = document.querySelector('.main-content');
-            const loginForm = document.getElementById('loginForm');
-            const loginUserSelect = document.getElementById('loginUserId');
-            const loginPassword = document.getElementById('loginPassword');
-            const loginConfirmWrap = document.getElementById('loginConfirmWrap');
-            const loginPasswordConfirm = document.getElementById('loginPasswordConfirm');
-            const loginErrorEl = document.getElementById('loginError');
-            const loginSubmitBtn = document.getElementById('loginSubmitBtn');
-
-            let userPasswords = safeParseJson(localStorage.getItem(PASSWORDS_KEY), {});
-            let resetRequired = safeParseJson(localStorage.getItem(RESET_REQUIRED_KEY), {});
-
-            function setLoginError(message) {
-                if (!loginErrorEl) return;
-                loginErrorEl.textContent = message || '';
-                loginErrorEl.style.display = message ? 'block' : 'none';
-            }
-
-            function syncLoginModeUI() {
-                if (!loginUserSelect || !loginPassword) return;
-                const uid = String(loginUserSelect.value || '').trim();
-                if (!uid) return;
-                const requiresSet = !!resetRequired[uid] || !userPasswords[uid];
-                if (loginConfirmWrap) loginConfirmWrap.style.display = requiresSet ? 'flex' : 'none';
-                if (loginSubmitBtn) loginSubmitBtn.textContent = requiresSet ? '비밀번호 설정 후 로그인' : '로그인';
-                setLoginError('');
-                // set 모드에서만 확인값이 필요하므로, 입력 실수 방지용으로 확인칸 값은 유지하되 검증 시에만 체크.
-            }
-
-            function setCurrentUserFromUserAccount(targetUser) {
-                if (!targetUser) return;
-                currentUserAccessProfile.userId = targetUser.userId || '';
-                currentUserAccessProfile.name = targetUser.name || '';
-                currentUserAccessProfile.type = targetUser.type || 'internal';
-                currentUserAccessProfile.role = targetUser.role || '';
-                currentUserAccessProfile.contractorName = targetUser.contractorName || '';
-                currentUserAccessProfile.extraAllowedPages = Array.from((targetUser.extraAllowedPages || []));
-            }
 
             let isAuthed = false;
             try {
@@ -197,22 +132,21 @@
                 /* ignore */
             }
 
-            const storedAuthUserId = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
-            if (!isAuthed && storedAuthUserId && Array.isArray(userAccounts)) {
-                const targetUser = userAccounts.find(function (u) {
-                    return u && u.userId === storedAuthUserId && u.active !== false;
-                });
-                if (targetUser) {
-                    setCurrentUserFromUserAccount(targetUser);
-                    isAuthed = true;
-                }
-            }
+            const pathLower = (window.location.pathname || '').toLowerCase();
+            const isMainAppEntry =
+                pathLower === '/' ||
+                pathLower.endsWith('/index.html') ||
+                pathLower === '' ||
+                pathLower.endsWith('/');
 
-            // 로그인 페이지 분리: 인증 안 된 상태면 index.html에서 바로 login.html로 보냅니다.
-            const isIndexPage = (window.location.pathname || '').toLowerCase().endsWith('index.html');
-            if (!isAuthed && isIndexPage && loginOverlay) {
+            if (!isAuthed && isMainAppEntry) {
                 const next = (window.location.hash || '').slice(1) || 'dashboard';
                 window.location.href = 'login.html?next=' + encodeURIComponent(next);
+                return;
+            }
+
+            if (!isAuthed) {
+                window.location.href = 'login.html?next=dashboard';
                 return;
             }
 
@@ -224,100 +158,6 @@
                 await ensureDashboardPartialMounted();
             } catch (e) {
                 console.error(e);
-            }
-
-            // 로그인 UI 초기화
-            if (loginOverlay && loginForm && loginUserSelect && Array.isArray(userAccounts)) {
-                const isSelectEl = loginUserSelect && String(loginUserSelect.tagName || '').toUpperCase() === 'SELECT';
-
-                if (isSelectEl) {
-                    const activeUsers = userAccounts.filter(function (u) { return u && u.active !== false; });
-                    loginUserSelect.innerHTML = activeUsers.map(function (u) {
-                        const uid = escapeHtmlAttr(u.userId || '');
-                        const nm = escapeHtmlAttr(u.name || '');
-                        return '<option value="' + uid + '">' + nm + ' (@' + uid + ')</option>';
-                    }).join('');
-                }
-
-                // 아이디가 미리 저장된 상태면 그 사용자로 모드 동기화
-                if (storedAuthUserId) loginUserSelect.value = storedAuthUserId;
-
-                const eventName = isSelectEl ? 'change' : 'input';
-                loginUserSelect.addEventListener(eventName, function () {
-                    syncLoginModeUI();
-                });
-
-                // 제출 핸들러
-                loginForm.addEventListener('submit', function (e) {
-                    e.preventDefault();
-                    if (!loginUserSelect) return;
-                    const uid = String(loginUserSelect.value || '').trim();
-                    const pw = String(loginPassword && loginPassword.value ? loginPassword.value : '').trim();
-
-                    if (!uid) {
-                        setLoginError('아이디를 선택하세요.');
-                        return;
-                    }
-                    if (!pw) {
-                        setLoginError('비밀번호를 입력하세요.');
-                        return;
-                    }
-
-                    const targetUser = userAccounts.find(function (u) { return u && u.userId === uid && u.active !== false; });
-                    if (!targetUser) {
-                        setLoginError('계정을 찾을 수 없습니다.');
-                        return;
-                    }
-
-                    const requiresSet = !!resetRequired[uid] || !userPasswords[uid];
-                    if (requiresSet) {
-                        const pw2 = String(loginPasswordConfirm && loginPasswordConfirm.value ? loginPasswordConfirm.value : '').trim();
-                        if (pw.length < 6) {
-                            setLoginError('비밀번호는 6자 이상으로 입력하세요.');
-                            return;
-                        }
-                        if (pw !== pw2) {
-                            setLoginError('비밀번호 확인이 일치하지 않습니다.');
-                            return;
-                        }
-                        userPasswords[uid] = pw;
-                        delete resetRequired[uid];
-                        localStorage.setItem(PASSWORDS_KEY, JSON.stringify(userPasswords));
-                        localStorage.setItem(RESET_REQUIRED_KEY, JSON.stringify(resetRequired));
-                    } else {
-                        if (String(userPasswords[uid] || '') !== pw) {
-                            setLoginError('아이디 또는 비밀번호가 올바르지 않습니다.');
-                            return;
-                        }
-                    }
-
-                    localStorage.setItem(AUTH_USER_KEY, uid);
-                    setCurrentUserFromUserAccount(targetUser);
-                    setLoginError('');
-
-                    // 로그인 성공: 오버레이 닫기 + 페이지 리렌더
-                    if (loginOverlay) loginOverlay.classList.remove('active');
-                    if (mainContentEl) mainContentEl.style.display = '';
-
-                    applyRoleBasedNavigation();
-                    const hash = window.location.hash.slice(1);
-                    const nextPage = (hash && document.getElementById(`page-${hash}`)) ? hash : 'dashboard';
-                    showPage(nextPage);
-                });
-
-                // 처음 모드 동기화
-                syncLoginModeUI();
-            }
-
-            // 로그인 상태에 따라 오버레이 표기
-            if (loginOverlay) {
-                if (!isAuthed) {
-                    loginOverlay.classList.add('active');
-                    if (mainContentEl) mainContentEl.style.display = 'none';
-                } else {
-                    loginOverlay.classList.remove('active');
-                    if (mainContentEl) mainContentEl.style.display = '';
-                }
             }
 
             applyRoleBasedNavigation();
@@ -3097,6 +2937,396 @@
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+        }
+
+        var CONTRACTOR_IMPORT_MAX_ROWS = 500;
+        var CONTRACTOR_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
+
+        function parseContractorCsvTextToRows(text) {
+            text = String(text || '').replace(/^\uFEFF/, '');
+            var rows = [];
+            var row = [];
+            var cell = '';
+            var inQ = false;
+            for (var i = 0; i < text.length; i++) {
+                var c = text[i];
+                if (inQ) {
+                    if (c === '"') {
+                        if (text[i + 1] === '"') {
+                            cell += '"';
+                            i++;
+                            continue;
+                        }
+                        inQ = false;
+                        continue;
+                    }
+                    cell += c;
+                    continue;
+                }
+                if (c === '"') {
+                    inQ = true;
+                    continue;
+                }
+                if (c === ',') {
+                    row.push(cell);
+                    cell = '';
+                    continue;
+                }
+                if (c === '\r') {
+                    if (text[i + 1] === '\n') i++;
+                    row.push(cell);
+                    rows.push(row);
+                    row = [];
+                    cell = '';
+                    continue;
+                }
+                if (c === '\n') {
+                    row.push(cell);
+                    rows.push(row);
+                    row = [];
+                    cell = '';
+                    continue;
+                }
+                cell += c;
+            }
+            row.push(cell);
+            if (row.length > 1 || (row.length === 1 && row[0] !== '')) {
+                rows.push(row);
+            }
+            return rows.filter(function (r) {
+                return r.some(function (cl) {
+                    return String(cl).trim() !== '';
+                });
+            });
+        }
+
+        function normalizeContractorImportHeaderKey(h) {
+            var s = String(h || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s/g, '');
+            var map = {
+                id: 'id',
+                name: 'name',
+                업체명: 'name',
+                phone: 'phone',
+                전화번호: 'phone',
+                date: 'date',
+                등록일: 'date',
+                haslicense: 'hasLicense',
+                사업자등록증: 'hasLicense',
+                hasbankaccount: 'hasBankAccount',
+                통장사본: 'hasBankAccount'
+            };
+            return map[s] || s;
+        }
+
+        function parseContractorImportBool(raw) {
+            var t = String(raw == null ? '' : raw)
+                .trim()
+                .toLowerCase();
+            if (!t) return false;
+            if (t === 'true' || t === '1' || t === 'yes' || t === 'y' || t === '있음') return true;
+            if (t === 'false' || t === '0' || t === 'no' || t === 'n' || t === '없음') return false;
+            return null;
+        }
+
+        function buildContractorItemForImport(rowMap, prev, explicitId) {
+            var name = String(rowMap.name == null ? '' : rowMap.name).trim();
+            var phone = String(rowMap.phone == null ? '' : rowMap.phone).trim();
+            var dateRaw = String(rowMap.date == null ? '' : rowMap.date).trim();
+            var dateStr = dateRaw;
+            if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                return { error: '날짜는 YYYY-MM-DD 형식이어야 합니다.' };
+            }
+            if (!dateStr) {
+                dateStr =
+                    (prev && prev.date) ||
+                    new Date().toISOString().slice(0, 10);
+            }
+            var hasL = parseContractorImportBool(
+                rowMap.hasLicense != null && rowMap.hasLicense !== '' ? rowMap.hasLicense : ''
+            );
+            if (hasL === null)
+                return { error: 'hasLicense 값을 해석할 수 없습니다 (true/false, 있음/없음).' };
+            var hasB = parseContractorImportBool(
+                rowMap.hasBankAccount != null && rowMap.hasBankAccount !== '' ? rowMap.hasBankAccount : ''
+            );
+            if (hasB === null)
+                return { error: 'hasBankAccount 값을 해석할 수 없습니다.' };
+
+            var o = {
+                id: explicitId,
+                name: name,
+                phone: phone,
+                date: dateStr,
+                hasLicense: hasL,
+                hasBankAccount: hasB
+            };
+            if (prev) {
+                if (hasL && prev.licenseDataUrl) {
+                    o.licenseDataUrl = prev.licenseDataUrl;
+                    o.licenseFileName = prev.licenseFileName;
+                    o.licenseMimeType = prev.licenseMimeType;
+                }
+                if (hasB && prev.bankDataUrl) {
+                    o.bankDataUrl = prev.bankDataUrl;
+                    o.bankFileName = prev.bankFileName;
+                    o.bankMimeType = prev.bankMimeType;
+                }
+            }
+            return { item: o };
+        }
+
+        function openContractorCsvImportPicker() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                alert(
+                    '세션을 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 로그인해 주세요.'
+                );
+                return;
+            }
+            var inp = document.getElementById('contractorCsvImportInput');
+            if (!inp) return;
+            inp.value = '';
+            inp.click();
+        }
+
+        function onContractorCsvImportFileChange(ev) {
+            var input = ev && ev.target;
+            var file = input && input.files && input.files[0];
+            if (!file) return;
+            if (file.size > CONTRACTOR_IMPORT_MAX_BYTES) {
+                alert('파일이 너무 큽니다. (최대 약 2MB)');
+                input.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () {
+                var text = String(reader.result || '');
+                var res = parseAndValidateContractorImportCsv(text);
+                input.value = '';
+                if (!res.ok) {
+                    alert(res.error || 'CSV를 읽을 수 없습니다.');
+                    return;
+                }
+                openContractorImportModalWithResult(res);
+            };
+            reader.onerror = function () {
+                alert('파일을 읽지 못했습니다.');
+                input.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseAndValidateContractorImportCsv(text) {
+            var rows = parseContractorCsvTextToRows(text);
+            if (!rows.length) {
+                return { ok: false, error: '데이터 행이 없습니다.' };
+            }
+            var headerCells = rows[0].map(function (h) {
+                return normalizeContractorImportHeaderKey(h);
+            });
+            var idx = {};
+            for (var hi = 0; hi < headerCells.length; hi++) {
+                var key = headerCells[hi];
+                if (key && idx[key] === undefined) idx[key] = hi;
+            }
+            if (idx.name === undefined) {
+                return { ok: false, error: 'CSV에 name(업체명) 열이 필요합니다.' };
+            }
+
+            var dataRows = rows.slice(1);
+            if (dataRows.length > CONTRACTOR_IMPORT_MAX_ROWS) {
+                return {
+                    ok: false,
+                    error: '한 번에 최대 ' + CONTRACTOR_IMPORT_MAX_ROWS + '행까지만 업로드할 수 있습니다.'
+                };
+            }
+
+            var usedExplicitIds = {};
+            var previews = [];
+            var pendingItems = [];
+            var maxExisting =
+                contractors.length > 0
+                    ? Math.max.apply(
+                          null,
+                          contractors.map(function (c) {
+                              return Number(c.id) || 0;
+                          })
+                      )
+                    : 0;
+            var autoCursor = maxExisting;
+
+            for (var ri = 0; ri < dataRows.length; ri++) {
+                var line = ri + 2;
+                var cells = dataRows[ri];
+                var rowMap = {};
+                Object.keys(idx).forEach(function (k) {
+                    rowMap[k] = cells[idx[k]] != null ? cells[idx[k]] : '';
+                });
+                var name = String(rowMap.name == null ? '' : rowMap.name).trim();
+                if (!name) {
+                    previews.push({
+                        line: line,
+                        name: '',
+                        idDisp: '',
+                        err: '업체명(name)이 비었습니다.'
+                    });
+                    continue;
+                }
+
+                var idCell = String(rowMap.id != null ? rowMap.id : '').trim();
+                var explicitId = null;
+                if (idCell !== '') {
+                    explicitId = Number(idCell);
+                    if (!Number.isFinite(explicitId)) {
+                        previews.push({
+                            line: line,
+                            name: name,
+                            idDisp: idCell,
+                            err: 'id는 숫자여야 합니다.'
+                        });
+                        continue;
+                    }
+                    if (usedExplicitIds[explicitId]) {
+                        previews.push({
+                            line: line,
+                            name: name,
+                            idDisp: String(explicitId),
+                            err: 'CSV 안에서 id가 중복되었습니다.'
+                        });
+                        continue;
+                    }
+                    usedExplicitIds[explicitId] = true;
+                } else {
+                    do {
+                        autoCursor++;
+                    } while (usedExplicitIds[autoCursor]);
+                    explicitId = autoCursor;
+                    usedExplicitIds[explicitId] = true;
+                }
+
+                var prev = contractors.find(function (c) {
+                    return Number(c.id) === explicitId;
+                });
+                var built = buildContractorItemForImport(rowMap, prev, explicitId);
+                if (built.error) {
+                    previews.push({
+                        line: line,
+                        name: name,
+                        idDisp: String(explicitId),
+                        err: built.error
+                    });
+                    continue;
+                }
+                previews.push({
+                    line: line,
+                    name: name,
+                    idDisp: String(explicitId),
+                    err: '',
+                    mode: prev ? '수정' : '신규'
+                });
+                pendingItems.push(built.item);
+            }
+
+            var errs = previews.filter(function (p) {
+                return p.err;
+            });
+            if (errs.length) {
+                return { ok: true, previews: previews, pendingItems: null, hasErrors: true };
+            }
+            if (!pendingItems.length) {
+                return { ok: false, error: '반영할 유효 행이 없습니다.' };
+            }
+            return { ok: true, previews: previews, pendingItems: pendingItems, hasErrors: false };
+        }
+
+        function openContractorImportModalWithResult(res) {
+            var body = document.getElementById('contractorImportModalBody');
+            var modal = document.getElementById('contractorImportModal');
+            if (!body || !modal) return;
+
+            window.__contractorImportPending = res.hasErrors ? null : res.pendingItems;
+
+            var summary =
+                '<div class="contractor-import-modal-summary">' +
+                (res.hasErrors
+                    ? '<strong>오류가 있는 행을 수정한 뒤 다시 업로드해 주세요.</strong> (저장 버튼은 비활성화)'
+                    : '<strong>' +
+                      res.pendingItems.length +
+                      '건</strong>을 서버에 반영합니다. 기존 id는 수정, 빈 id는 신규 번호가 부여됩니다.') +
+                '</div>';
+
+            var table =
+                '<div class="table-section"><table><thead><tr><th>CSV행</th><th>id</th><th>업체명</th><th>구분</th><th>결과</th></tr></thead><tbody>';
+            for (var pi = 0; pi < res.previews.length; pi++) {
+                var p = res.previews[pi];
+                table +=
+                    '<tr><td>' +
+                    p.line +
+                    '</td><td>' +
+                    escapeHtml(p.idDisp) +
+                    '</td><td>' +
+                    escapeHtml(p.name) +
+                    '</td><td>' +
+                    escapeHtml(p.mode || '-') +
+                    '</td><td class="' +
+                    (p.err ? 'contractor-import-row-err' : '') +
+                    '">' +
+                    escapeHtml(p.err || 'OK') +
+                    '</td></tr>';
+            }
+            table += '</tbody></table></div>';
+
+            var actions =
+                '<div class="contractor-import-modal-actions">' +
+                '<button type="button" class="btn btn-secondary" onclick="closeContractorImportModal()">닫기</button>' +
+                '<button type="button" class="btn btn-primary" id="contractorImportConfirmBtn" onclick="confirmContractorImport()" ' +
+                (res.hasErrors ? 'disabled' : '') +
+                '>서버에 반영</button></div>';
+
+            body.innerHTML = summary + table + actions;
+            modal.classList.add('active');
+        }
+
+        function closeContractorImportModal() {
+            var modal = document.getElementById('contractorImportModal');
+            if (modal) modal.classList.remove('active');
+            window.__contractorImportPending = null;
+        }
+
+        function confirmContractorImport() {
+            var pending = window.__contractorImportPending;
+            if (!pending || !pending.length) return;
+            var i = 0;
+            function step() {
+                if (i >= pending.length) {
+                    syncContractorsFromServer().then(function () {
+                        alert(pending.length + '건 반영했습니다.');
+                        closeContractorImportModal();
+                    });
+                    return;
+                }
+                var item = pending[i];
+                upsertContractorToServer(item).then(function (r) {
+                    if (!r.ok) {
+                        alert(
+                            '저장 실패 (목록 ' +
+                                (i + 1) +
+                                '번째 / id ' +
+                                item.id +
+                                '): ' +
+                                (r.error || '')
+                        );
+                        syncContractorsFromServer();
+                        closeContractorImportModal();
+                        return;
+                    }
+                    i++;
+                    step();
+                });
+            }
+            step();
         }
 
         function openContractorDetailPanel(id) {
@@ -5976,33 +6206,7 @@
                 return;
             }
 
-            // Supabase 미사용(로컬 데모) 시: 로컬 저장소만 갱신
-            const PASSWORDS_KEY = 'bps_user_passwords';
-            const RESET_REQUIRED_KEY = 'bps_password_reset_required';
-            const AUTH_USER_KEY = 'bps_auth_userId';
-            try {
-                const passwordsRaw = localStorage.getItem(PASSWORDS_KEY);
-                const resetRaw = localStorage.getItem(RESET_REQUIRED_KEY);
-                const passwords = passwordsRaw ? JSON.parse(passwordsRaw) : {};
-                const resetRequired = resetRaw ? JSON.parse(resetRaw) : {};
-                if (passwords && Object.prototype.hasOwnProperty.call(passwords, uid)) delete passwords[uid];
-                if (resetRequired) resetRequired[uid] = true;
-                localStorage.setItem(PASSWORDS_KEY, JSON.stringify(passwords || {}));
-                localStorage.setItem(RESET_REQUIRED_KEY, JSON.stringify(resetRequired || {}));
-            } catch (e) {
-                /* ignore */
-            }
-
-            try {
-                const authUser = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
-                if (authUser && authUser === uid) {
-                    localStorage.removeItem(AUTH_USER_KEY);
-                    location.reload();
-                }
-            } catch (e) {
-                /* ignore */
-            }
-            showToast('비밀번호가 초기화되었습니다. 로그인 페이지에서 새 비밀번호를 설정하세요.');
+            showToast('로그인이 필요합니다. Supabase 연동 후 이용해 주세요.');
         }
 
         // 페이지 전환 시 자동 렌더링
@@ -9295,6 +9499,10 @@
                 openContractorDetailPanel,
                 viewContractorImage,
                 updateContractorFileName,
+                openContractorCsvImportPicker,
+                onContractorCsvImportFileChange,
+                closeContractorImportModal,
+                confirmContractorImport,
 
                 // 경비
                 downloadExpenseCSV,

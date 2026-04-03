@@ -3,23 +3,9 @@ import { ensureLoginPanelMounted } from './login-panel-loader.js';
 
 const VIRTUAL_DOMAIN = 'bps-virtual.local';
 const AUTH_USER_KEY = 'bps_auth_userId';
-const PASSWORDS_KEY = 'bps_user_passwords';
-const RESET_REQUIRED_KEY = 'bps_password_reset_required';
-const USER_ACCOUNTS_KEY = 'bps_user_accounts';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const useRemoteAuth = !!(supabaseUrl && supabaseAnon);
-
-function safeParseJson(val, fallback) {
-    try {
-        if (val === null || val === undefined) return fallback;
-        const parsed = JSON.parse(val);
-        return parsed != null ? parsed : fallback;
-    } catch (e) {
-        return fallback;
-    }
-}
 
 function virtualEmail(userId) {
     return String(userId || '')
@@ -62,23 +48,6 @@ function supabaseAuthErrorToMessage(err) {
     return msg || '로그인에 실패했습니다.';
 }
 
-const defUserAccounts = [
-    {
-        name: '방준호',
-        userId: 'junho',
-        type: 'internal',
-        role: '슈퍼관리자',
-        contractorName: '',
-        active: true,
-        extraAllowedPages: [],
-    },
-];
-
-function loadUserAccounts() {
-    const stored = safeParseJson(localStorage.getItem(USER_ACCOUNTS_KEY), null);
-    return Array.isArray(stored) && stored.length ? stored : defUserAccounts;
-}
-
 async function run() {
     try {
         await ensureLoginPanelMounted();
@@ -99,12 +68,6 @@ async function run() {
     const params = new URLSearchParams(window.location.search);
     const nextPage = params.get('next') || 'dashboard';
 
-    const userAccounts = loadUserAccounts();
-    const userPasswords = safeParseJson(localStorage.getItem(PASSWORDS_KEY), {});
-    const resetRequired = safeParseJson(localStorage.getItem(RESET_REQUIRED_KEY), {});
-
-    let supabase = null;
-
     function setLoginError(message) {
         if (!loginErrorEl) return;
         if (message) {
@@ -116,21 +79,40 @@ async function run() {
         }
     }
 
-    /** 원격 프로필 기준 또는 로컬 레거시 기준 */
+    function disableForm(msg) {
+        setLoginError(msg);
+        if (loginSubmitBtn) loginSubmitBtn.disabled = true;
+        loginUserInput.disabled = true;
+        loginPassword.disabled = true;
+        if (loginPasswordConfirm) loginPasswordConfirm.disabled = true;
+    }
+
+    if (!supabaseUrl || !supabaseAnon) {
+        disableForm(
+            'VITE_SUPABASE_URL·VITE_SUPABASE_ANON_KEY가 설정되지 않았습니다. .env를 구성한 뒤 개발 서버를 다시 실행해 주세요.'
+        );
+        return;
+    }
+
+    if (params.get('needConfig') === '1') {
+        setLoginError(
+            'Supabase 환경 변수가 없어 메인 화면을 열 수 없습니다. Vite/Vercel 등 배포 설정에 VITE_SUPABASE_URL·VITE_SUPABASE_ANON_KEY를 넣은 뒤 다시 접속해 주세요.'
+        );
+    }
+
     let remoteRequiresSet = false;
     let remoteActive = true;
 
     async function syncModeUI() {
         try {
-        const uid = String(loginUserInput.value || '').trim();
-        if (!uid) {
-            if (loginConfirmWrap) loginConfirmWrap.style.display = 'none';
-            if (loginSubmitBtn) loginSubmitBtn.textContent = '로그인';
-            setLoginError('');
-            return;
-        }
+            const uid = String(loginUserInput.value || '').trim();
+            if (!uid) {
+                if (loginConfirmWrap) loginConfirmWrap.style.display = 'none';
+                if (loginSubmitBtn) loginSubmitBtn.textContent = '로그인';
+                setLoginError('');
+                return;
+            }
 
-        if (useRemoteAuth) {
             const st = await fetchProfileStatus(uid);
             if (st && st.ok) {
                 remoteActive = !!st.active;
@@ -163,141 +145,67 @@ async function run() {
                 return;
             }
             setLoginError('');
-            return;
-        }
-
-        const targetUser = userAccounts.find(function (u) {
-            return u && u.userId === uid && u.active !== false;
-        });
-        if (!targetUser) {
-            if (loginConfirmWrap) loginConfirmWrap.style.display = 'none';
-            if (loginSubmitBtn) loginSubmitBtn.textContent = '로그인';
-            setLoginError('');
-            return;
-        }
-
-        const requiresSetLegacy = !!resetRequired[uid] || !userPasswords[uid];
-        if (loginConfirmWrap) {
-            loginConfirmWrap.style.display = requiresSetLegacy ? 'flex' : 'none';
-        }
-        if (loginSubmitBtn) {
-            loginSubmitBtn.textContent = requiresSetLegacy ? '비밀번호 설정 후 로그인' : '로그인';
-        }
-        setLoginError('');
         } catch (e) {
-            if (useRemoteAuth) {
-                setLoginError('네트워크 오류가 발생했습니다.');
-            }
+            setLoginError('네트워크 오류가 발생했습니다.');
         }
     }
 
     const storedAuthUserId = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
     if (storedAuthUserId) loginUserInput.value = storedAuthUserId;
 
-    const boot = async () => {
-        if (useRemoteAuth) {
-            supabase = createClient(supabaseUrl, supabaseAnon, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    storage: localStorage,
-                },
-            });
-            window.__bpsSupabase = supabase;
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData && sessionData.session) {
-                window.location.href = 'index.html#' + nextPage;
-                return;
+    const supabase = createClient(supabaseUrl, supabaseAnon, {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            storage: localStorage,
+        },
+    });
+    window.__bpsSupabase = supabase;
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData && sessionData.session) {
+        window.location.href = 'index.html#' + nextPage;
+        return;
+    }
+
+    loginUserInput.addEventListener('input', function () {
+        syncModeUI();
+    });
+    await syncModeUI();
+
+    loginForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const uid = String(loginUserInput.value || '').trim();
+        const pw = String(loginPassword.value || '').trim();
+
+        if (!uid) return setLoginError('아이디를 입력하세요.');
+        if (!pw) return setLoginError('비밀번호를 입력하세요.');
+
+        try {
+            await syncModeUI();
+            if (!remoteActive) {
+                return setLoginError('비활성 계정입니다. 관리자에게 문의하세요.');
             }
-        } else if (
-            storedAuthUserId &&
-            userAccounts.some(function (u) {
-                return u && u.userId === storedAuthUserId && u.active !== false;
-            }) &&
-            !resetRequired[storedAuthUserId] &&
-            userPasswords[storedAuthUserId]
-        ) {
-            window.location.href = 'index.html#' + nextPage;
-            return;
-        }
-
-        loginUserInput.addEventListener('input', function () {
-            syncModeUI();
-        });
-        await syncModeUI();
-
-        loginForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const uid = String(loginUserInput.value || '').trim();
-            const pw = String(loginPassword.value || '').trim();
-
-            if (!uid) return setLoginError('아이디를 입력하세요.');
-            if (!pw) return setLoginError('비밀번호를 입력하세요.');
-
-            if (useRemoteAuth) {
-                try {
-                    await syncModeUI();
-                    if (!remoteActive) {
-                        return setLoginError('비활성 계정입니다. 관리자에게 문의하세요.');
-                    }
-                    if (remoteRequiresSet) {
-                        const pw2 = String(
-                            loginPasswordConfirm && loginPasswordConfirm.value
-                                ? loginPasswordConfirm.value
-                                : ''
-                        ).trim();
-                        if (pw.length < 6) return setLoginError('비밀번호는 6자 이상으로 입력하세요.');
-                        if (pw !== pw2) return setLoginError('비밀번호 확인이 일치하지 않습니다.');
-                        await postSetPassword(uid, pw);
-                    }
-                    const { error } = await supabase.auth.signInWithPassword({
-                        email: virtualEmail(uid),
-                        password: pw,
-                    });
-                    if (error) return setLoginError(supabaseAuthErrorToMessage(error));
-                    localStorage.setItem(AUTH_USER_KEY, uid);
-                    setLoginError('');
-                    window.location.href = 'index.html#' + nextPage;
-                } catch (err) {
-                    setLoginError(err && err.message ? String(err.message) : '처리에 실패했습니다.');
-                }
-                return;
-            }
-
-            const targetUser = userAccounts.find(function (u) {
-                return u && u.userId === uid && u.active !== false;
-            });
-            if (!targetUser) return setLoginError('계정을 찾을 수 없습니다.');
-
-            const requiresSet = !!resetRequired[uid] || !userPasswords[uid];
-
-            if (requiresSet) {
+            if (remoteRequiresSet) {
                 const pw2 = String(
                     loginPasswordConfirm && loginPasswordConfirm.value ? loginPasswordConfirm.value : ''
                 ).trim();
                 if (pw.length < 6) return setLoginError('비밀번호는 6자 이상으로 입력하세요.');
                 if (pw !== pw2) return setLoginError('비밀번호 확인이 일치하지 않습니다.');
-                userPasswords[uid] = pw;
-                delete resetRequired[uid];
-
-                try {
-                    localStorage.setItem(PASSWORDS_KEY, JSON.stringify(userPasswords));
-                    localStorage.setItem(RESET_REQUIRED_KEY, JSON.stringify(resetRequired));
-                } catch (err) {
-                    /* ignore */
-                }
-            } else {
-                if (String(userPasswords[uid] || '') !== pw)
-                    return setLoginError('아이디 또는 비밀번호가 올바르지 않습니다.');
+                await postSetPassword(uid, pw);
             }
-
+            const { error } = await supabase.auth.signInWithPassword({
+                email: virtualEmail(uid),
+                password: pw,
+            });
+            if (error) return setLoginError(supabaseAuthErrorToMessage(error));
             localStorage.setItem(AUTH_USER_KEY, uid);
             setLoginError('');
             window.location.href = 'index.html#' + nextPage;
-        });
-    };
-
-    boot();
+        } catch (err) {
+            setLoginError(err && err.message ? String(err.message) : '처리에 실패했습니다.');
+        }
+    });
 }
 
 if (document.readyState === 'loading') {
