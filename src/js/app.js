@@ -539,6 +539,225 @@
             });
         }
 
+        const DASHBOARD_PERIOD_LANE_H = 22;
+        const DASHBOARD_PERIOD_LANE_GAP = 2;
+
+        let dashboardPeriodOverlayObserverReady = false;
+
+        function dashboardEventPassesCalendarFilters(event) {
+            const hasCalendarAnchor = !!(event.startDate || event.endDate);
+            if (!hasCalendarAnchor) return false;
+            if (dashboardCalendarFilter === '진행') return event.status !== '완료';
+            if (dashboardCalendarFilter === '완료') return event.status === '완료';
+            return true;
+        }
+
+        function getDashboardMultiDayPeriodEvents() {
+            const out = [];
+            const seen = new Set();
+            getDashboardEvents().forEach(function (event) {
+                const start = normalizeYmd(event.startDate);
+                const end = normalizeYmd(event.endDate);
+                if (!start || !end) return;
+                const from = start <= end ? start : end;
+                const to = start <= end ? end : start;
+                if (daysBetweenInclusive(from, to) <= 1) return;
+                if (!dashboardEventPassesCalendarFilters(event)) return;
+                if (!matchesDashboardSearch(event)) return;
+                const key = String(event.code != null ? event.code : event.id);
+                if (seen.has(key)) return;
+                seen.add(key);
+                out.push({ event: event, from: from, to: to });
+            });
+            return out;
+        }
+
+        function ensureDashboardPeriodOverlayObserver() {
+            if (dashboardPeriodOverlayObserverReady) return;
+            const wrap = document.querySelector('.dashboard-calendar-grid-wrap');
+            if (!wrap) return;
+            dashboardPeriodOverlayObserverReady = true;
+            if (typeof ResizeObserver !== 'undefined') {
+                new ResizeObserver(function () {
+                    renderDashboardPeriodOverlay();
+                }).observe(wrap);
+            }
+            window.addEventListener('resize', function () {
+                renderDashboardPeriodOverlay();
+            });
+        }
+
+        function scheduleDashboardPeriodOverlay() {
+            ensureDashboardPeriodOverlayObserver();
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    renderDashboardPeriodOverlay();
+                });
+            });
+        }
+
+        function getDashPeriodEventsTopRelative(cellEl, wrapRect) {
+            const ev = cellEl.querySelector('.calendar-day-events');
+            if (ev) {
+                const r = ev.getBoundingClientRect();
+                return r.top - wrapRect.top;
+            }
+            const dayNum = cellEl.querySelector('.day-number');
+            if (dayNum) {
+                const r = dayNum.getBoundingClientRect();
+                return r.bottom - wrapRect.top + 4;
+            }
+            const r = cellEl.getBoundingClientRect();
+            return r.top - wrapRect.top + 28;
+        }
+
+        function renderDashboardPeriodOverlay() {
+            const overlay = document.getElementById('dashboardCalendarPeriodOverlay');
+            const wrap = document.querySelector('.dashboard-calendar-grid-wrap');
+            const grid = document.getElementById('dashboardCalendarGrid');
+            if (!overlay || !wrap || !grid) return;
+
+            overlay.innerHTML = '';
+            grid.querySelectorAll('.calendar-day-events').forEach(function (el) {
+                el.style.paddingTop = '';
+            });
+
+            const cells = Array.prototype.map.call(grid.querySelectorAll('.calendar-day'), function (el) {
+                return { el: el, dateStr: el.getAttribute('data-date') || '' };
+            });
+
+            const periodItems = getDashboardMultiDayPeriodEvents();
+            if (periodItems.length === 0) {
+                overlay.setAttribute('aria-hidden', 'true');
+                return;
+            }
+
+            const segments = [];
+            periodItems.forEach(function (item) {
+                const from = item.from;
+                const to = item.to;
+                const event = item.event;
+                for (var w = 0; w < 6; w++) {
+                    var rowCells = cells.slice(w * 7, w * 7 + 7);
+                    var inRow = rowCells.filter(function (c) {
+                        return c.dateStr && c.dateStr >= from && c.dateStr <= to;
+                    });
+                    if (inRow.length === 0) continue;
+                    var startEl = inRow[0].el;
+                    var endEl = inRow[inRow.length - 1].el;
+                    var firstDs = inRow[0].dateStr;
+                    var lastDs = inRow[inRow.length - 1].dateStr;
+                    segments.push({
+                        event: event,
+                        from: from,
+                        to: to,
+                        week: w,
+                        startCol: rowCells.indexOf(inRow[0]),
+                        endCol: rowCells.indexOf(inRow[inRow.length - 1]),
+                        startEl: startEl,
+                        endEl: endEl,
+                        firstDs: firstDs,
+                        lastDs: lastDs
+                    });
+                }
+            });
+
+            var byWeek = {};
+            segments.forEach(function (seg) {
+                if (!byWeek[seg.week]) byWeek[seg.week] = [];
+                byWeek[seg.week].push(seg);
+            });
+
+            for (var w = 0; w < 6; w++) {
+                var pad = 0;
+                var segs = byWeek[w];
+                if (segs && segs.length) {
+                    segs.sort(function (a, b) {
+                        return a.startCol - b.startCol || a.endCol - b.endCol;
+                    });
+                    var lanes = [];
+                    segs.forEach(function (seg) {
+                        var li = 0;
+                        while (true) {
+                            if (!lanes[li]) lanes[li] = [];
+                            var ok = true;
+                            for (var j = 0; j < lanes[li].length; j++) {
+                                var o = lanes[li][j];
+                                if (!(seg.endCol < o.startCol || seg.startCol > o.endCol)) {
+                                    ok = false;
+                                    break;
+                                }
+                            }
+                            if (ok) {
+                                lanes[li].push(seg);
+                                seg.lane = li;
+                                break;
+                            }
+                            li++;
+                        }
+                    });
+                    var maxLane = 0;
+                    segs.forEach(function (s) {
+                        if (s.lane > maxLane) maxLane = s.lane;
+                    });
+                    pad = (maxLane + 1) * (DASHBOARD_PERIOD_LANE_H + DASHBOARD_PERIOD_LANE_GAP);
+                }
+                var rowCells = cells.slice(w * 7, w * 7 + 7);
+                rowCells.forEach(function (c) {
+                    var evEl = c.el.querySelector('.calendar-day-events');
+                    if (evEl && pad > 0) evEl.style.paddingTop = pad + 'px';
+                });
+            }
+
+            var wrapRectDraw = wrap.getBoundingClientRect();
+
+            var rowBaseTop = [];
+            for (var rw = 0; rw < 6; rw++) {
+                var minT = Infinity;
+                for (var c = 0; c < 7; c++) {
+                    var cellEl = cells[rw * 7 + c].el;
+                    var t = getDashPeriodEventsTopRelative(cellEl, wrapRectDraw);
+                    if (t < minT) minT = t;
+                }
+                rowBaseTop[rw] = Number.isFinite(minT) ? minT : 0;
+            }
+
+            segments.forEach(function (seg) {
+                var startRect = seg.startEl.getBoundingClientRect();
+                var endRect = seg.endEl.getBoundingClientRect();
+                var left = startRect.left - wrapRectDraw.left;
+                var width = endRect.right - startRect.left;
+                var baseTop = rowBaseTop[seg.week];
+                var top = baseTop + seg.lane * (DASHBOARD_PERIOD_LANE_H + DASHBOARD_PERIOD_LANE_GAP);
+
+                var bar = document.createElement('button');
+                bar.type = 'button';
+                bar.className = 'dashboard-period-bar ' + (seg.event.status === '완료' ? 'completed' : 'progress');
+                if (seg.firstDs === seg.from) bar.classList.add('dashboard-period-bar-round-left');
+                else bar.classList.add('dashboard-period-bar-flat-left');
+                if (seg.lastDs === seg.to) bar.classList.add('dashboard-period-bar-round-right');
+                else bar.classList.add('dashboard-period-bar-flat-right');
+
+                var title = (seg.event.building ? seg.event.building + ' - ' : '') + seg.event.project;
+                var span = document.createElement('span');
+                span.className = 'dashboard-period-bar-title';
+                span.textContent = title;
+                bar.appendChild(span);
+
+                bar.style.left = left + 'px';
+                bar.style.top = top + 'px';
+                bar.style.width = Math.max(0, width) + 'px';
+                bar.style.height = DASHBOARD_PERIOD_LANE_H + 'px';
+
+                bar.onclick = function () {
+                    showDashboardEventModal(seg.event);
+                };
+                overlay.appendChild(bar);
+            });
+
+            overlay.removeAttribute('aria-hidden');
+        }
+
         function renderDashboardCalendar() {
             const grid = document.getElementById('dashboardCalendarGrid');
             const titleEl = document.getElementById('dashboardCalendarTitle');
@@ -552,6 +771,11 @@
             const lastDate = lastDay.getDate();
             const prevLastDate = prevLastDay.getDate();
 
+            const prevYear = dashboardCalendarMonth === 0 ? dashboardCalendarYear - 1 : dashboardCalendarYear;
+            const prevMonthIdx = dashboardCalendarMonth === 0 ? 11 : dashboardCalendarMonth - 1;
+            const nextYear = dashboardCalendarMonth === 11 ? dashboardCalendarYear + 1 : dashboardCalendarYear;
+            const nextMonthIdx = dashboardCalendarMonth === 11 ? 0 : dashboardCalendarMonth + 1;
+
             titleEl.textContent = dashboardCalendarYear + '년 ' + (dashboardCalendarMonth + 1) + '월';
 
             const today = new Date();
@@ -561,15 +785,28 @@
                 const day = prevLastDate - i;
                 const dayDiv = document.createElement('div');
                 dayDiv.className = 'calendar-day other-month';
+                const ds =
+                    prevYear +
+                    '-' +
+                    String(prevMonthIdx + 1).padStart(2, '0') +
+                    '-' +
+                    String(day).padStart(2, '0');
+                dayDiv.setAttribute('data-date', ds);
                 dayDiv.innerHTML = '<div class="day-number">' + day + '</div>';
                 grid.appendChild(dayDiv);
             }
 
             for (let day = 1; day <= lastDate; day++) {
-                const dateStr = dashboardCalendarYear + '-' + String(dashboardCalendarMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+                const dateStr =
+                    dashboardCalendarYear +
+                    '-' +
+                    String(dashboardCalendarMonth + 1).padStart(2, '0') +
+                    '-' +
+                    String(day).padStart(2, '0');
                 const dayOfWeek = new Date(dashboardCalendarYear, dashboardCalendarMonth, day).getDay();
                 const dayDiv = document.createElement('div');
                 dayDiv.className = 'calendar-day';
+                dayDiv.setAttribute('data-date', dateStr);
                 if (dayOfWeek === 0) dayDiv.classList.add('sunday');
                 if (dayOfWeek === 6) dayDiv.classList.add('saturday');
                 if (isCurrentMonth && day === today.getDate()) dayDiv.classList.add('today');
@@ -578,13 +815,12 @@
                 const eventsContainer = document.createElement('div');
                 eventsContainer.className = 'calendar-day-events';
                 const dayEvents = getDashboardEventsForDate(dateStr);
-                dayEvents.slice(0, 4).forEach(event => {
+                const cellEvents = dayEvents.filter(function (e) {
+                    return !e._isPeriod;
+                });
+                cellEvents.slice(0, 4).forEach(event => {
                     const eventBar = document.createElement('div');
                     eventBar.className = 'event-bar ' + (event.status === '완료' ? 'completed' : 'progress');
-                    if (event._dayType === 'period-segment-start') eventBar.classList.add('event-bar-period-segment-start');
-                    else if (event._dayType === 'period-segment-middle') eventBar.classList.add('event-bar-period-segment-middle');
-                    else if (event._dayType === 'period-segment-end') eventBar.classList.add('event-bar-period-segment-end');
-                    else if (event._dayType === 'period-segment-single') eventBar.classList.add('event-bar-period-segment-single');
                     const eventTitle = (event.building ? event.building + ' - ' : '') + event.project;
                     eventBar.innerHTML = '<span class="event-title">' + eventTitle + '</span>';
                     eventBar.onclick = () => showDashboardEventModal(event);
@@ -606,9 +842,18 @@
             for (let day = 1; day <= remainingDays; day++) {
                 const dayDiv = document.createElement('div');
                 dayDiv.className = 'calendar-day other-month';
+                const ds =
+                    nextYear +
+                    '-' +
+                    String(nextMonthIdx + 1).padStart(2, '0') +
+                    '-' +
+                    String(day).padStart(2, '0');
+                dayDiv.setAttribute('data-date', ds);
                 dayDiv.innerHTML = '<div class="day-number">' + day + '</div>';
                 grid.appendChild(dayDiv);
             }
+
+            scheduleDashboardPeriodOverlay();
         }
 
         function dashboardChangeMonth(delta) {
