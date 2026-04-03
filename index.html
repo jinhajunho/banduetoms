@@ -721,6 +721,15 @@
                         </select>
                     </div>
                     <div class="header-actions">
+                        <button type="button" class="btn btn-secondary" onclick="openSgaCsvImportPicker()" title="UTF-8 CSV. 컬럼: id,date,category,amount,memo">
+                            <i class="fas fa-upload"></i>
+                            CSV 업로드
+                        </button>
+                        <input type="file" id="sgaCsvImportInput" accept=".csv,text/csv" style="display: none;" onchange="onSgaCsvImportFileChange(event)">
+                        <button type="button" class="btn btn-secondary" onclick="downloadSgaImportTemplate()" title="date·category·amount 필수. id 비우면 신규.">
+                            <i class="fas fa-file-download"></i>
+                            업로드용 양식(CSV)
+                        </button>
                         <button class="btn btn-secondary" onclick="downloadSgaCSV()">
                             <i class="fas fa-download"></i>
                             CSV 다운로드
@@ -744,6 +753,17 @@
                         </thead>
                         <tbody id="sgaTableBody"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- 판관비 CSV 업로드 미리보기 -->
+            <div class="modal event-modal" id="sgaImportModal" onclick="if(event.target===this) closeSgaImportModal()">
+                <div class="modal-content sga-import-modal-content" onclick="event.stopPropagation()">
+                    <div class="modal-header">
+                        <div class="modal-title">판관비 CSV 업로드</div>
+                        <button type="button" class="modal-close" onclick="closeSgaImportModal()">&times;</button>
+                    </div>
+                    <div id="sgaImportModalBody"></div>
                 </div>
             </div>
 

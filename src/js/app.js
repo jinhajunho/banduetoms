@@ -3959,12 +3959,22 @@
             if (!sel) return;
             const months = new Set();
             const now = new Date();
-            months.add(now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+            const defaultMonth =
+                now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            months.add(defaultMonth);
             sgaExpenses.forEach(function(e) {
                 if (e.date) months.add(String(e.date).slice(0, 7));
             });
             const sorted = Array.from(months).sort().reverse();
-            const current = sel.value || (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+            const previous = sel.value;
+            let current;
+            if (previous === '') {
+                current = '';
+            } else if (previous && sorted.includes(previous)) {
+                current = previous;
+            } else {
+                current = defaultMonth;
+            }
             sel.innerHTML = '<option value="">전체</option>' + sorted.map(function(m) {
                 const parts = m.split('-');
                 return '<option value="' + m + '"' + (m === current ? ' selected' : '') + '>' + parts[0] + '년 ' + parseInt(parts[1], 10) + '월</option>';
@@ -4703,6 +4713,322 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        }
+
+        function downloadSgaImportTemplate() {
+            let csv = '\uFEFF';
+            csv +=
+                'id,date,category,amount,memo\n' +
+                ',2026-01-20,복리후생비,120000,점심\n';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', '판관비_업로드양식.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        var SGA_IMPORT_MAX_ROWS = 500;
+        var SGA_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
+
+        function normalizeSgaImportHeaderKey(h) {
+            var s = String(h || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s/g, '');
+            var map = {
+                id: 'id',
+                date: 'date',
+                지출일자: 'date',
+                category: 'category',
+                계정과목: 'category',
+                amount: 'amount',
+                금액: 'amount',
+                '금액(vat별도)': 'amount',
+                memo: 'memo',
+                메모: 'memo',
+            };
+            return map[s] || s;
+        }
+
+        function buildSgaItemForImport(rowMap, prev, explicitId) {
+            var dateRaw = String(rowMap.date == null ? '' : rowMap.date).trim();
+            if (!dateRaw || !/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)) {
+                return { error: '지출일자(date)는 YYYY-MM-DD 형식이어야 합니다.' };
+            }
+            var category = String(rowMap.category == null ? '' : rowMap.category).trim();
+            if (!category) {
+                return { error: '계정과목(category)은 필수입니다.' };
+            }
+            var amountStr = String(rowMap.amount != null ? rowMap.amount : '')
+                .trim()
+                .replace(/,/g, '');
+            var amount = Number(amountStr);
+            if (!Number.isFinite(amount) || amount <= 0) {
+                return { error: '금액(amount)은 0보다 큰 숫자여야 합니다.' };
+            }
+            var memo = String(rowMap.memo == null ? '' : rowMap.memo).trim();
+            return {
+                item: {
+                    id: explicitId,
+                    date: dateRaw,
+                    category: category,
+                    amount: Math.round(amount),
+                    memo: memo,
+                },
+            };
+        }
+
+        function openSgaCsvImportPicker() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                alert('세션을 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 로그인해 주세요.');
+                return;
+            }
+            var inp = document.getElementById('sgaCsvImportInput');
+            if (!inp) return;
+            inp.value = '';
+            inp.click();
+        }
+
+        function onSgaCsvImportFileChange(ev) {
+            var input = ev && ev.target;
+            var file = input && input.files && input.files[0];
+            if (!file) return;
+            if (file.size > SGA_IMPORT_MAX_BYTES) {
+                alert('파일이 너무 큽니다. (최대 약 2MB)');
+                input.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () {
+                var text = String(reader.result || '');
+                var res = parseAndValidateSgaImportCsv(text);
+                input.value = '';
+                if (!res.ok) {
+                    alert(res.error || 'CSV를 읽을 수 없습니다.');
+                    return;
+                }
+                openSgaImportModalWithResult(res);
+            };
+            reader.onerror = function () {
+                alert('파일을 읽지 못했습니다.');
+                input.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseAndValidateSgaImportCsv(text) {
+            var rows = parseContractorCsvTextToRows(text);
+            if (!rows.length) {
+                return { ok: false, error: '데이터 행이 없습니다.' };
+            }
+            var headerCells = rows[0].map(function (h) {
+                return normalizeSgaImportHeaderKey(h);
+            });
+            var idx = {};
+            for (var hi = 0; hi < headerCells.length; hi++) {
+                var key = headerCells[hi];
+                if (key && idx[key] === undefined) idx[key] = hi;
+            }
+            if (idx.date === undefined) {
+                return { ok: false, error: 'CSV에 date(지출일자) 열이 필요합니다.' };
+            }
+            if (idx.category === undefined) {
+                return { ok: false, error: 'CSV에 category(계정과목) 열이 필요합니다.' };
+            }
+            if (idx.amount === undefined) {
+                return { ok: false, error: 'CSV에 amount(금액) 열이 필요합니다.' };
+            }
+
+            var dataRows = rows.slice(1);
+            if (dataRows.length > SGA_IMPORT_MAX_ROWS) {
+                return {
+                    ok: false,
+                    error: '한 번에 최대 ' + SGA_IMPORT_MAX_ROWS + '행까지만 업로드할 수 있습니다.',
+                };
+            }
+
+            var usedExplicitIds = {};
+            var previews = [];
+            var pendingItems = [];
+            var maxExisting =
+                sgaExpenses.length > 0
+                    ? Math.max.apply(
+                          null,
+                          sgaExpenses.map(function (e) {
+                              return Number(e.id) || 0;
+                          })
+                      )
+                    : 0;
+            var autoCursor = maxExisting;
+
+            for (var ri = 0; ri < dataRows.length; ri++) {
+                var line = ri + 2;
+                var cells = dataRows[ri];
+                var rowMap = {};
+                Object.keys(idx).forEach(function (k) {
+                    rowMap[k] = cells[idx[k]] != null ? cells[idx[k]] : '';
+                });
+
+                var idCell = String(rowMap.id != null ? rowMap.id : '').trim();
+                var explicitId = null;
+                if (idCell !== '') {
+                    explicitId = Number(idCell);
+                    if (!Number.isFinite(explicitId)) {
+                        previews.push({
+                            line: line,
+                            name: String(rowMap.category || '').trim() || '-',
+                            idDisp: idCell,
+                            err: 'id는 숫자여야 합니다.',
+                        });
+                        continue;
+                    }
+                    if (usedExplicitIds[explicitId]) {
+                        previews.push({
+                            line: line,
+                            name: String(rowMap.category || '').trim() || '-',
+                            idDisp: String(explicitId),
+                            err: 'CSV 안에서 id가 중복되었습니다.',
+                        });
+                        continue;
+                    }
+                    usedExplicitIds[explicitId] = true;
+                } else {
+                    do {
+                        autoCursor++;
+                    } while (usedExplicitIds[autoCursor]);
+                    explicitId = autoCursor;
+                    usedExplicitIds[explicitId] = true;
+                }
+
+                var prev = sgaExpenses.find(function (e) {
+                    return Number(e.id) === explicitId;
+                });
+                var built = buildSgaItemForImport(rowMap, prev, explicitId);
+                if (built.error) {
+                    previews.push({
+                        line: line,
+                        name: String(rowMap.category || '').trim() || '-',
+                        idDisp: String(explicitId),
+                        err: built.error,
+                    });
+                    continue;
+                }
+                var it = built.item;
+                previews.push({
+                    line: line,
+                    name: it.category + ' / ' + it.date + ' / ' + it.amount + '원',
+                    idDisp: String(explicitId),
+                    err: '',
+                    mode: prev ? '수정' : '신규',
+                });
+                pendingItems.push(it);
+            }
+
+            var errs = previews.filter(function (p) {
+                return p.err;
+            });
+            if (errs.length) {
+                return { ok: true, previews: previews, pendingItems: null, hasErrors: true };
+            }
+            if (!pendingItems.length) {
+                return { ok: false, error: '반영할 유효 행이 없습니다.' };
+            }
+            return { ok: true, previews: previews, pendingItems: pendingItems, hasErrors: false };
+        }
+
+        function openSgaImportModalWithResult(res) {
+            var body = document.getElementById('sgaImportModalBody');
+            var modal = document.getElementById('sgaImportModal');
+            if (!body || !modal) return;
+
+            window.__sgaImportPending = res.hasErrors ? null : res.pendingItems;
+
+            var summary =
+                '<div class="sga-import-modal-summary">' +
+                (res.hasErrors
+                    ? '<strong>오류가 있는 행을 수정한 뒤 다시 업로드해 주세요.</strong> (저장 버튼은 비활성화)'
+                    : '<strong>' +
+                      res.pendingItems.length +
+                      '건</strong>을 서버에 반영합니다. 기존 id는 수정, 빈 id는 신규 번호가 부여됩니다.') +
+                '</div>';
+
+            var table =
+                '<div class="table-section"><table><thead><tr><th>CSV행</th><th>id</th><th>내용요약</th><th>구분</th><th>결과</th></tr></thead><tbody>';
+            for (var pi = 0; pi < res.previews.length; pi++) {
+                var p = res.previews[pi];
+                table +=
+                    '<tr><td>' +
+                    p.line +
+                    '</td><td>' +
+                    escapeHtml(p.idDisp) +
+                    '</td><td>' +
+                    escapeHtml(p.name) +
+                    '</td><td>' +
+                    escapeHtml(p.mode || '-') +
+                    '</td><td class="' +
+                    (p.err ? 'sga-import-row-err' : '') +
+                    '">' +
+                    escapeHtml(p.err || 'OK') +
+                    '</td></tr>';
+            }
+            table += '</tbody></table></div>';
+
+            var actions =
+                '<div class="sga-import-modal-actions">' +
+                '<button type="button" class="btn btn-secondary" onclick="closeSgaImportModal()">닫기</button>' +
+                '<button type="button" class="btn btn-primary" id="sgaImportConfirmBtn" onclick="confirmSgaImport()" ' +
+                (res.hasErrors ? 'disabled' : '') +
+                '>서버에 반영</button></div>';
+
+            body.innerHTML = summary + table + actions;
+            modal.classList.add('active');
+        }
+
+        function closeSgaImportModal() {
+            var modal = document.getElementById('sgaImportModal');
+            if (modal) modal.classList.remove('active');
+            window.__sgaImportPending = null;
+        }
+
+        function confirmSgaImport() {
+            var pending = window.__sgaImportPending;
+            if (!pending || !pending.length) return;
+            var i = 0;
+            function step() {
+                if (i >= pending.length) {
+                    var selMonth = document.getElementById('sgaMonthFilter');
+                    if (selMonth) selMonth.value = '';
+                    syncSgaFromServer().then(function () {
+                        alert(pending.length + '건 반영했습니다. 월 필터는 「전체」로 맞춰 두었습니다.');
+                        closeSgaImportModal();
+                    });
+                    return;
+                }
+                var item = pending[i];
+                upsertSgaToServer(item).then(function (r) {
+                    if (!r.ok) {
+                        alert(
+                            '저장 실패 (목록 ' +
+                                (i + 1) +
+                                '번째 / id ' +
+                                item.id +
+                                '): ' +
+                                (r.error || '')
+                        );
+                        syncSgaFromServer();
+                        closeSgaImportModal();
+                        return;
+                    }
+                    i++;
+                    step();
+                });
+            }
+            step();
         }
 
         // ========================================
@@ -9881,6 +10207,11 @@
 
                 // 판관비
                 downloadSgaCSV,
+                downloadSgaImportTemplate,
+                openSgaCsvImportPicker,
+                onSgaCsvImportFileChange,
+                closeSgaImportModal,
+                confirmSgaImport,
                 openSgaPanel,
                 closeSgaPanel,
                 saveSgaExpense,
