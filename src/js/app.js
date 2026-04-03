@@ -1528,22 +1528,43 @@
             var tbody = document.getElementById(tbodyId);
             if (!tbody) return;
             var field = getFieldForMasterKey(key);
-            var sorted = masterArr.slice().sort(function (a, b) { return a.name.localeCompare(b.name, 'ko'); });
+            var sorted = masterArr.slice().sort(function (a, b) {
+                return a.name.localeCompare(b.name, 'ko');
+            });
             tbody.innerHTML = sorted.map(function (m) {
-                var used = estimates.some(function (e) { return (e[field] || '').trim() === m.name; });
+                var used = estimates.some(function (e) {
+                    return (e[field] || '').trim() === m.name;
+                });
                 var stateLabel = m.active ? '활성' : '비활성';
                 var nameJsArg = '\'' + String(m.name).replace(/\\/g, '\\\\').replace(/'/g, '\\\'') + '\'';
-                return '<tr><td style="font-weight: 500;">' + escapeHtmlAttr(m.name) + '</td>' +
+                return (
+                    '<tr><td style="font-weight: 500;">' +
+                    escapeHtmlAttr(m.name) +
+                    '</td>' +
                     '<td style="text-align:center;">' +
-                    '<button type="button" class="master-state-switch' + (m.active ? ' is-active' : '') + '" onclick="toggleMasterActive(\'' + key + '\',' + nameJsArg + ')" title="' + (m.active ? '비활성으로 전환' : '활성으로 전환') + '">' +
+                    '<button type="button" class="master-state-switch' +
+                    (m.active ? ' is-active' : '') +
+                    '" onclick="toggleMasterActive(\'' +
+                    key +
+                    '\',' +
+                    nameJsArg +
+                    ')" title="' +
+                    (m.active ? '비활성으로 전환' : '활성으로 전환') +
+                    '">' +
                     '<span class="master-state-switch-track"><span class="master-state-switch-thumb"></span></span>' +
-                    '<span class="master-state-switch-label">' + stateLabel + '</span>' +
+                    '<span class="master-state-switch-label">' +
+                    stateLabel +
+                    '</span>' +
                     '</button>' +
                     '</td>' +
                     '<td style="text-align:center;white-space:nowrap;">' +
-                    '<button type="button" class="master-delete-icon-btn" title="' + (used ? '사용 중 항목은 삭제할 수 없습니다.' : '삭제') + '" ' +
-                    (used ? 'disabled' : 'onclick="removeMasterItem(\'' + key + '\',' + nameJsArg + ')"') + '>' +
-                    '<i class="fas fa-trash"></i></button></td></tr>';
+                    '<button type="button" class="master-delete-icon-btn" title="' +
+                    (used ? '사용 중 항목은 삭제할 수 없습니다.' : '삭제') +
+                    '" ' +
+                    (used ? 'disabled' : 'onclick="removeMasterItem(\'' + key + '\',' + nameJsArg + ')"') +
+                    '>' +
+                    '<i class="fas fa-trash"></i></button></td></tr>'
+                );
             }).join('');
         }
 
@@ -1688,6 +1709,9 @@
         let currentStatus = 'all';
         let estimateListPage = 1;
         const ESTIMATE_PAGE_SIZE = 10;
+        let contractorListPage = 1;
+        let expenseListPage = 1;
+        let sgaListPage = 1;
 
         // 컬러 바 색상 결정 (수금상태 기준)
         function getColorBarClass(item) {
@@ -2523,15 +2547,24 @@
             renderTable({ preservePage: true });
         }
 
-        function estimatePaginationNumberButtonsHtml(totalPages) {
-            const cur = estimateListPage;
+        /** 프로젝트 관리와 동일한 숫자 버튼 (handlerName: 전역 함수명 문자열, 예: goEstimatePage) */
+        function paginationNumberButtonsHtml(currentPage, totalPages, handlerName) {
+            const cur = currentPage;
             const n = totalPages;
 
             function btn(page, isActive) {
                 if (isActive) {
                     return '<button type="button" class="btn btn-sm estimate-page-num estimate-page-num--active" aria-current="page">' + page + '</button>';
                 }
-                return '<button type="button" class="btn btn-secondary btn-sm estimate-page-num" onclick="goEstimatePage(' + page + ')">' + page + '</button>';
+                return (
+                    '<button type="button" class="btn btn-secondary btn-sm estimate-page-num" onclick="' +
+                    handlerName +
+                    '(' +
+                    page +
+                    ')">' +
+                    page +
+                    '</button>'
+                );
             }
 
             if (n <= 20) {
@@ -2551,7 +2584,9 @@
                 for (let k = Math.max(2, n - 5); k <= n - 1; k++) set.add(k);
             }
 
-            const sorted = Array.from(set).sort(function (a, b) { return a - b; });
+            const sorted = Array.from(set).sort(function (a, b) {
+                return a - b;
+            });
             let html = '';
             for (let x = 0; x < sorted.length; x++) {
                 if (x > 0 && sorted[x] - sorted[x - 1] > 1) {
@@ -2562,20 +2597,51 @@
             return html;
         }
 
-        function updateEstimatePaginationUI(totalItems, totalPages) {
-            const wrap = document.getElementById('estimateTablePagination');
-            const info = document.getElementById('estimatePaginationInfo');
-            const ctrl = document.getElementById('estimatePaginationControls');
+        function updateGenericListPagination(wrapId, infoId, ctrlId, totalItems, totalPages, currentPage, pageSize, handlerName) {
+            const wrap = document.getElementById(wrapId);
+            const info = document.getElementById(infoId);
+            const ctrl = document.getElementById(ctrlId);
             if (!wrap || !info || !ctrl) return;
             if (totalItems === 0) {
                 wrap.style.display = 'none';
                 return;
             }
             wrap.style.display = '';
-            const start = (estimateListPage - 1) * ESTIMATE_PAGE_SIZE + 1;
-            const end = Math.min(estimateListPage * ESTIMATE_PAGE_SIZE, totalItems);
+            const start = (currentPage - 1) * pageSize + 1;
+            const end = Math.min(currentPage * pageSize, totalItems);
             info.textContent = start + '–' + end + ' / ' + totalItems + '건';
-            ctrl.innerHTML = estimatePaginationNumberButtonsHtml(totalPages);
+            ctrl.innerHTML = paginationNumberButtonsHtml(currentPage, totalPages, handlerName);
+        }
+
+        function updateEstimatePaginationUI(totalItems, totalPages) {
+            updateGenericListPagination(
+                'estimateTablePagination',
+                'estimatePaginationInfo',
+                'estimatePaginationControls',
+                totalItems,
+                totalPages,
+                estimateListPage,
+                ESTIMATE_PAGE_SIZE,
+                'goEstimatePage'
+            );
+        }
+
+        function goContractorPage(p) {
+            if (p < 1) return;
+            contractorListPage = p;
+            renderContractorTable({ preservePage: true });
+        }
+
+        function goExpenseListPage(p) {
+            if (p < 1) return;
+            expenseListPage = p;
+            renderExpenseTable({ preservePage: true });
+        }
+
+        function goSgaListPage(p) {
+            if (p < 1) return;
+            sgaListPage = p;
+            renderSgaTable({ preservePage: true });
         }
 
         // 테이블 렌더링
@@ -2873,9 +2939,17 @@
         }
 
         // 테이블 렌더링
-        function renderContractorTable() {
+        function renderContractorTable(options) {
+            const preservePage = options && options.preservePage === true;
+            if (!preservePage) contractorListPage = 1;
             const tbody = document.getElementById('contractorTableBody');
-            
+            const totalItems = contractors.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / ESTIMATE_PAGE_SIZE));
+            if (contractorListPage > totalPages) contractorListPage = totalPages;
+            if (contractorListPage < 1) contractorListPage = 1;
+            const sliceStart = (contractorListPage - 1) * ESTIMATE_PAGE_SIZE;
+            const pageRows = contractors.slice(sliceStart, sliceStart + ESTIMATE_PAGE_SIZE);
+
             if (contractors.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -2884,18 +2958,41 @@
                         </td>
                     </tr>
                 `;
+                updateGenericListPagination(
+                    'contractorTablePagination',
+                    'contractorPaginationInfo',
+                    'contractorPaginationControls',
+                    0,
+                    1,
+                    1,
+                    ESTIMATE_PAGE_SIZE,
+                    'goContractorPage'
+                );
                 return;
             }
 
-            tbody.innerHTML = contractors.map((item, index) => `
+            tbody.innerHTML = pageRows.map((item, index) => {
+                const rowNum = sliceStart + index + 1;
+                return `
                 <tr class="table-row-clickable" data-contractor-id="${item.id}" onclick="openContractorDetailPanel(${item.id})">
-                    <td>${index + 1}</td>
+                    <td>${rowNum}</td>
                     <td style="font-weight: 600;">${item.name}</td>
                     <td>${item.phone || '-'}</td>
                     <td>${item.hasLicense ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('license', ${item.id})" style="color: var(--success); cursor: pointer;"><i class="fas fa-check-circle"></i> 있음</span>` : '<span style="color: var(--gray-400);">없음</span>'}</td>
                     <td>${item.hasBankAccount ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('bank', ${item.id})" style="color: var(--success); cursor: pointer;"><i class="fas fa-check-circle"></i> 있음</span>` : '<span style="color: var(--gray-400);">없음</span>'}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
+            updateGenericListPagination(
+                'contractorTablePagination',
+                'contractorPaginationInfo',
+                'contractorPaginationControls',
+                totalItems,
+                totalPages,
+                contractorListPage,
+                ESTIMATE_PAGE_SIZE,
+                'goContractorPage'
+            );
         }
 
         function downloadContractorCSV() {
@@ -3678,7 +3775,9 @@
         let expenseEditingId = null;
         let sgaEditingId = null;
 
-        function renderSgaTable() {
+        function renderSgaTable(options) {
+            const preservePage = options && options.preservePage === true;
+            if (!preservePage) sgaListPage = 1;
             const tbody = document.getElementById('sgaTableBody');
             if (!tbody) return;
             const month = getSgaMonthFilter();
@@ -3687,21 +3786,49 @@
             }) : sgaExpenses.slice();
             filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
 
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / ESTIMATE_PAGE_SIZE));
+            if (sgaListPage > totalPages) sgaListPage = totalPages;
+            if (sgaListPage < 1) sgaListPage = 1;
+            const sliceStart = (sgaListPage - 1) * ESTIMATE_PAGE_SIZE;
+            const pageRows = filtered.slice(sliceStart, sliceStart + ESTIMATE_PAGE_SIZE);
+
             if (!filtered.length) {
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">' +
                     (month ? '해당 월에 등록된 판관비 내역이 없습니다' : '등록된 판관비 내역이 없습니다') + '</td></tr>';
+                updateGenericListPagination(
+                    'sgaTablePagination',
+                    'sgaPaginationInfo',
+                    'sgaPaginationControls',
+                    0,
+                    1,
+                    1,
+                    ESTIMATE_PAGE_SIZE,
+                    'goSgaListPage'
+                );
                 return;
             }
 
-            tbody.innerHTML = filtered.map(function(item, idx) {
+            tbody.innerHTML = pageRows.map(function(item, idx) {
+                var rowNum = sliceStart + idx + 1;
                 return '<tr class="table-row-clickable" data-sga-id="' + item.id + '" onclick="openSgaDetailPanel(' + item.id + ')">' +
-                    '<td>' + (idx + 1) + '</td>' +
+                    '<td>' + rowNum + '</td>' +
                     '<td>' + (item.date || '-') + '</td>' +
                     '<td>' + (item.category || '-') + '</td>' +
                     '<td class="text-right">' + (item.amount || 0).toLocaleString() + '원</td>' +
                     '<td class="sga-memo-cell"><span class="sga-memo-text">' + (item.memo || '-') + '</span></td>' +
                 '</tr>';
             }).join('');
+            updateGenericListPagination(
+                'sgaTablePagination',
+                'sgaPaginationInfo',
+                'sgaPaginationControls',
+                totalItems,
+                totalPages,
+                sgaListPage,
+                ESTIMATE_PAGE_SIZE,
+                'goSgaListPage'
+            );
         }
 
         function openSgaDetailPanel(id) {
@@ -3946,6 +4073,7 @@
         }
 
         function onExpenseMonthChange() {
+            expenseListPage = 1;
             renderExpenseTable();
         }
 
@@ -3982,6 +4110,7 @@
         }
 
         function onSgaMonthChange() {
+            sgaListPage = 1;
             renderSgaTable();
         }
 
@@ -4044,10 +4173,18 @@
         }
 
         // 테이블 렌더링 (월별 필터 적용, 사용일시 기준)
-        function renderExpenseTable() {
+        function renderExpenseTable(options) {
+            const preservePage = options && options.preservePage === true;
+            if (!preservePage) expenseListPage = 1;
             const tbody = document.getElementById('expenseTableBody');
             const filtered = getFilteredExpensesByMonth();
-            
+            const totalItems = filtered.length;
+            const totalPages = Math.max(1, Math.ceil(totalItems / ESTIMATE_PAGE_SIZE));
+            if (expenseListPage > totalPages) expenseListPage = totalPages;
+            if (expenseListPage < 1) expenseListPage = 1;
+            const sliceStart = (expenseListPage - 1) * ESTIMATE_PAGE_SIZE;
+            const pageRows = filtered.slice(sliceStart, sliceStart + ESTIMATE_PAGE_SIZE);
+
             if (filtered.length === 0) {
                 tbody.innerHTML = `
                     <tr>
@@ -4056,14 +4193,25 @@
                         </td>
                     </tr>
                 `;
+                updateGenericListPagination(
+                    'expenseTablePagination',
+                    'expensePaginationInfo',
+                    'expensePaginationControls',
+                    0,
+                    1,
+                    1,
+                    ESTIMATE_PAGE_SIZE,
+                    'goExpenseListPage'
+                );
                 return;
             }
 
-            tbody.innerHTML = filtered.map((item, index) => {
+            tbody.innerHTML = pageRows.map((item, index) => {
                 const n = getExpenseReceipts(item).length;
+                const rowNum = sliceStart + index + 1;
                 return `
                 <tr class="table-row-clickable" data-expense-id="${item.id}">
-                    <td>${index + 1}</td>
+                    <td>${rowNum}</td>
                     <td><span class="badge ${item.type === '계좌이체' ? 'badge-transfer' : 'badge-card'}">${item.type}</span></td>
                     <td>${item.date}</td>
                     <td>${item.building || '-'}</td>
@@ -4073,6 +4221,16 @@
                 </tr>
             `;
             }).join('');
+            updateGenericListPagination(
+                'expenseTablePagination',
+                'expensePaginationInfo',
+                'expensePaginationControls',
+                totalItems,
+                totalPages,
+                expenseListPage,
+                ESTIMATE_PAGE_SIZE,
+                'goExpenseListPage'
+            );
         }
 
         // 저장 (영수증 복수: data URL 배열로 저장)
@@ -6154,7 +6312,6 @@
             const totalEl = document.getElementById('totalUnpaid');
             if (totalEl) totalEl.textContent = totalUnpaidNet.toLocaleString() + '원';
 
-            // 테이블
             const tbody = document.getElementById('unpaidTableBody');
             if (unpaidItems.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">미수금 내역이 없습니다</td></tr>';
@@ -6162,9 +6319,10 @@
                 tbody.innerHTML = unpaidItems.map((item, idx) => {
                     const salesDate = getUnpaidSalesDisplayDate(item);
                     const revenueNet = vatExclusive(item.revenue);
+                    const rowNum = idx + 1;
                     return `
                         <tr>
-                            <td>${idx + 1}</td>
+                            <td>${rowNum}</td>
                             <td>${salesDate}</td>
                             <td>${item.building}</td>
                             <td>${item.project}</td>
@@ -6394,6 +6552,7 @@
         function renderUsersTable() {
             const tbody = document.getElementById('usersTableBody');
             if (!tbody) return;
+
             tbody.innerHTML = userAccounts.map(function (u) {
                 const isActive = u.active !== false;
                 return '<tr>' +
@@ -10139,6 +10298,9 @@
                 togglePaymentRowInline,
                 deleteRow,
                 goEstimatePage,
+                goContractorPage,
+                goExpenseListPage,
+                goSgaListPage,
                 openStatusPopover,
                 showFileList,
                 handleMultiFileSelect,
