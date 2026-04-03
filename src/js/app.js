@@ -758,6 +758,51 @@
             overlay.removeAttribute('aria-hidden');
         }
 
+        function getTodayYmdString() {
+            const t = new Date();
+            return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+        }
+
+        function fillDashboardCalendarDayCell(dayDiv, dateStr, isOtherMonth, dayNumberDisplay) {
+            dayDiv.className = 'calendar-day' + (isOtherMonth ? ' other-month' : '');
+            dayDiv.setAttribute('data-date', dateStr);
+
+            const ymd = dateStr.split('-').map(Number);
+            const dayOfWeek = new Date(ymd[0], ymd[1] - 1, ymd[2]).getDay();
+            if (dayOfWeek === 0) dayDiv.classList.add('sunday');
+            if (dayOfWeek === 6) dayDiv.classList.add('saturday');
+            if (dateStr === getTodayYmdString()) dayDiv.classList.add('today');
+
+            dayDiv.innerHTML = '<div class="day-number">' + dayNumberDisplay + '</div>';
+            const eventsContainer = document.createElement('div');
+            eventsContainer.className = 'calendar-day-events';
+            const dayEvents = getDashboardEventsForDate(dateStr);
+            const cellEvents = dayEvents.filter(function (e) {
+                return !e._isPeriod;
+            });
+            cellEvents.slice(0, 4).forEach(function (event) {
+                const eventBar = document.createElement('div');
+                eventBar.className = 'event-bar ' + (event.status === '완료' ? 'completed' : 'progress');
+                const eventTitle = (event.building ? event.building + ' - ' : '') + event.project;
+                eventBar.innerHTML = '<span class="event-title">' + eventTitle + '</span>';
+                eventBar.onclick = function () {
+                    showDashboardEventModal(event);
+                };
+                eventsContainer.appendChild(eventBar);
+            });
+            dayDiv.appendChild(eventsContainer);
+            if (dayEvents.length > 4) {
+                const moreBtn = document.createElement('button');
+                moreBtn.type = 'button';
+                moreBtn.className = 'calendar-more-btn';
+                moreBtn.textContent = '+' + (dayEvents.length - 4) + '개 더보기';
+                moreBtn.onclick = function () {
+                    showDashboardDayEventsModal(dateStr, dayEvents);
+                };
+                dayDiv.appendChild(moreBtn);
+            }
+        }
+
         function renderDashboardCalendar() {
             const grid = document.getElementById('dashboardCalendarGrid');
             const titleEl = document.getElementById('dashboardCalendarTitle');
@@ -778,21 +823,16 @@
 
             titleEl.textContent = dashboardCalendarYear + '년 ' + (dashboardCalendarMonth + 1) + '월';
 
-            const today = new Date();
-            const isCurrentMonth = today.getFullYear() === dashboardCalendarYear && today.getMonth() === dashboardCalendarMonth;
-
             for (let i = firstDayOfWeek - 1; i >= 0; i--) {
                 const day = prevLastDate - i;
-                const dayDiv = document.createElement('div');
-                dayDiv.className = 'calendar-day other-month';
                 const ds =
                     prevYear +
                     '-' +
                     String(prevMonthIdx + 1).padStart(2, '0') +
                     '-' +
                     String(day).padStart(2, '0');
-                dayDiv.setAttribute('data-date', ds);
-                dayDiv.innerHTML = '<div class="day-number">' + day + '</div>';
+                const dayDiv = document.createElement('div');
+                fillDashboardCalendarDayCell(dayDiv, ds, true, day);
                 grid.appendChild(dayDiv);
             }
 
@@ -803,53 +843,21 @@
                     String(dashboardCalendarMonth + 1).padStart(2, '0') +
                     '-' +
                     String(day).padStart(2, '0');
-                const dayOfWeek = new Date(dashboardCalendarYear, dashboardCalendarMonth, day).getDay();
                 const dayDiv = document.createElement('div');
-                dayDiv.className = 'calendar-day';
-                dayDiv.setAttribute('data-date', dateStr);
-                if (dayOfWeek === 0) dayDiv.classList.add('sunday');
-                if (dayOfWeek === 6) dayDiv.classList.add('saturday');
-                if (isCurrentMonth && day === today.getDate()) dayDiv.classList.add('today');
-
-                dayDiv.innerHTML = '<div class="day-number">' + day + '</div>';
-                const eventsContainer = document.createElement('div');
-                eventsContainer.className = 'calendar-day-events';
-                const dayEvents = getDashboardEventsForDate(dateStr);
-                const cellEvents = dayEvents.filter(function (e) {
-                    return !e._isPeriod;
-                });
-                cellEvents.slice(0, 4).forEach(event => {
-                    const eventBar = document.createElement('div');
-                    eventBar.className = 'event-bar ' + (event.status === '완료' ? 'completed' : 'progress');
-                    const eventTitle = (event.building ? event.building + ' - ' : '') + event.project;
-                    eventBar.innerHTML = '<span class="event-title">' + eventTitle + '</span>';
-                    eventBar.onclick = () => showDashboardEventModal(event);
-                    eventsContainer.appendChild(eventBar);
-                });
-                dayDiv.appendChild(eventsContainer);
-                if (dayEvents.length > 4) {
-                    const moreBtn = document.createElement('button');
-                    moreBtn.type = 'button';
-                    moreBtn.className = 'calendar-more-btn';
-                    moreBtn.textContent = '+' + (dayEvents.length - 4) + '개 더보기';
-                    moreBtn.onclick = () => showDashboardDayEventsModal(dateStr, dayEvents);
-                    dayDiv.appendChild(moreBtn);
-                }
+                fillDashboardCalendarDayCell(dayDiv, dateStr, false, day);
                 grid.appendChild(dayDiv);
             }
 
             const remainingDays = 42 - (firstDayOfWeek + lastDate);
             for (let day = 1; day <= remainingDays; day++) {
-                const dayDiv = document.createElement('div');
-                dayDiv.className = 'calendar-day other-month';
                 const ds =
                     nextYear +
                     '-' +
                     String(nextMonthIdx + 1).padStart(2, '0') +
                     '-' +
                     String(day).padStart(2, '0');
-                dayDiv.setAttribute('data-date', ds);
-                dayDiv.innerHTML = '<div class="day-number">' + day + '</div>';
+                const dayDiv = document.createElement('div');
+                fillDashboardCalendarDayCell(dayDiv, ds, true, day);
                 grid.appendChild(dayDiv);
             }
 

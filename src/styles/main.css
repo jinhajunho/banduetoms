@@ -2224,8 +2224,20 @@
         }
 
 
-        .calendar-container .calendar-day.other-month {
-            opacity: 0.3;
+        /* 이전·다음 달 칸: 숫자만 흐리게 — 일정 막대·오버레이는 읽기 좋게 유지 */
+        .calendar-container .calendar-day.other-month .day-number {
+            opacity: 0.55;
+            color: var(--gray-400);
+        }
+
+        .calendar-container .calendar-day.other-month.sunday .day-number {
+            color: var(--danger);
+            opacity: 0.55;
+        }
+
+        .calendar-container .calendar-day.other-month.saturday .day-number {
+            color: var(--primary);
+            opacity: 0.55;
         }
 
         .calendar-container .calendar-day.today {
@@ -6361,8 +6373,19 @@
             border-color: var(--primary) !important;
         }
 
-        body.dark-mode .calendar-container .calendar-day.other-month {
-            opacity: 0.28 !important;
+        body.dark-mode .calendar-container .calendar-day.other-month .day-number {
+            opacity: 0.5 !important;
+            color: var(--gray-500) !important;
+        }
+
+        body.dark-mode .calendar-container .calendar-day.other-month.sunday .day-number {
+            color: var(--danger) !important;
+            opacity: 0.5 !important;
+        }
+
+        body.dark-mode .calendar-container .calendar-day.other-month.saturday .day-number {
+            color: var(--primary) !important;
+            opacity: 0.5 !important;
         }
 
         body.dark-mode .calendar-more-btn {
