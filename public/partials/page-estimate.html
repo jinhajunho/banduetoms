@@ -1,0 +1,187 @@
+﻿            <div class="page-header">
+                <h1 class="page-title">프로젝트 관리</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="downloadEstimateCSV()">
+                        <i class="fas fa-download"></i>
+                        CSV 다운로드
+                    </button>
+                    <button class="btn btn-primary" onclick="openNewEstimate()">
+                        <i class="fas fa-plus"></i>
+                        프로젝트 등록
+                    </button>
+                </div>
+            </div>
+
+            <!-- 필터 섹션 -->
+            <div class="filter-section">
+                <div class="tabs">
+                    <div class="tabs-left">
+                        <button class="tab active" data-status="all">전체</button>
+                        <button class="tab" data-status="견적">견적</button>
+                        <button class="tab" data-status="진행">진행</button>
+                        <button class="tab" data-status="완료">완료</button>
+                        <button class="tab" data-status="보류">보류</button>
+                    </div>
+                    <div class="tabs-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" id="filterResetBtn">
+                            <i class="fas fa-rotate-left"></i> 초기화
+                        </button>
+                    </div>
+                </div>
+                <input type="hidden" id="filterDatePreset" value="all">
+                <div class="estimate-filter-layout">
+                    <div class="estimate-filter-top">
+                        <!-- 상단 좌측: 기준일 + (전체/월 선택/기간 직접) -->
+                        <div class="estimate-filter-left">
+                            <div class="estimate-filter-left-row">
+                                <div class="estimate-filter-basis">
+                                    <div class="estimate-filter-basis-top">
+                                        <label class="filter-label estimate-filter-basis-label">기준일</label>
+                                        <div class="estimate-filter-left-actions estimate-filter-left-actions--compact">
+                                            <div class="estimate-filter-presets" role="group" aria-label="기간 빠른 선택">
+                                                <button type="button" class="btn-filter-preset active estimate-filter-preset" data-preset="all">전체</button>
+                                                <div class="estimate-filter-popover-anchor">
+                                                    <button type="button" class="btn-filter-preset estimate-filter-preset" data-preset="byMonth">월별</button>
+                                                    <div id="estimateFilterMonthWrap" class="estimate-filter-popover-panel estimate-filter-month-panel custom-month-picker" style="display: none;">
+                                                        <input type="hidden" id="filterByMonth" value="">
+                                                        <div class="cmp-month-view" id="cmpMonthView">
+                                                            <div class="cmp-year-nav">
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearPrev" aria-label="이전 연도">‹</button>
+                                                                <button type="button" class="cmp-year-label-btn" id="cmpYearOpenGrid" aria-label="연도 목록 열기">2026년</button>
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearNext" aria-label="다음 연도">›</button>
+                                                            </div>
+                                                            <div class="cmp-month-grid" id="cmpMonthGrid" role="listbox" aria-label="월 선택"></div>
+                                                            <div class="cmp-footer">
+                                                                <button type="button" class="cmp-text-btn" id="cmpMonthClear">지우기</button>
+                                                                <button type="button" class="cmp-text-btn" id="cmpMonthThis">이번 달</button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="cmp-year-view" id="cmpYearView" hidden>
+                                                            <div class="cmp-year-page-nav">
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearPagePrev" aria-label="이전 연도 구간">‹</button>
+                                                                <span class="cmp-year-page-label" id="cmpYearPageLabel">2024–2035</span>
+                                                                <button type="button" class="cmp-icon-btn" id="cmpYearPageNext" aria-label="다음 연도 구간">›</button>
+                                                            </div>
+                                                            <div class="cmp-year-grid" id="cmpYearGrid" role="grid" aria-label="연도 선택"></div>
+                                                            <button type="button" class="cmp-back-btn" id="cmpBackToMonths">월 선택으로</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="filter-group filter-group--date-actions estimate-filter-popover-anchor">
+                                                <button type="button" class="btn btn-secondary btn-sm" id="toggleEstimateCustomRange" aria-expanded="false">기간별</button>
+                                                <div id="estimateFilterCustomRange" class="estimate-filter-popover-panel estimate-filter-custom-range" style="display: none;">
+                                                    <div class="estimate-filter-range-field">
+                                                        <label class="filter-label" for="filterDateFrom">시작</label>
+                                                        <input type="hidden" id="filterDateFrom" value="">
+                                                        <button type="button" class="filter-date-display" id="filterDateFromBtn" style="max-width: 150px;" aria-label="시작 날짜 선택" title="시작 날짜 선택">날짜 선택</button>
+                                                    </div>
+                                                    <div class="estimate-filter-range-field">
+                                                        <label class="filter-label" for="filterDateTo">종료</label>
+                                                        <input type="hidden" id="filterDateTo" value="">
+                                                        <button type="button" class="filter-date-display" id="filterDateToBtn" style="max-width: 150px;" aria-label="종료 날짜 선택" title="종료 날짜 선택">날짜 선택</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <select class="filter-select" id="filterDateBasis" title="날짜 필터 기준">
+                                        <option value="date">등록일</option>
+                                        <option value="sales">매출일자</option>
+                                        <option value="start">진행일</option>
+                                        <option value="end">완료일</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 상단 우측: (대/중/소) + (세금계산서/입금상태) 2행 가로 묶음 -->
+                        <div class="estimate-filter-right">
+                            <div class="estimate-filter-right-row estimate-filter-right-row--single">
+                                <div class="filter-group">
+                                    <label class="filter-label">대분류</label>
+                                    <select class="filter-select" id="filterCategory1">
+                                        <option value="">전체</option>
+                                        <option value="B2B">B2B</option>
+                                        <option value="B2C">B2C</option>
+                                        <option value="컨텍터스">컨텍터스</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">중분류</label>
+                                    <select class="filter-select" id="filterCategory2">
+                                        <option value="">전체</option>
+                                        <option value="코오롱">코오롱</option>
+                                        <option value="저스트코">저스트코</option>
+                                        <option value="다락">다락</option>
+                                        <option value="관리건물">관리건물</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">소분류</label>
+                                    <select class="filter-select" id="filterCategory3">
+                                        <option value="">전체</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">세금계산서</label>
+                                    <select class="filter-select" id="filterTax">
+                                        <option value="">전체</option>
+                                        <option value="발행완료">발행완료</option>
+                                        <option value="미발행">미발행</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">입금상태</label>
+                                    <select class="filter-select" id="filterCashflow">
+                                        <option value="">전체</option>
+                                        <option value="미입금">미입금</option>
+                                        <option value="입금완료">입금완료</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 하단: 검색바만 -->
+                    <div class="estimate-filter-bottom">
+                        <div class="filter-group estimate-filter-search-only">
+                            <label class="filter-label">검색</label>
+                            <div class="estimate-filter-search-row">
+                                <input type="text" class="filter-input" id="filterSearch" placeholder="코드, 건물명, 공사명, 담당자, 도급사 검색">
+                                <button type="button" class="btn btn-primary btn-sm" id="filterSearchBtn">검색</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="estimateDatePickerPanel" class="estimate-filter-date-picker-panel" style="display: none;"></div>
+            </div>
+
+            <!-- 테이블: 페이지 전체(메인 영역) 스크롤 + thead sticky -->
+            <div class="table-section">
+                <div class="table-container estimate-project-table-scroll">
+                    <table class="estimate-list-table">
+                        <thead>
+                            <tr>
+                                <th>상태</th>
+                                <th>대분류</th>
+                                <th>중분류</th>
+                                <th>소분류</th>
+                                <th>건물명</th>
+                                <th>공사명</th>
+                                <th>매출액 / 매입액</th>
+                                <th>수금액 / 이체액 / 차인지급액</th>
+                                <th>도급사</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- 데이터가 여기에 들어갑니다 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="estimate-table-pagination" id="estimateTablePagination" role="navigation" aria-label="프로젝트 목록 페이지" style="display: none;">
+                    <div class="estimate-pagination-info" id="estimatePaginationInfo"></div>
+                    <div class="estimate-pagination-controls" id="estimatePaginationControls"></div>
+                </div>
+            </div>
+
