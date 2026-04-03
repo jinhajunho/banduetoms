@@ -3922,12 +3922,22 @@
             if (!sel) return;
             const months = new Set();
             const now = new Date();
-            months.add(now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+            const defaultMonth =
+                now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            months.add(defaultMonth);
             expenses.forEach(e => {
                 if (e.date) months.add(e.date.slice(0, 7));
             });
             const sorted = Array.from(months).sort().reverse();
-            const current = sel.value || (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+            const previous = sel.value;
+            let current;
+            if (previous === '') {
+                current = '';
+            } else if (previous && sorted.includes(previous)) {
+                current = previous;
+            } else {
+                current = defaultMonth;
+            }
             sel.innerHTML = '<option value="">전체</option>' + sorted.map(m => {
                 const [y, mo] = m.split('-');
                 const label = y + '년 ' + parseInt(mo, 10) + '월';
@@ -4643,8 +4653,10 @@
             var i = 0;
             function step() {
                 if (i >= pending.length) {
+                    var selMonth = document.getElementById('expenseMonthFilter');
+                    if (selMonth) selMonth.value = '';
                     syncExpensesFromServer().then(function () {
-                        alert(pending.length + '건 반영했습니다.');
+                        alert(pending.length + '건 반영했습니다. 월 필터는 「전체」로 바꿔 두었습니다.');
                         closeExpenseImportModal();
                     });
                     return;
