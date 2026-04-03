@@ -1,6 +1,6 @@
 /**
  * index.html 진입점: VITE_SUPABASE_* 필수. 세션·프로필이 있으면 app.js 로드, 없으면 login.html로 보냅니다.
- * app.js는 로드 시점에 #page-estimate 내부 필터 DOM에 바인딩하므로, public/partials/page-estimate.html 주입을 먼저 수행합니다.
+ * app.js 로드 전에 partial 주입: #page-estimate(필터 바인딩), #page-performance(DOMContentLoaded에서 경영실적 UI 초기화).
  */
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -23,9 +23,11 @@ function mapDbRoleToUi(role) {
     return map[s] || s || '직원';
 }
 
-async function loadAppWithEstimatePartial() {
+async function loadAppWithShellPartials() {
     const { ensureEstimatePartialMounted } = await import('./estimate-partial-loader.js');
     await ensureEstimatePartialMounted();
+    const { ensurePerformancePartialMounted } = await import('./performance-partial-loader.js');
+    await ensurePerformancePartialMounted();
     await import('./app.js');
 }
 
@@ -60,7 +62,7 @@ async function main() {
             window.location.replace('login.html?next=' + encodeURIComponent(next));
             return;
         }
-        await loadAppWithEstimatePartial();
+        await loadAppWithShellPartials();
         window.dispatchEvent(new Event('DOMContentLoaded'));
         return;
     }
@@ -90,7 +92,7 @@ async function main() {
             window.location.replace('login.html?next=' + encodeURIComponent(next));
             return;
         }
-        await loadAppWithEstimatePartial();
+        await loadAppWithShellPartials();
         window.dispatchEvent(new Event('DOMContentLoaded'));
         return;
     }
@@ -107,7 +109,7 @@ async function main() {
             : [],
     };
 
-    await loadAppWithEstimatePartial();
+    await loadAppWithShellPartials();
     window.dispatchEvent(new Event('DOMContentLoaded'));
 }
 
