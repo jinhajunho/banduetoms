@@ -722,11 +722,19 @@
                 rowBaseTop[rw] = Number.isFinite(minT) ? minT : 0;
             }
 
+            var wrapW = wrapRectDraw.width;
             segments.forEach(function (seg) {
                 var startRect = seg.startEl.getBoundingClientRect();
                 var endRect = seg.endEl.getBoundingClientRect();
                 var left = startRect.left - wrapRectDraw.left;
                 var width = endRect.right - startRect.left;
+                if (left < 0) {
+                    width += left;
+                    left = 0;
+                }
+                if (left + width > wrapW) {
+                    width = Math.max(0, wrapW - left);
+                }
                 var baseTop = rowBaseTop[seg.week];
                 var top = baseTop + seg.lane * (DASHBOARD_PERIOD_LANE_H + DASHBOARD_PERIOD_LANE_GAP);
 

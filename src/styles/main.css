@@ -2113,6 +2113,9 @@
 
         .dashboard-calendar-grid-wrap {
             position: relative;
+            max-width: 100%;
+            min-width: 0;
+            overflow-x: hidden;
         }
 
         .dashboard-calendar-period-overlay {
@@ -2205,12 +2208,15 @@
 
         .calendar-container .calendar-grid {
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(7, minmax(0, 1fr));
             gap: 4px;
+            min-width: 0;
+            width: 100%;
         }
 
+        /* aspect-ratio 제거: 기간 lane padding으로 행 높이가 늘 때 정사각형 강제로 열 너비가 밀려 가로 스크롤이 남 */
         .calendar-container .calendar-day {
-            aspect-ratio: 1;
+            min-width: 0;
             padding: 6px;
             border: 1px solid var(--gray-200);
             border-radius: 6px;
