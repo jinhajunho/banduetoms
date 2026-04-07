@@ -1406,8 +1406,13 @@
         }
 
         function projectSalesPurchaseChipClass(isPurchaseSide, item, purchaseAmount) {
+            // 매출 칩은 구분(type)과 무관하게 세금계산서 발행 여부로만 색상 표시
+            if (!isPurchaseSide) {
+                return item.taxIssued ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued';
+            }
+            // 매입 칩은 기존 규칙 유지 (비세금계산서 또는 금액 0이면 회색)
             if (item.type !== '세금계산서') return 'table-amount-chip--na';
-            if (isPurchaseSide && purchaseAmount <= 0) return 'table-amount-chip--na';
+            if (purchaseAmount <= 0) return 'table-amount-chip--na';
             return item.taxIssued ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued';
         }
 
@@ -5061,6 +5066,23 @@
                     }
                     if (!salesPacked.rows.length && !payPacked.rows.length && !purchasePacked.rows.length && !transferPacked.rows.length) {
                         buildFinanceRowsFromSummary(base);
+                    } else {
+                        // 1행형 CSV에서 테이블행이 제공되면 집계값도 해당 행 합계로 즉시 동기화
+                        var salesSum2 = (base.salesRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                        var paySum2 = (base.paymentRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                        var purSum2 = (base.purchaseRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                        var trSum2 = (base.transferRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                        if (!base.revenue && salesSum2) base.revenue = salesSum2;
+                        if (!base.purchase && purSum2) base.purchase = purSum2;
+                        base.aggregateSalesGross = salesSum2 || base.revenue || 0;
+                        base.aggregatePaymentGross = paySum2;
+                        base.aggregatePurchaseGross = purSum2 || base.purchase || 0;
+                        base.aggregateTransferGross = trSum2;
+                        if (base.revenue > 0) {
+                            if (paySum2 <= 0) base.paidStatus = '미수';
+                            else if (paySum2 >= base.revenue) base.paidStatus = '전액';
+                            else base.paidStatus = '부분';
+                        }
                     }
 
                     previews.push({ line: line, codeDisp: base.code, building: (base.building || '-').slice(0, 40), err: '' });
