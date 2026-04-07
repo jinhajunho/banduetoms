@@ -1,6 +1,15 @@
 ﻿            <div class="page-header">
                 <h1 class="page-title">프로젝트 관리</h1>
                 <div class="header-actions">
+                    <button type="button" class="btn btn-secondary" onclick="openEstimateCsvImportPicker()" title="UTF-8 CSV. 컬럼은 CSV 다운로드와 동일합니다.">
+                        <i class="fas fa-upload"></i>
+                        CSV 업로드
+                    </button>
+                    <input type="file" id="estimateCsvImportInput" accept=".csv,text/csv" style="display: none;" onchange="onEstimateCsvImportFileChange(event)">
+                    <button type="button" class="btn btn-secondary" onclick="downloadEstimateImportTemplate()" title="업로드용 예시 행이 포함된 양식입니다.">
+                        <i class="fas fa-file-download"></i>
+                        업로드용 양식(CSV)
+                    </button>
                     <button class="btn btn-secondary" onclick="downloadEstimateCSV()">
                         <i class="fas fa-download"></i>
                         CSV 다운로드

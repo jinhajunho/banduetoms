@@ -84,6 +84,17 @@
             <!-- 프로젝트 관리: public/partials/page-estimate.html (estimate-partial-loader.js 주입, index-bootstrap에서 app.js 전) -->
             <div id="page-estimate" class="page-section" style="display: none;"></div>
 
+            <!-- 프로젝트 관리 CSV 업로드 미리보기 -->
+            <div class="modal event-modal" id="estimateImportModal" onclick="if(event.target===this) closeEstimateImportModal()">
+                <div class="modal-content contractor-import-modal-content" onclick="event.stopPropagation()">
+                    <div class="modal-header">
+                        <div class="modal-title">프로젝트 CSV 업로드</div>
+                        <button type="button" class="modal-close" onclick="closeEstimateImportModal()">&times;</button>
+                    </div>
+                    <div id="estimateImportModalBody"></div>
+                </div>
+            </div>
+
             <!-- 경영실적관리: public/partials/page-performance.html (performance-partial-loader.js 주입, index-bootstrap에서 app.js 전) -->
             <div id="page-performance" class="page-section" style="display: none;"></div>
 

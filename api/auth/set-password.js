@@ -10,7 +10,7 @@ function jsonResponse(status, body) {
 }
 
 function requireEnv(name) {
-  const v = process.env[name];
+  const v = process.env[name] || (name === 'SUPABASE_URL' ? process.env.VITE_SUPABASE_URL : undefined);
   if (!v) throw new Error(`Missing env var: ${name}`);
   return v;
 }

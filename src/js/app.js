@@ -4481,6 +4481,392 @@
             document.body.removeChild(link);
         }
 
+        function downloadEstimateImportTemplate() {
+            let csv = '\uFEFF';
+            csv +=
+                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,매출액,매입액,등록일\n' +
+                ',견적,B2B,코오롱,지원,예시건물,예시공사,,,0,0,2026-01-15\n';
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', '프로젝트관리_업로드양식.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        var ESTIMATE_IMPORT_MAX_ROWS = 500;
+        var ESTIMATE_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
+
+        function normalizeEstimateImportHeaderKey(h) {
+            var s = String(h || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s/g, '');
+            var map = {
+                code: 'code',
+                코드: 'code',
+                status: 'status',
+                상태: 'status',
+                category1: 'category1',
+                대분류: 'category1',
+                category2: 'category2',
+                중분류: 'category2',
+                category3: 'category3',
+                소분류: 'category3',
+                building: 'building',
+                건물명: 'building',
+                project: 'project',
+                공사명: 'project',
+                manager: 'manager',
+                담당자: 'manager',
+                contractor: 'contractor',
+                도급사: 'contractor',
+                revenue: 'revenue',
+                매출액: 'revenue',
+                purchase: 'purchase',
+                매입액: 'purchase',
+                date: 'date',
+                등록일: 'date',
+            };
+            return map[s] || s;
+        }
+
+        function parseEstimateImportNumber(raw) {
+            var s = String(raw == null ? '' : raw).trim().replace(/,/g, '');
+            if (s === '') return null;
+            var n = Number(s);
+            if (!Number.isFinite(n)) return NaN;
+            return n;
+        }
+
+        function generateEstimateImportCode(line) {
+            var yy = String(new Date().getFullYear()).slice(-2);
+            return yy + String(Date.now()).slice(-5) + String(10000 + (line % 10000)).slice(-4);
+        }
+
+        function defaultEstimateShellForImport(explicitCode, line) {
+            var today = new Date().toISOString().slice(0, 10);
+            var code = String(explicitCode || '').trim() || generateEstimateImportCode(line);
+            return {
+                code: code,
+                date: today,
+                status: '견적',
+                startDate: '',
+                endDate: '',
+                category1: 'B2B',
+                category2: '코오롱',
+                category3: '지원',
+                building: '',
+                project: '',
+                manager: currentUserAccessProfile.name || '방준호',
+                createdBy: currentUserAccessProfile.userId || '',
+                type: '세금계산서',
+                contractor: '',
+                revenue: 0,
+                paidStatus: '미수',
+                purchase: 0,
+                taxIssued: false,
+                hasSales: false,
+                hasPurchase: false,
+                businessIncomeTransferDate: '',
+                businessIncomeGross: 0,
+                businessIncomeNetPay: 0,
+                businessIncomePaidStatus: '미지급',
+                aggregateSalesGross: 0,
+                aggregatePaymentGross: 0,
+                aggregatePurchaseGross: 0,
+                aggregateTransferGross: 0,
+                salesDates: [],
+            };
+        }
+
+        function applyEstimateCsvRowToItem(item, rowMap) {
+            if (rowMap.status != null && String(rowMap.status).trim() !== '') {
+                item.status = String(rowMap.status).trim();
+            }
+            if (rowMap.category1 != null && String(rowMap.category1).trim() !== '') {
+                item.category1 = String(rowMap.category1).trim();
+            }
+            if (rowMap.category2 != null && String(rowMap.category2).trim() !== '') {
+                item.category2 = String(rowMap.category2).trim();
+            }
+            if (rowMap.category3 != null && String(rowMap.category3).trim() !== '') {
+                item.category3 = String(rowMap.category3).trim();
+            }
+            if (rowMap.building != null && String(rowMap.building).trim() !== '') {
+                item.building = String(rowMap.building).trim();
+            }
+            if (rowMap.project != null && String(rowMap.project).trim() !== '') {
+                item.project = String(rowMap.project).trim();
+            }
+            if (rowMap.manager != null && String(rowMap.manager).trim() !== '') {
+                item.manager = String(rowMap.manager).trim();
+            }
+            if (rowMap.contractor != null && String(rowMap.contractor).trim() !== '') {
+                item.contractor = String(rowMap.contractor).trim();
+            }
+            var rev = parseEstimateImportNumber(rowMap.revenue);
+            if (rev !== null) {
+                if (Number.isNaN(rev)) return '매출액(revenue)은 숫자여야 합니다.';
+                item.revenue = Math.round(rev);
+            }
+            var pur = parseEstimateImportNumber(rowMap.purchase);
+            if (pur !== null) {
+                if (Number.isNaN(pur)) return '매입액(purchase)은 숫자여야 합니다.';
+                item.purchase = Math.round(pur);
+            }
+            var d = String(rowMap.date != null ? rowMap.date : '').trim();
+            if (d) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '등록일(date)은 YYYY-MM-DD 형식이어야 합니다.';
+                item.date = d;
+            }
+            return null;
+        }
+
+        function openEstimateCsvImportPicker() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                alert('세션을 불러오지 못했습니다. 페이지를 새로고침한 뒤 다시 로그인해 주세요.');
+                return;
+            }
+            var inp = document.getElementById('estimateCsvImportInput');
+            if (!inp) return;
+            inp.value = '';
+            inp.click();
+        }
+
+        function onEstimateCsvImportFileChange(ev) {
+            var input = ev && ev.target;
+            var file = input && input.files && input.files[0];
+            if (!file) return;
+            if (file.size > ESTIMATE_IMPORT_MAX_BYTES) {
+                alert('파일이 너무 큽니다. (최대 약 2MB)');
+                input.value = '';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () {
+                var text = String(reader.result || '');
+                var res = parseAndValidateEstimateImportCsv(text);
+                input.value = '';
+                if (!res.ok) {
+                    alert(res.error || 'CSV를 읽을 수 없습니다.');
+                    return;
+                }
+                openEstimateImportModalWithResult(res);
+            };
+            reader.onerror = function () {
+                alert('파일을 읽지 못했습니다.');
+                input.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseAndValidateEstimateImportCsv(text) {
+            var rows = parseContractorCsvTextToRows(text);
+            if (!rows.length) {
+                return { ok: false, error: '데이터 행이 없습니다.' };
+            }
+            var headerCells = rows[0].map(function (h) {
+                return normalizeEstimateImportHeaderKey(h);
+            });
+            var idx = {};
+            for (var hi = 0; hi < headerCells.length; hi++) {
+                var key = headerCells[hi];
+                if (key && idx[key] === undefined) idx[key] = hi;
+            }
+            if (idx.code === undefined && idx.building === undefined && idx.project === undefined) {
+                return { ok: false, error: 'CSV에 코드·건물명·공사명 중 하나의 열이 필요합니다.' };
+            }
+
+            var dataRows = rows.slice(1);
+            if (dataRows.length > ESTIMATE_IMPORT_MAX_ROWS) {
+                return {
+                    ok: false,
+                    error: '한 번에 최대 ' + ESTIMATE_IMPORT_MAX_ROWS + '행까지만 업로드할 수 있습니다.',
+                };
+            }
+
+            var previews = [];
+            var pendingItems = [];
+            var usedCodes = {};
+
+            for (var ri = 0; ri < dataRows.length; ri++) {
+                var line = ri + 2;
+                var cells = dataRows[ri];
+                var rowMap = {};
+                Object.keys(idx).forEach(function (k) {
+                    rowMap[k] = cells[idx[k]] != null ? cells[idx[k]] : '';
+                });
+
+                var codeCell = String(rowMap.code != null ? rowMap.code : '').trim();
+                var buildingCell = String(rowMap.building != null ? rowMap.building : '').trim();
+                var projectCell = String(rowMap.project != null ? rowMap.project : '').trim();
+
+                var rowNonEmpty = cells.some(function (cl) {
+                    return String(cl).trim() !== '';
+                });
+                if (!rowNonEmpty) continue;
+
+                if (!codeCell && !buildingCell && !projectCell) {
+                    previews.push({
+                        line: line,
+                        codeDisp: '-',
+                        building: '-',
+                        err: '코드 또는 건물명/공사명 중 하나는 필요합니다.',
+                    });
+                    continue;
+                }
+
+                var base;
+                if (codeCell) {
+                    if (usedCodes[codeCell]) {
+                        previews.push({
+                            line: line,
+                            codeDisp: codeCell,
+                            building: buildingCell || '-',
+                            err: 'CSV 안에서 코드가 중복되었습니다.',
+                        });
+                        continue;
+                    }
+                    usedCodes[codeCell] = true;
+                    var existing = estimates.find(function (e) {
+                        return String(e.code || '').trim() === codeCell;
+                    });
+                    if (existing) {
+                        base = JSON.parse(JSON.stringify(existing));
+                    } else {
+                        base = defaultEstimateShellForImport(codeCell, line);
+                    }
+                } else {
+                    base = defaultEstimateShellForImport('', line);
+                    usedCodes[String(base.code)] = true;
+                }
+
+                var rowErr = applyEstimateCsvRowToItem(base, rowMap);
+                if (rowErr) {
+                    previews.push({
+                        line: line,
+                        codeDisp: base.code || '-',
+                        building: (base.building || buildingCell || '-').slice(0, 40),
+                        err: rowErr,
+                    });
+                    continue;
+                }
+
+                applyEstimateDefaultsAndSeed([base]);
+                seedEstimateAggregates(base);
+
+                previews.push({
+                    line: line,
+                    codeDisp: base.code,
+                    building: (base.building || '-').slice(0, 40),
+                    err: '',
+                });
+                pendingItems.push(base);
+            }
+
+            if (!pendingItems.length) {
+                return { ok: false, error: '반영할 유효 행이 없습니다.' };
+            }
+            var hasErrors = previews.some(function (p) {
+                return p.err;
+            });
+            if (hasErrors) {
+                return { ok: true, previews: previews, pendingItems: null, hasErrors: true };
+            }
+            return { ok: true, previews: previews, pendingItems: pendingItems, hasErrors: false };
+        }
+
+        function openEstimateImportModalWithResult(res) {
+            var body = document.getElementById('estimateImportModalBody');
+            var modal = document.getElementById('estimateImportModal');
+            if (!body || !modal) return;
+
+            window.__estimateImportPending = res.hasErrors ? null : res.pendingItems;
+
+            var summary =
+                '<div class="contractor-import-modal-summary">' +
+                (res.hasErrors
+                    ? '<strong>오류가 있는 행을 수정한 뒤 다시 업로드해 주세요.</strong> (저장 버튼은 비활성화)'
+                    : '<strong>' +
+                      res.pendingItems.length +
+                      '건</strong>을 서버에 반영합니다. 기존 코드는 덮어쓰고, 없는 코드는 신규로 저장합니다.') +
+                '</div>';
+
+            var table =
+                '<div class="table-section"><table><thead><tr><th>CSV행</th><th>코드</th><th>건물명</th><th>결과</th></tr></thead><tbody>';
+            for (var pi = 0; pi < res.previews.length; pi++) {
+                var p = res.previews[pi];
+                table +=
+                    '<tr><td>' +
+                    p.line +
+                    '</td><td>' +
+                    escapeHtml(String(p.codeDisp || '')) +
+                    '</td><td>' +
+                    escapeHtml(String(p.building || '')) +
+                    '</td><td class="' +
+                    (p.err ? 'contractor-import-row-err' : '') +
+                    '">' +
+                    escapeHtml(p.err || 'OK') +
+                    '</td></tr>';
+            }
+            table += '</tbody></table></div>';
+
+            var actions =
+                '<div class="contractor-import-modal-actions">' +
+                '<button type="button" class="btn btn-secondary" onclick="closeEstimateImportModal()">닫기</button>' +
+                '<button type="button" class="btn btn-primary" id="estimateImportConfirmBtn" onclick="confirmEstimateImport()" ' +
+                (res.hasErrors ? 'disabled' : '') +
+                '>서버에 반영</button></div>';
+
+            body.innerHTML = summary + table + actions;
+            modal.classList.add('active');
+        }
+
+        function closeEstimateImportModal() {
+            var modal = document.getElementById('estimateImportModal');
+            if (modal) modal.classList.remove('active');
+            window.__estimateImportPending = null;
+        }
+
+        function confirmEstimateImport() {
+            var pending = window.__estimateImportPending;
+            if (!pending || !pending.length) return;
+            var i = 0;
+            function step() {
+                if (i >= pending.length) {
+                    syncEstimatesFromServer().then(function () {
+                        alert(pending.length + '건 반영했습니다.');
+                        closeEstimateImportModal();
+                    });
+                    return;
+                }
+                var item = pending[i];
+                upsertEstimateToServer(item).then(function (r) {
+                    if (!r.ok) {
+                        alert(
+                            '저장 실패 (목록 ' +
+                                (i + 1) +
+                                '번째 / 코드 ' +
+                                item.code +
+                                '): ' +
+                                (r.error || '')
+                        );
+                        syncEstimatesFromServer();
+                        closeEstimateImportModal();
+                        return;
+                    }
+                    i++;
+                    step();
+                });
+            }
+            step();
+        }
+
         function downloadExpenseCSV() {
             const filtered = getFilteredExpensesByMonth();
             let csv = '\uFEFF'; // UTF-8 BOM
@@ -10278,6 +10664,11 @@
 
                 // 견적/프로젝트
                 downloadEstimateCSV,
+                downloadEstimateImportTemplate,
+                openEstimateCsvImportPicker,
+                onEstimateCsvImportFileChange,
+                closeEstimateImportModal,
+                confirmEstimateImport,
                 openNewEstimate,
                 closePanel,
                 openPanel,
