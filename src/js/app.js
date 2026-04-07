@@ -4453,22 +4453,33 @@
 
         function downloadEstimateCSV() {
             let csv = '\uFEFF';
-            csv += '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,매출액,매입액,등록일\n';
+            csv +=
+                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태\n';
             estimates.forEach(function (item) {
-                csv += [
-                    csvEscape(item.code || ''),
-                    csvEscape(item.status || ''),
-                    csvEscape(item.category1 || ''),
-                    csvEscape(item.category2 || ''),
-                    csvEscape(item.category3 || ''),
-                    csvEscape(item.building || ''),
-                    csvEscape(item.project || ''),
-                    csvEscape(item.manager || ''),
-                    csvEscape(item.contractor || ''),
-                    csvEscape(Number(item.revenue || 0)),
-                    csvEscape(Number(item.purchase || 0)),
-                    csvEscape(item.date || '')
-                ].join(',') + '\n';
+                const taxIssuedDisp = item.taxIssued ? '발행완료' : '미발행';
+                csv +=
+                    [
+                        csvEscape(item.code || ''),
+                        csvEscape(item.status || ''),
+                        csvEscape(item.category1 || ''),
+                        csvEscape(item.category2 || ''),
+                        csvEscape(item.category3 || ''),
+                        csvEscape(item.building || ''),
+                        csvEscape(item.project || ''),
+                        csvEscape(item.manager || ''),
+                        csvEscape(item.contractor || ''),
+                        csvEscape(item.type || '세금계산서'),
+                        csvEscape(Number(item.revenue || 0)),
+                        csvEscape(item.paidStatus || '미수'),
+                        csvEscape(taxIssuedDisp),
+                        csvEscape(Number(item.purchase || 0)),
+                        csvEscape(item.date || ''),
+                        csvEscape(item.startDate || ''),
+                        csvEscape(item.endDate || ''),
+                        csvEscape(Number(item.businessIncomeGross || 0)),
+                        csvEscape(item.businessIncomeTransferDate || ''),
+                        csvEscape(item.businessIncomePaidStatus || '미지급'),
+                    ].join(',') + '\n';
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -4484,8 +4495,13 @@
         function downloadEstimateImportTemplate() {
             let csv = '\uFEFF';
             csv +=
-                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,매출액,매입액,등록일\n' +
-                ',견적,B2B,코오롱,지원,예시건물,예시공사,,,0,0,2026-01-15\n';
+                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태\n' +
+                csvEscape(
+                    '※ 첫 줄=헤더 고정. 아래 2행은 예시(삭제·수정). 코드 공란 시 신규 자동코드. 건물명·공사명·코드 중 하나 필수. 날짜 YYYY-MM-DD. 과세유형: 세금계산서/사업소득/자체인력. 수금: 미수/전액/부분/해당없음. 세금계산서발행: 미발행/발행완료. 사업소득 지급: 미지급/지급.'
+                ) +
+                '\n' +
+                ',견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,12000000,미수,미발행,8000000,2026-01-15,,,0,,미지급\n' +
+                ',진행,B2C,개인,지원,빌라 101호,실내 도장,김철수,,사업소득,5000000,해당없음,,0,2026-02-01,2026-02-01,2026-02-28,5000000,2026-02-10,미지급\n';
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -4531,6 +4547,26 @@
                 매입액: 'purchase',
                 date: 'date',
                 등록일: 'date',
+                startdate: 'startDate',
+                시작일: 'startDate',
+                enddate: 'endDate',
+                완료일: 'endDate',
+                type: 'type',
+                과세유형: 'type',
+                매출유형: 'type',
+                paidstatus: 'paidStatus',
+                수금상태: 'paidStatus',
+                taxissued: 'taxIssued',
+                세금계산서발행: 'taxIssued',
+                businessincomegross: 'businessIncomeGross',
+                사업소득총액: 'businessIncomeGross',
+                소득총액: 'businessIncomeGross',
+                businessincometransferdate: 'businessIncomeTransferDate',
+                사업소득이체일: 'businessIncomeTransferDate',
+                이체일: 'businessIncomeTransferDate',
+                businessincomepaidstatus: 'businessIncomePaidStatus',
+                사업소득지급상태: 'businessIncomePaidStatus',
+                소득지급: 'businessIncomePaidStatus',
             };
             return map[s] || s;
         }
@@ -4541,6 +4577,40 @@
             var n = Number(s);
             if (!Number.isFinite(n)) return NaN;
             return n;
+        }
+
+        function parseEstimateImportOptionalYmd(raw, label) {
+            var d = String(raw != null ? raw : '').trim();
+            if (!d) return { ok: true, value: null };
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+                return { ok: false, err: label + '은 YYYY-MM-DD 형식이거나 비워야 합니다.' };
+            }
+            return { ok: true, value: d };
+        }
+
+        function parseEstimateImportTaxIssuedCell(raw) {
+            if (raw == null) return { ok: true, value: null };
+            var s = String(raw).trim();
+            if (s === '') return { ok: true, value: null };
+            var lower = s.toLowerCase();
+            if (
+                lower === 'true' ||
+                lower === '1' ||
+                lower === 'y' ||
+                lower === 'yes' ||
+                lower === 'o' ||
+                s === '발행완료' ||
+                s === '발행'
+            ) {
+                return { ok: true, value: true };
+            }
+            if (lower === 'false' || lower === '0' || lower === 'n' || lower === 'no' || lower === 'x' || s === '미발행') {
+                return { ok: true, value: false };
+            }
+            return {
+                ok: false,
+                err: '세금계산서발행은 미발행·발행완료 또는 true/false로 입력하세요.',
+            };
         }
 
         function generateEstimateImportCode(line) {
@@ -4624,6 +4694,55 @@
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '등록일(date)은 YYYY-MM-DD 형식이어야 합니다.';
                 item.date = d;
             }
+
+            if (rowMap.type != null && String(rowMap.type).trim() !== '') {
+                var t = String(rowMap.type).trim();
+                if (!/^(세금계산서|사업소득|자체인력)$/.test(t)) {
+                    return '과세유형(type)은 세금계산서, 사업소득, 자체인력 중 하나여야 합니다.';
+                }
+                item.type = t;
+            }
+            if (rowMap.paidStatus != null && String(rowMap.paidStatus).trim() !== '') {
+                var ps = String(rowMap.paidStatus).trim();
+                if (!/^(미수|전액|부분|해당없음)$/.test(ps)) {
+                    return '수금상태(paidStatus)는 미수, 전액, 부분, 해당없음 중 하나여야 합니다.';
+                }
+                item.paidStatus = ps;
+            }
+            var taxParsed = parseEstimateImportTaxIssuedCell(rowMap.taxIssued);
+            if (!taxParsed.ok) return taxParsed.err;
+            if (taxParsed.value !== null) item.taxIssued = taxParsed.value;
+
+            var sd = parseEstimateImportOptionalYmd(rowMap.startDate, '시작일(startDate)');
+            if (!sd.ok) return sd.err;
+            if (sd.value) item.startDate = sd.value;
+
+            var ed = parseEstimateImportOptionalYmd(rowMap.endDate, '완료일(endDate)');
+            if (!ed.ok) return ed.err;
+            if (ed.value) item.endDate = ed.value;
+
+            var big = parseEstimateImportNumber(rowMap.businessIncomeGross);
+            if (big !== null) {
+                if (Number.isNaN(big)) return '사업소득총액은 숫자여야 합니다.';
+                item.businessIncomeGross = Math.round(big);
+                var _biz = computeBizTaxFromGross(item.businessIncomeGross);
+                item.businessIncomeNetPay = _biz.net;
+            }
+            var bit = String(rowMap.businessIncomeTransferDate != null ? rowMap.businessIncomeTransferDate : '').trim();
+            if (bit) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(bit)) {
+                    return '사업소득이체일은 YYYY-MM-DD 형식이어야 합니다.';
+                }
+                item.businessIncomeTransferDate = bit;
+            }
+            if (rowMap.businessIncomePaidStatus != null && String(rowMap.businessIncomePaidStatus).trim() !== '') {
+                var bip = String(rowMap.businessIncomePaidStatus).trim();
+                if (!/^(미지급|지급)$/.test(bip)) {
+                    return '사업소득지급상태는 미지급 또는 지급이어야 합니다.';
+                }
+                item.businessIncomePaidStatus = bip;
+            }
+
             return null;
         }
 
@@ -4710,6 +4829,9 @@
                     return String(cl).trim() !== '';
                 });
                 if (!rowNonEmpty) continue;
+
+                var noteSkip = String(cells[0] != null ? cells[0] : '').trim();
+                if (noteSkip.indexOf('※') === 0 || noteSkip.indexOf('#') === 0) continue;
 
                 if (!codeCell && !buildingCell && !projectCell) {
                     previews.push({
