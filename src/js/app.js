@@ -935,6 +935,10 @@
                 if (!e.code || String(e.code).trim() === '') {
                     e.code = '26' + String(100000 + i);
                 }
+                if (!Array.isArray(e.salesRows)) e.salesRows = [];
+                if (!Array.isArray(e.paymentRows)) e.paymentRows = [];
+                if (!Array.isArray(e.purchaseRows)) e.purchaseRows = [];
+                if (!Array.isArray(e.transferRows)) e.transferRows = [];
                 if (e.businessIncomeGross === undefined) e.businessIncomeGross = 0;
                 if (e.businessIncomeTransferDate === undefined) e.businessIncomeTransferDate = '';
                 if (e.businessIncomePaidStatus === undefined) e.businessIncomePaidStatus = '미지급';
@@ -971,6 +975,58 @@
             if (e.aggregateTransferGross == null) {
                 const p = e.purchase || 0;
                 e.aggregateTransferGross = p > 0 ? Math.round(p * 0.6) : 0;
+            }
+        }
+
+        function buildFinanceRowsFromSummary(item) {
+            if (!item) return;
+            applyEstimateDefaultsAndSeed([item]);
+            seedEstimateAggregates(item);
+
+            const d =
+                (item.salesDates && item.salesDates.length ? item.salesDates[item.salesDates.length - 1] : '') ||
+                (item.date ? String(item.date).slice(0, 10) : new Date().toISOString().slice(0, 10));
+            const name = String(item.contractor || item.project || '-');
+
+            const revenueGross = Number(item.revenue) || 0;
+            const purchaseGross = Number(item.purchase) || 0;
+            const paidGross = Number(item.aggregatePaymentGross) || 0;
+            const transferGross = Number(item.aggregateTransferGross) || 0;
+
+            // 매출 1행
+            if (revenueGross > 0 && (!item.salesRows || item.salesRows.length === 0)) {
+                const p = splitNetTaxFromGross(revenueGross);
+                item.salesRows = [
+                    [d, name, p.net, p.tax, p.gross, item.taxIssued ? '발행' : '미발행', '-', 'CSV 자동', null],
+                ];
+            }
+
+            // 수금 1행 (미수도 0원 행으로 남김: CSV 입력을 “표로도” 보이게)
+            if (
+                revenueGross > 0 &&
+                (!item.paymentRows || item.paymentRows.length === 0) &&
+                (item.paidStatus === '미수' || item.paidStatus === '부분' || item.paidStatus === '전액')
+            ) {
+                const pp = splitNetTaxFromGross(paidGross);
+                const memo =
+                    item.paidStatus === '전액'
+                        ? '전액 수금(CSV)'
+                        : item.paidStatus === '부분'
+                          ? '부분 수금(CSV)'
+                          : '미수(CSV)';
+                item.paymentRows = [[d, name, pp.net, pp.tax, pp.gross, memo, null]];
+            }
+
+            // 매입 1행
+            if (purchaseGross > 0 && (!item.purchaseRows || item.purchaseRows.length === 0)) {
+                const p2 = splitNetTaxFromGross(purchaseGross);
+                item.purchaseRows = [[d, name, p2.net, p2.tax, p2.gross, '미발행', '-', 'CSV 자동', null]];
+            }
+
+            // 이체 1행 (매입이 있으면 기본 이체도 표에 보여줌)
+            if (purchaseGross > 0 && (!item.transferRows || item.transferRows.length === 0)) {
+                const tp = splitNetTaxFromGross(transferGross);
+                item.transferRows = [[d, name, tp.net, tp.tax, tp.gross, '이체(CSV)', null]];
             }
         }
 
@@ -4881,6 +4937,7 @@
 
                 applyEstimateDefaultsAndSeed([base]);
                 seedEstimateAggregates(base);
+                buildFinanceRowsFromSummary(base);
 
                 previews.push({
                     line: line,
@@ -8297,21 +8354,12 @@
                                         <th>메모</th>
                                     </tr>
                                 </thead>
-                                <tbody id="salesPayments-${item.code}">
-                                    <tr data-row-type="payment" data-saved="true" onclick="onFinanceRowClick(event, this, 'payment')">
-                                        <td>2026-03-10</td>
-                                        <td>-</td>
-                                        <td style="font-weight: 600;">${Math.round((item.revenue * 0.4) / 1.1).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${Math.round((item.revenue * 0.4) - Math.round((item.revenue * 0.4) / 1.1)).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${(item.revenue * 0.4).toLocaleString()}원</td>
-                                        <td>1차 수금</td>
-                                    </tr>
-                                </tbody>
+                                <tbody id="salesPayments-${item.code}"></tbody>
                             </table>
                             </div>
                             <div class="payment-summary">
                                 <span class="payment-summary-label">총 수금액(vat포함)</span>
-                                <span class="payment-summary-value" id="paymentSummary-${item.code}">${(item.revenue * 0.4).toLocaleString()}원 / ${item.revenue.toLocaleString()}원</span>
+                                <span class="payment-summary-value" id="paymentSummary-${item.code}">—</span>
                             </div>
                         </div>
                     </div>
@@ -8346,28 +8394,7 @@
                                         <th style="width: 120px;">메모</th>
                                     </tr>
                                 </thead>
-                                <tbody id="purchaseList-${item.code}">
-                                    <tr data-row-type="purchase" data-saved="true" onclick="onFinanceRowClick(event, this, 'purchase')">
-                                        <td>2026-03-10</td>
-                                        <td>영진인프라</td>
-                                        <td style="font-weight: 600;">${Math.round((item.purchase * 0.6) / 1.1).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${Math.round((item.purchase * 0.6) - Math.round((item.purchase * 0.6) / 1.1)).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${(item.purchase * 0.6).toLocaleString()}원</td>
-                                        <td><span class="badge badge-issued">발행</span></td>
-                                        <td>-</td>
-                                        <td>바닥공사</td>
-                                    </tr>
-                                    <tr data-row-type="purchase" data-saved="true" onclick="onFinanceRowClick(event, this, 'purchase')">
-                                        <td>2026-03-10</td>
-                                        <td>강서집수리</td>
-                                        <td style="font-weight: 600;">${Math.round((item.purchase * 0.4) / 1.1).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${Math.round((item.purchase * 0.4) - Math.round((item.purchase * 0.4) / 1.1)).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${(item.purchase * 0.4).toLocaleString()}원</td>
-                                        <td><span class="badge badge-not-issued">미발행</span></td>
-                                        <td>-</td>
-                                        <td>전기설비</td>
-                                    </tr>
-                                </tbody>
+                                <tbody id="purchaseList-${item.code}"></tbody>
                             </table>
                             </div>
                             <div class="payment-summary">
@@ -8398,21 +8425,12 @@
                                         <th style="width: 180px;">메모</th>
                                     </tr>
                                 </thead>
-                                <tbody id="transferList-${item.code}">
-                                    <tr data-row-type="transfer" data-saved="true" onclick="onFinanceRowClick(event, this, 'transfer')">
-                                        <td>2026-03-10</td>
-                                        <td>영진인프라</td>
-                                        <td style="font-weight: 600;">${Math.round((item.purchase * 0.6) / 1.1).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${Math.round((item.purchase * 0.6) - Math.round((item.purchase * 0.6) / 1.1)).toLocaleString()}원</td>
-                                        <td style="font-weight: 600;">${(item.purchase * 0.6).toLocaleString()}원</td>
-                                        <td>영진인프라</td>
-                                    </tr>
-                                </tbody>
+                                <tbody id="transferList-${item.code}"></tbody>
                             </table>
                             </div>
                             <div class="payment-summary">
                                 <span class="payment-summary-label">총 이체액(vat포함)</span>
-                                <span class="payment-summary-value" id="transferSummary-${item.code}">${(item.purchase * 0.6).toLocaleString()}원 / ${item.purchase.toLocaleString()}원</span>
+                                <span class="payment-summary-value" id="transferSummary-${item.code}">—</span>
                             </div>
                         </div>
                     </div>
@@ -8527,7 +8545,10 @@
             if (isEditMode || isNewEstimate) {
                 resetPanelDirtyState();
             }
-            if (item && item.code) recalcFinanceSummaries(item.code);
+            if (item && item.code) {
+                renderFinanceTablesFromItem(item);
+                recalcFinanceSummaries(item.code);
+            }
         }
 
         // 행 ⋮ 메뉴 — 인라인 액션 방식 (드롭다운 없음, 겹침 방지)
@@ -8643,6 +8664,37 @@
             row.setAttribute('data-saved', 'true');
             row.dataset.rowValues = JSON.stringify(values);
             row.classList.add('finance-row-clickable');
+        }
+
+        function renderFinanceTablesFromItem(item) {
+            if (!item || !item.code) return;
+            applyEstimateDefaultsAndSeed([item]);
+            // CSV/기존 데이터에서 요약만 있고 행이 없는 경우 → 행 생성
+            if (
+                (Number(item.revenue) || 0) > 0 &&
+                (!item.salesRows || item.salesRows.length === 0) &&
+                (!item.paymentRows || item.paymentRows.length === 0) &&
+                (!item.purchaseRows || item.purchaseRows.length === 0) &&
+                (!item.transferRows || item.transferRows.length === 0)
+            ) {
+                buildFinanceRowsFromSummary(item);
+            }
+
+            const code = String(item.code);
+            function fill(tbodyId, type, rows) {
+                const body = document.getElementById(tbodyId);
+                if (!body) return;
+                body.innerHTML = '';
+                (rows || []).forEach(function (values) {
+                    const tr = document.createElement('tr');
+                    renderFinanceRow(tr, type, values, '');
+                    body.appendChild(tr);
+                });
+            }
+            fill('salesList-' + code, 'sales', item.salesRows);
+            fill('salesPayments-' + code, 'payment', item.paymentRows);
+            fill('purchaseList-' + code, 'purchase', item.purchaseRows);
+            fill('transferList-' + code, 'transfer', item.transferRows);
         }
 
         function openFinanceRowModal(type, code, row) {
@@ -8834,11 +8886,16 @@
             const purchaseBody = document.getElementById('purchaseList-' + code);
             const transferBody = document.getElementById('transferList-' + code);
 
+            const estRow = estimates.find(function (e) { return e.code === code; });
+            if (estRow) seedEstimateAggregates(estRow);
+
             let salesTotal = 0, paymentDone = 0, purchaseTotal = 0, transferDone = 0;
             let salesNet = 0, purchaseNet = 0;
+            let salesRowCnt = 0, paymentRowCnt = 0, purchaseRowCnt = 0, transferRowCnt = 0;
             const salesDates = [];
             if (salesBody) Array.from(salesBody.rows).forEach(function (r) {
                 if ((r.getAttribute('data-row-type') || 'sales') !== 'sales') return;
+                salesRowCnt++;
                 salesTotal += getRowGrossFromValues(r, 4);
                 salesNet += getRowNetFromValues(r, 2);
                 let dt = '';
@@ -8852,21 +8909,27 @@
             });
             if (payBody) Array.from(payBody.rows).forEach(function (r) {
                 if ((r.getAttribute('data-row-type') || '') !== 'payment') return;
+                paymentRowCnt++;
                 paymentDone += getRowGrossFromValues(r, 4);
             });
+            if (paymentRowCnt === 0 && estRow) {
+                paymentDone = Number(estRow.aggregatePaymentGross) || 0;
+            }
             if (purchaseBody) Array.from(purchaseBody.rows).forEach(function (r) {
                 if ((r.getAttribute('data-row-type') || 'purchase') !== 'purchase') return;
+                purchaseRowCnt++;
                 purchaseTotal += getRowGrossFromValues(r, 4);
                 purchaseNet += getRowNetFromValues(r, 2);
             });
             if (transferBody) Array.from(transferBody.rows).forEach(function (r) {
                 if ((r.getAttribute('data-row-type') || '') !== 'transfer') return;
+                transferRowCnt++;
                 transferDone += getRowGrossFromValues(r, 4);
             });
+            if (transferRowCnt === 0 && estRow) {
+                transferDone = Number(estRow.aggregateTransferGross) || 0;
+            }
 
-            const estRow = estimates.find(function (e) { return e.code === code; });
-            const salesRowCnt = salesBody ? salesBody.rows.length : 0;
-            const purchaseRowCnt = purchaseBody ? purchaseBody.rows.length : 0;
             if (!salesTotal && !salesRowCnt && estRow && estRow.revenue) salesTotal = estRow.revenue;
             if (!purchaseTotal && !purchaseRowCnt && estRow && estRow.purchase) purchaseTotal = estRow.purchase;
 
@@ -8885,6 +8948,10 @@
                 estRow.aggregatePurchaseGross = purchaseTotal;
                 estRow.aggregateTransferGross = transferDone;
                 estRow.salesDates = salesDates;
+                estRow.salesRows = (salesBody ? Array.from(salesBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'sales').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.salesRows || []));
+                estRow.paymentRows = (payBody ? Array.from(payBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'payment').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.paymentRows || []));
+                estRow.purchaseRows = (purchaseBody ? Array.from(purchaseBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'purchase').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.purchaseRows || []));
+                estRow.transferRows = (transferBody ? Array.from(transferBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'transfer').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.transferRows || []));
             }
             if (currentEditItem && currentEditItem.code === code) {
                 currentEditItem.aggregateSalesGross = salesTotal;
@@ -8892,6 +8959,10 @@
                 currentEditItem.aggregatePurchaseGross = purchaseTotal;
                 currentEditItem.aggregateTransferGross = transferDone;
                 currentEditItem.salesDates = salesDates;
+                currentEditItem.salesRows = (salesBody ? Array.from(salesBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'sales').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.salesRows || []));
+                currentEditItem.paymentRows = (payBody ? Array.from(payBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'payment').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.paymentRows || []));
+                currentEditItem.purchaseRows = (purchaseBody ? Array.from(purchaseBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'purchase').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.purchaseRows || []));
+                currentEditItem.transferRows = (transferBody ? Array.from(transferBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'transfer').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.transferRows || []));
             }
             let bizGrossForProfit = estRow ? (estRow.businessIncomeGross || 0) : 0;
             const bizInput = document.getElementById('biz_gross');
@@ -10149,6 +10220,10 @@
                     taxIssued: !!currentEditItem.taxIssued,
                     hasSales: false,
                     hasPurchase: false,
+                    salesRows: currentEditItem.salesRows || [],
+                    paymentRows: currentEditItem.paymentRows || [],
+                    purchaseRows: currentEditItem.purchaseRows || [],
+                    transferRows: currentEditItem.transferRows || [],
                     businessIncomeTransferDate: currentEditItem.businessIncomeTransferDate || '',
                     businessIncomeGross: currentEditItem.businessIncomeGross || 0,
                     businessIncomeNetPay: currentEditItem.businessIncomeNetPay || 0,
