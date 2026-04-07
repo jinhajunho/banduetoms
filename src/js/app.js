@@ -978,6 +978,29 @@
             }
         }
 
+        function estimateCodeKey(code) {
+            return String(code == null ? '' : code).trim();
+        }
+        function findEstimateIndexByCode(code) {
+            const k = estimateCodeKey(code);
+            return estimates.findIndex(function (e) {
+                return estimateCodeKey(e && e.code) === k;
+            });
+        }
+        function findEstimateByCode(code) {
+            const ix = findEstimateIndexByCode(code);
+            return ix === -1 ? null : estimates[ix];
+        }
+
+        function derivePaidStatusFromAmounts(salesGross, paymentGross) {
+            const s = Math.round(Number(salesGross) || 0);
+            const p = Math.round(Number(paymentGross) || 0);
+            if (s <= 0) return '미수';
+            if (p <= 0) return '미수';
+            if (p >= s) return '전액';
+            return '부분';
+        }
+
         function buildFinanceRowsFromSummary(item) {
             if (!item) return;
             applyEstimateDefaultsAndSeed([item]);
@@ -1109,6 +1132,13 @@
                 .catch(function (e) {
                     return { ok: false, error: (e && e.message) || '견적 서버 저장 실패' };
                 });
+        }
+
+        /** 금융 행(매출/수금/매입/이체) 편집 후 `estimates` 스냅샷을 Supabase에 반영 */
+        function persistEstimateToServerByCode(code) {
+            const ix = findEstimateIndexByCode(code);
+            if (ix === -1) return Promise.resolve({ ok: false, error: '항목을 찾을 수 없습니다.' });
+            return upsertEstimateToServer(estimates[ix]);
         }
 
         function deleteEstimateFromServer(code) {
@@ -8296,10 +8326,7 @@
 
         // 프로젝트 상세 열기 (가운데 모달로 표시)
         function openPanel(code) {
-            const c = String(code == null ? '' : code).trim();
-            const item = estimates.find(function (e) {
-                return String(e && e.code != null ? e.code : '').trim() === c;
-            });
+            const item = findEstimateByCode(code);
             if (!item) return;
 
             currentEditItem = {...item};
@@ -9045,6 +9072,15 @@
             recalcFinanceSummaries(code);
             markPanelDirtyIfChanged();
             closeFinanceRowModal();
+            persistEstimateToServerByCode(code).then(function (r) {
+                if (!r.ok) {
+                    alert(r.error || '서버에 저장하지 못했습니다. 네트워크·로그인 상태를 확인해 주세요.');
+                    return;
+                }
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    showToast('서버에 저장되었습니다.');
+                }
+            });
         }
 
         function confirmDeleteFinanceRow() {
@@ -9055,6 +9091,15 @@
             recalcFinanceSummaries(code);
             markPanelDirtyIfChanged();
             closeFinanceRowModal();
+            persistEstimateToServerByCode(code).then(function (r) {
+                if (!r.ok) {
+                    alert(r.error || '서버에 저장하지 못했습니다. 네트워크·로그인 상태를 확인해 주세요.');
+                    return;
+                }
+                if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                    showToast('서버에 저장되었습니다.');
+                }
+            });
         }
 
         function parseWonTextToNumber(v) {
@@ -9125,10 +9170,8 @@
             const purchaseBody = document.getElementById('purchaseList-' + code);
             const transferBody = document.getElementById('transferList-' + code);
 
-            const codeKey = String(code == null ? '' : code).trim();
-            const estRow = estimates.find(function (e) {
-                return String(e && e.code != null ? e.code : '').trim() === codeKey;
-            });
+            const codeKey = estimateCodeKey(code);
+            const estRow = findEstimateByCode(codeKey);
             if (estRow) seedEstimateAggregates(estRow);
 
             let salesTotal = 0, paymentDone = 0, purchaseTotal = 0, transferDone = 0;
@@ -9200,10 +9243,13 @@
                         return String(r && r[5] ? r[5] : '').trim() === '발행';
                     });
                 }
+                estRow.revenue = salesTotal;
+                estRow.purchase = purchaseTotal;
+                estRow.paidStatus = derivePaidStatusFromAmounts(salesTotal, paymentDone);
             }
             if (
                 currentEditItem &&
-                String(currentEditItem.code != null ? currentEditItem.code : '').trim() === codeKey
+                estimateCodeKey(currentEditItem.code) === codeKey
             ) {
                 currentEditItem.aggregateSalesGross = salesTotal;
                 currentEditItem.aggregatePaymentGross = paymentDone;
@@ -9219,13 +9265,27 @@
                         return String(r && r[5] ? r[5] : '').trim() === '발행';
                     });
                 }
+                currentEditItem.revenue = salesTotal;
+                currentEditItem.purchase = purchaseTotal;
+                currentEditItem.paidStatus = derivePaidStatusFromAmounts(salesTotal, paymentDone);
+                const erEl = document.getElementById('edit_revenue');
+                if (erEl) erEl.value = String(Math.round(salesTotal));
+                const epEl = document.getElementById('edit_purchase');
+                if (epEl) epEl.value = String(Math.round(purchaseTotal));
+                const psEl = document.getElementById('edit_paidStatus');
+                if (psEl) psEl.value = currentEditItem.paidStatus;
+                const tiEl = document.getElementById('edit_taxIssued');
+                if (tiEl && (currentEditItem.salesRows || []).length > 0) {
+                    tiEl.value = currentEditItem.taxIssued ? 'true' : 'false';
+                }
             }
             let bizGrossForProfit = estRow ? (estRow.businessIncomeGross || 0) : 0;
             const bizInput = document.getElementById('biz_gross');
-            if (bizInput && currentEditItem && currentEditItem.code === code && (currentEditItem.type === '세금계산서' || currentEditItem.type === '사업소득')) {
+            if (bizInput && currentEditItem && estimateCodeKey(currentEditItem.code) === codeKey && (currentEditItem.type === '세금계산서' || currentEditItem.type === '사업소득')) {
                 bizGrossForProfit = computeBizTaxFromGross(bizInput.value).gross;
             }
             updateProfitAnalysisSummary(code, salesNet, purchaseNet, bizGrossForProfit);
+            renderTable({ preservePage: true });
         }
 
         function applySameFromSourceToFinanceModal() {
@@ -10345,7 +10405,7 @@
 
             readBusinessIncomeFormIntoItem(currentEditItem);
 
-            const index = estimates.findIndex(e => e.code === currentEditItem.code);
+            const index = findEstimateIndexByCode(currentEditItem.code);
             if (index !== -1) {
                 estimates[index] = { ...estimates[index], ...currentEditItem };
                 const remote = await upsertEstimateToServer(estimates[index]);
@@ -10383,7 +10443,7 @@
             // 입력 값 읽어서 derived 값(세금/실수령/지급여부 등)까지 currentEditItem에 반영
             readBusinessIncomeFormIntoItem(currentEditItem);
 
-            const index = estimates.findIndex(e => e.code === currentEditItem.code);
+            const index = findEstimateIndexByCode(currentEditItem.code);
             if (index !== -1) {
                 estimates[index] = { ...estimates[index], ...currentEditItem };
                 const remote = await upsertEstimateToServer(estimates[index]);
@@ -10406,7 +10466,7 @@
                 return;
             }
             isEditMode = false;
-            const originalItem = estimates.find(e => e.code === currentEditItem.code);
+            const originalItem = findEstimateByCode(currentEditItem.code);
             if (originalItem) {
                 currentEditItem = {...originalItem};
                 renderPanelContent(currentEditItem);
@@ -10505,7 +10565,10 @@
                 setSaveLoading(false);
 
             } else {
-                // 기존 견적 수정
+                // 기존 견적 수정 — 금융 표 DOM → 집계/행 배열을 먼저 반영한 뒤 폼을 읽습니다.
+                if (currentEditItem && currentEditItem.code) {
+                    recalcFinanceSummaries(currentEditItem.code);
+                }
                 const editDateEl = document.getElementById('edit_date');
                 if (editDateEl) currentEditItem.date = editDateEl.value;
                 currentEditItem.status = document.getElementById('edit_status').value;
@@ -10537,7 +10600,7 @@
                 readBusinessIncomeFormIntoItem(currentEditItem);
 
                 // 원본 데이터 업데이트
-                const index = estimates.findIndex(e => e.code === currentEditItem.code);
+                const index = findEstimateIndexByCode(currentEditItem.code);
                 if (index !== -1) {
                     const updated = { ...currentEditItem };
                     const remoteEdit = await upsertEstimateToServer(updated);
@@ -10589,7 +10652,7 @@
 
         // 견적서 편집기 열기 (단계별 UI)
         function openEstimateEditor(code) {
-            const estimate = estimates.find(e => e.code === code);
+            const estimate = findEstimateByCode(code);
             if (!estimate) return;
             
             currentEditItem = {...estimate};
@@ -10958,7 +11021,7 @@
             currentEditItem.revenue = total;
             
             // 기존 견적 업데이트 또는 새 견적 추가
-            const existingIndex = estimates.findIndex(e => e.code === currentEditItem.code);
+            const existingIndex = findEstimateIndexByCode(currentEditItem.code);
             if (existingIndex >= 0) {
                 estimates[existingIndex] = {...currentEditItem};
             } else {
