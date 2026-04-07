@@ -9191,6 +9191,11 @@
                 estRow.paymentRows = (payBody ? Array.from(payBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'payment').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.paymentRows || []));
                 estRow.purchaseRows = (purchaseBody ? Array.from(purchaseBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'purchase').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.purchaseRows || []));
                 estRow.transferRows = (transferBody ? Array.from(transferBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'transfer').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.transferRows || []));
+                if ((estRow.salesRows || []).length > 0) {
+                    estRow.taxIssued = (estRow.salesRows || []).some(function (r) {
+                        return String(r && r[5] ? r[5] : '').trim() === '발행';
+                    });
+                }
             }
             if (currentEditItem && currentEditItem.code === code) {
                 currentEditItem.aggregateSalesGross = salesTotal;
@@ -9202,6 +9207,11 @@
                 currentEditItem.paymentRows = (payBody ? Array.from(payBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'payment').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.paymentRows || []));
                 currentEditItem.purchaseRows = (purchaseBody ? Array.from(purchaseBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'purchase').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.purchaseRows || []));
                 currentEditItem.transferRows = (transferBody ? Array.from(transferBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'transfer').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.transferRows || []));
+                if ((currentEditItem.salesRows || []).length > 0) {
+                    currentEditItem.taxIssued = (currentEditItem.salesRows || []).some(function (r) {
+                        return String(r && r[5] ? r[5] : '').trim() === '발행';
+                    });
+                }
             }
             let bizGrossForProfit = estRow ? (estRow.businessIncomeGross || 0) : 0;
             const bizInput = document.getElementById('biz_gross');
