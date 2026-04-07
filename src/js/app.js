@@ -944,6 +944,7 @@
                 if (e.businessIncomePaidStatus === undefined) e.businessIncomePaidStatus = '미지급';
                 if (e.salesDates === undefined) e.salesDates = [];
                 seedEstimateAggregates(e);
+                e.purchaseTaxIssued = derivePurchaseTaxIssuedFromRows(e.purchaseRows);
             });
         }
 
@@ -999,6 +1000,13 @@
             if (p <= 0) return '미수';
             if (p >= s) return '전액';
             return '부분';
+        }
+
+        function derivePurchaseTaxIssuedFromRows(purchaseRows) {
+            if (!Array.isArray(purchaseRows) || purchaseRows.length === 0) return false;
+            return purchaseRows.some(function (r) {
+                return String(r && r[5] ? r[5] : '').trim() === '발행';
+            });
         }
 
         function buildFinanceRowsFromSummary(item) {
@@ -1436,14 +1444,17 @@
         }
 
         function projectSalesPurchaseChipClass(isPurchaseSide, item, purchaseAmount) {
-            // 매출 칩은 구분(type)과 무관하게 세금계산서 발행 여부로만 색상 표시
+            // 매출 칩: 매출 행 기준 taxIssued(세금계산서 발행 여부)
             if (!isPurchaseSide) {
                 return item.taxIssued ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued';
             }
-            // 매입 칩은 기존 규칙 유지 (비세금계산서 또는 금액 0이면 회색)
+            // 매입 칩: 매입 행(values[5]) 발행/미발행만 반영 (매출 taxIssued와 무관)
             if (item.type !== '세금계산서') return 'table-amount-chip--na';
             if (purchaseAmount <= 0) return 'table-amount-chip--na';
-            return item.taxIssued ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued';
+            const pIssued = item.purchaseTaxIssued === true
+                ? true
+                : (item.purchaseTaxIssued === false ? false : derivePurchaseTaxIssuedFromRows(item.purchaseRows || []));
+            return pIssued ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued';
         }
 
         function tableAmountDash() {
@@ -4768,6 +4779,7 @@
                 aggregatePurchaseGross: 0,
                 aggregateTransferGross: 0,
                 salesDates: [],
+                purchaseTaxIssued: false,
             };
         }
 
@@ -8012,7 +8024,8 @@
                 aggregatePaymentGross: 0,
                 aggregatePurchaseGross: 0,
                 aggregateTransferGross: 0,
-                salesDates: []
+                salesDates: [],
+                purchaseTaxIssued: false
             };
 
             itemRows = [{
@@ -9243,6 +9256,7 @@
                         return String(r && r[5] ? r[5] : '').trim() === '발행';
                     });
                 }
+                estRow.purchaseTaxIssued = derivePurchaseTaxIssuedFromRows(estRow.purchaseRows || []);
                 estRow.revenue = salesTotal;
                 estRow.purchase = purchaseTotal;
                 estRow.paidStatus = derivePaidStatusFromAmounts(salesTotal, paymentDone);
@@ -9265,6 +9279,7 @@
                         return String(r && r[5] ? r[5] : '').trim() === '발행';
                     });
                 }
+                currentEditItem.purchaseTaxIssued = derivePurchaseTaxIssuedFromRows(currentEditItem.purchaseRows || []);
                 currentEditItem.revenue = salesTotal;
                 currentEditItem.purchase = purchaseTotal;
                 currentEditItem.paidStatus = derivePaidStatusFromAmounts(salesTotal, paymentDone);
@@ -10534,6 +10549,7 @@
                     paidStatus: currentEditItem.paidStatus,
                     purchase: (currentEditItem.type === '세금계산서' || currentEditItem.type === '사업소득') ? (currentEditItem.purchase || 0) : 0,
                     taxIssued: !!currentEditItem.taxIssued,
+                    purchaseTaxIssued: derivePurchaseTaxIssuedFromRows(currentEditItem.purchaseRows || []),
                     hasSales: false,
                     hasPurchase: false,
                     salesRows: currentEditItem.salesRows || [],
