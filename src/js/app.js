@@ -9125,7 +9125,10 @@
             const purchaseBody = document.getElementById('purchaseList-' + code);
             const transferBody = document.getElementById('transferList-' + code);
 
-            const estRow = estimates.find(function (e) { return e.code === code; });
+            const codeKey = String(code == null ? '' : code).trim();
+            const estRow = estimates.find(function (e) {
+                return String(e && e.code != null ? e.code : '').trim() === codeKey;
+            });
             if (estRow) seedEstimateAggregates(estRow);
 
             let salesTotal = 0, paymentDone = 0, purchaseTotal = 0, transferDone = 0;
@@ -9166,7 +9169,8 @@
                 transferDone += getRowGrossFromValues(r, 4);
             });
             if (transferRowCnt === 0 && estRow) {
-                transferDone = Number(estRow.aggregateTransferGross) || 0;
+                // 이체 행이 없으면 최신 매입 합계 기준 기본값(60%)으로 동기화
+                transferDone = purchaseTotal > 0 ? Math.round(purchaseTotal * 0.6) : 0;
             }
 
             if (!salesTotal && !salesRowCnt && estRow && estRow.revenue) salesTotal = estRow.revenue;
@@ -9197,7 +9201,10 @@
                     });
                 }
             }
-            if (currentEditItem && currentEditItem.code === code) {
+            if (
+                currentEditItem &&
+                String(currentEditItem.code != null ? currentEditItem.code : '').trim() === codeKey
+            ) {
                 currentEditItem.aggregateSalesGross = salesTotal;
                 currentEditItem.aggregatePaymentGross = paymentDone;
                 currentEditItem.aggregatePurchaseGross = purchaseTotal;
