@@ -4551,13 +4551,17 @@
         function downloadEstimateImportTemplate() {
             let csv = '\uFEFF';
             csv +=
-                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태\n' +
+                '구분,코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,일자,상호명,vat별도,부가세,vat포함,메모\n' +
                 csvEscape(
-                    '※ 첫 줄=헤더 고정. 아래 2행은 예시(삭제·수정). 코드 공란 시 신규 자동코드. 건물명·공사명·코드 중 하나 필수. 날짜 YYYY-MM-DD. 과세유형: 세금계산서/사업소득/자체인력. 수금: 미수/전액/부분/해당없음. 세금계산서발행: 미발행/발행완료. 사업소득 지급: 미지급/지급.'
+                    '※ 한 파일에 프로젝트/매출/수금/매입/이체를 함께 입력합니다. 구분=프로젝트|매출|수금|매입|이체. 프로젝트 행에는 요약컬럼을, 테이블행(매출/수금/매입/이체)에는 일자/상호명/vat별도/부가세/vat포함/메모를 입력하세요. vat포함만 채워도 되고(vat별도/부가세는 자동계산), 둘 다 채우면 vat포함을 우선합니다. 날짜는 YYYY-MM-DD.'
                 ) +
                 '\n' +
-                ',견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,12000000,미수,미발행,8000000,2026-01-15,,,0,,미지급\n' +
-                ',진행,B2C,개인,지원,빌라 101호,실내 도장,김철수,,사업소득,5000000,해당없음,,0,2026-02-01,2026-02-01,2026-02-28,5000000,2026-02-10,미지급\n';
+                '프로젝트,,견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,12000000,미수,미발행,8000000,2026-01-15,2026-04-06,2026-04-07,0,,미지급,,,,,,\n' +
+                '매출,26SAMPLE,,,,,,,,,, , ,미발행,, , , , , , ,2026-04-06,(주)예시건설,,,,12000000,1차 매출\n' +
+                '수금,26SAMPLE,,,,,,,,,, , , , , , , , , , ,2026-04-10,(주)예시건설,,,,6000000,1차 수금\n' +
+                '수금,26SAMPLE,,,,,,,,,, , , , , , , , , , ,2026-04-20,(주)예시건설,,,,6000000,2차 수금\n' +
+                '매입,26SAMPLE,,,,,,,,,, , ,미발행,8000000, , , , , , ,2026-04-08,영진인프라,,,,4800000,자재\n' +
+                '이체,26SAMPLE,,,,,,,,,, , , , , , , , , , ,2026-04-15,영진인프라,,,,2880000,1차 이체\n';
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -4579,6 +4583,8 @@
                 .toLowerCase()
                 .replace(/\s/g, '');
             var map = {
+                kind: 'kind',
+                구분: 'kind',
                 code: 'code',
                 코드: 'code',
                 status: 'status',
@@ -4623,6 +4629,18 @@
                 businessincomepaidstatus: 'businessIncomePaidStatus',
                 사업소득지급상태: 'businessIncomePaidStatus',
                 소득지급: 'businessIncomePaidStatus',
+                rowdate: 'rowDate',
+                일자: 'rowDate',
+                rowname: 'rowName',
+                상호명: 'rowName',
+                vat별도: 'rowNet',
+                rownet: 'rowNet',
+                부가세: 'rowTax',
+                rowtax: 'rowTax',
+                vat포함: 'rowGross',
+                rowgross: 'rowGross',
+                memo: 'rowMemo',
+                메모: 'rowMemo',
             };
             return map[s] || s;
         }
@@ -4853,8 +4871,15 @@
                 var key = headerCells[hi];
                 if (key && idx[key] === undefined) idx[key] = hi;
             }
-            if (idx.code === undefined && idx.building === undefined && idx.project === undefined) {
-                return { ok: false, error: 'CSV에 코드·건물명·공사명 중 하나의 열이 필요합니다.' };
+            const hasKind = idx.kind !== undefined;
+            if (!hasKind) {
+                if (idx.code === undefined && idx.building === undefined && idx.project === undefined) {
+                    return { ok: false, error: 'CSV에 코드·건물명·공사명 중 하나의 열이 필요합니다.' };
+                }
+            } else {
+                if (idx.code === undefined) {
+                    return { ok: false, error: '구분이 있는 양식은 code(코드) 열이 필요합니다.' };
+                }
             }
 
             var dataRows = rows.slice(1);
@@ -4868,6 +4893,33 @@
             var previews = [];
             var pendingItems = [];
             var usedCodes = {};
+            var itemByCode = {};
+
+            function getOrCreateByCode(code, line) {
+                const c = String(code || '').trim();
+                if (!c) return null;
+                if (itemByCode[c]) return itemByCode[c];
+                const existing = estimates.find(function (e) { return String(e.code || '').trim() === c; });
+                const base = existing ? JSON.parse(JSON.stringify(existing)) : defaultEstimateShellForImport(c, line);
+                applyEstimateDefaultsAndSeed([base]);
+                itemByCode[c] = base;
+                return base;
+            }
+
+            function parseFinanceRowAmounts(rowMap) {
+                const gross = parseEstimateImportNumber(rowMap.rowGross);
+                if (gross !== null) {
+                    if (Number.isNaN(gross)) return { ok: false, err: 'vat포함(rowGross)은 숫자여야 합니다.' };
+                    const parts = splitNetTaxFromGross(Math.round(gross));
+                    return { ok: true, net: parts.net, tax: parts.tax, gross: parts.gross };
+                }
+                const net = parseEstimateImportNumber(rowMap.rowNet);
+                if (net === null) return { ok: true, net: 0, tax: 0, gross: 0 };
+                if (Number.isNaN(net)) return { ok: false, err: 'vat별도(rowNet)은 숫자여야 합니다.' };
+                const n = Math.round(net);
+                const t = Math.round(n * 0.1);
+                return { ok: true, net: n, tax: t, gross: n + t };
+            }
 
             for (var ri = 0; ri < dataRows.length; ri++) {
                 var line = ri + 2;
@@ -4877,6 +4929,7 @@
                     rowMap[k] = cells[idx[k]] != null ? cells[idx[k]] : '';
                 });
 
+                var kindCell = hasKind ? String(rowMap.kind != null ? rowMap.kind : '').trim() : '';
                 var codeCell = String(rowMap.code != null ? rowMap.code : '').trim();
                 var buildingCell = String(rowMap.building != null ? rowMap.building : '').trim();
                 var projectCell = String(rowMap.project != null ? rowMap.project : '').trim();
@@ -4889,68 +4942,142 @@
                 var noteSkip = String(cells[0] != null ? cells[0] : '').trim();
                 if (noteSkip.indexOf('※') === 0 || noteSkip.indexOf('#') === 0) continue;
 
-                if (!codeCell && !buildingCell && !projectCell) {
-                    previews.push({
-                        line: line,
-                        codeDisp: '-',
-                        building: '-',
-                        err: '코드 또는 건물명/공사명 중 하나는 필요합니다.',
-                    });
-                    continue;
-                }
-
-                var base;
-                if (codeCell) {
-                    if (usedCodes[codeCell]) {
-                        previews.push({
-                            line: line,
-                            codeDisp: codeCell,
-                            building: buildingCell || '-',
-                            err: 'CSV 안에서 코드가 중복되었습니다.',
-                        });
+                if (!hasKind) {
+                    // 구 양식(프로젝트 1행) 호환
+                    if (!codeCell && !buildingCell && !projectCell) {
+                        previews.push({ line: line, codeDisp: '-', building: '-', err: '코드 또는 건물명/공사명 중 하나는 필요합니다.' });
                         continue;
                     }
-                    usedCodes[codeCell] = true;
-                    var existing = estimates.find(function (e) {
-                        return String(e.code || '').trim() === codeCell;
-                    });
-                    if (existing) {
-                        base = JSON.parse(JSON.stringify(existing));
-                    } else {
-                        base = defaultEstimateShellForImport(codeCell, line);
-                    }
-                } else {
-                    base = defaultEstimateShellForImport('', line);
-                    usedCodes[String(base.code)] = true;
-                }
 
-                var rowErr = applyEstimateCsvRowToItem(base, rowMap);
-                if (rowErr) {
-                    previews.push({
-                        line: line,
-                        codeDisp: base.code || '-',
-                        building: (base.building || buildingCell || '-').slice(0, 40),
-                        err: rowErr,
-                    });
+                    var base;
+                    if (codeCell) {
+                        if (usedCodes[codeCell]) {
+                            previews.push({ line: line, codeDisp: codeCell, building: buildingCell || '-', err: 'CSV 안에서 코드가 중복되었습니다.' });
+                            continue;
+                        }
+                        usedCodes[codeCell] = true;
+                        var existing = estimates.find(function (e) { return String(e.code || '').trim() === codeCell; });
+                        base = existing ? JSON.parse(JSON.stringify(existing)) : defaultEstimateShellForImport(codeCell, line);
+                    } else {
+                        base = defaultEstimateShellForImport('', line);
+                        usedCodes[String(base.code)] = true;
+                    }
+
+                    var rowErr = applyEstimateCsvRowToItem(base, rowMap);
+                    if (rowErr) {
+                        previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: rowErr });
+                        continue;
+                    }
+
+                    applyEstimateDefaultsAndSeed([base]);
+                    seedEstimateAggregates(base);
+                    buildFinanceRowsFromSummary(base);
+
+                    previews.push({ line: line, codeDisp: base.code, building: (base.building || '-').slice(0, 40), err: '' });
+                    pendingItems.push(base);
                     continue;
                 }
 
-                applyEstimateDefaultsAndSeed([base]);
-                seedEstimateAggregates(base);
-                buildFinanceRowsFromSummary(base);
+                // 신 양식: 한 파일에 프로젝트/매출/수금/매입/이체 행 혼합
+                if (!codeCell) {
+                    previews.push({ line: line, codeDisp: '-', building: '-', err: '구분이 있는 행은 코드(code)가 필수입니다.' });
+                    continue;
+                }
+                const base2 = getOrCreateByCode(codeCell, line);
+                if (!base2) {
+                    previews.push({ line: line, codeDisp: codeCell || '-', building: '-', err: '코드를 찾을 수 없습니다.' });
+                    continue;
+                }
 
-                previews.push({
-                    line: line,
-                    codeDisp: base.code,
-                    building: (base.building || '-').slice(0, 40),
-                    err: '',
+                const k = kindCell.replace(/\s/g, '').toLowerCase();
+                const kind =
+                    (k === '프로젝트' || k === 'project' || k === 'estimate') ? 'project'
+                    : (k === '매출' || k === 'sales') ? 'sales'
+                    : (k === '수금' || k === 'payment') ? 'payment'
+                    : (k === '매입' || k === 'purchase') ? 'purchase'
+                    : (k === '이체' || k === 'transfer') ? 'transfer'
+                    : '';
+                if (!kind) {
+                    previews.push({ line: line, codeDisp: base2.code, building: (base2.building || '-').slice(0, 40), err: '구분(kind)은 프로젝트/매출/수금/매입/이체 중 하나여야 합니다.' });
+                    continue;
+                }
+
+                if (kind === 'project') {
+                    var perr = applyEstimateCsvRowToItem(base2, rowMap);
+                    if (perr) {
+                        previews.push({ line: line, codeDisp: base2.code, building: (base2.building || '-').slice(0, 40), err: perr });
+                        continue;
+                    }
+                    seedEstimateAggregates(base2);
+                    previews.push({ line: line, codeDisp: base2.code, building: (base2.building || '-').slice(0, 40), err: '' });
+                    continue;
+                }
+
+                const dt = String(rowMap.rowDate != null ? rowMap.rowDate : '').trim();
+                if (dt && !/^\d{4}-\d{2}-\d{2}$/.test(dt)) {
+                    previews.push({ line: line, codeDisp: base2.code, building: (base2.building || '-').slice(0, 40), err: '일자(rowDate)는 YYYY-MM-DD 형식이어야 합니다.' });
+                    continue;
+                }
+                const nm = String(rowMap.rowName != null ? rowMap.rowName : '').trim() || String(base2.contractor || base2.project || '-');
+                const memo = String(rowMap.rowMemo != null ? rowMap.rowMemo : '').trim();
+
+                const amt = parseFinanceRowAmounts(rowMap);
+                if (!amt.ok) {
+                    previews.push({ line: line, codeDisp: base2.code, building: (base2.building || '-').slice(0, 40), err: amt.err });
+                    continue;
+                }
+
+                if (kind === 'sales') {
+                    var taxTxt = String(rowMap.taxIssued != null ? rowMap.taxIssued : '').trim();
+                    if (taxTxt === '발행완료') taxTxt = '발행';
+                    if (taxTxt === '') taxTxt = '미발행';
+                    if (!Array.isArray(base2.salesRows)) base2.salesRows = [];
+                    base2.salesRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, (taxTxt === '발행' ? '발행' : '미발행'), '-', memo || 'CSV', null]);
+                } else if (kind === 'payment') {
+                    if (!Array.isArray(base2.paymentRows)) base2.paymentRows = [];
+                    base2.paymentRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, memo || 'CSV', null]);
+                } else if (kind === 'purchase') {
+                    var taxTxt2 = String(rowMap.taxIssued != null ? rowMap.taxIssued : '').trim();
+                    if (taxTxt2 === '발행완료') taxTxt2 = '발행';
+                    if (taxTxt2 === '') taxTxt2 = '미발행';
+                    if (!Array.isArray(base2.purchaseRows)) base2.purchaseRows = [];
+                    base2.purchaseRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, (taxTxt2 === '발행' ? '발행' : '미발행'), '-', memo || 'CSV', null]);
+                } else if (kind === 'transfer') {
+                    if (!Array.isArray(base2.transferRows)) base2.transferRows = [];
+                    base2.transferRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, memo || 'CSV', null]);
+                }
+
+                previews.push({ line: line, codeDisp: base2.code, building: (base2.building || '-').slice(0, 40), err: '' });
+            }
+
+            if (hasKind) {
+                const codes = Object.keys(itemByCode);
+                codes.forEach(function (c) {
+                    const it = itemByCode[c];
+                    // 요약 값이 비어있으면 행 합계로 채움
+                    const salesSum = (it.salesRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                    const paySum = (it.paymentRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                    const purSum = (it.purchaseRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                    const trSum = (it.transferRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
+                    if (!it.revenue && salesSum) it.revenue = salesSum;
+                    if (!it.purchase && purSum) it.purchase = purSum;
+                    it.aggregateSalesGross = salesSum || it.revenue || 0;
+                    it.aggregatePaymentGross = paySum;
+                    it.aggregatePurchaseGross = purSum || it.purchase || 0;
+                    it.aggregateTransferGross = trSum;
+                    if (it.revenue > 0) {
+                        if (paySum <= 0) it.paidStatus = '미수';
+                        else if (paySum >= it.revenue) it.paidStatus = '전액';
+                        else it.paidStatus = '부분';
+                    }
+                    if ((it.salesRows || []).some(function (r) { return String(r && r[5] || '') === '발행'; })) it.taxIssued = true;
+                    applyEstimateDefaultsAndSeed([it]);
+                    seedEstimateAggregates(it);
+                    pendingItems.push(it);
                 });
-                pendingItems.push(base);
             }
 
-            if (!pendingItems.length) {
-                return { ok: false, error: '반영할 유효 행이 없습니다.' };
-            }
+            if (!pendingItems.length) return { ok: false, error: '반영할 유효 행이 없습니다.' };
             var hasErrors = previews.some(function (p) {
                 return p.err;
             });
