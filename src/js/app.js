@@ -4551,17 +4551,17 @@
         function downloadEstimateImportTemplate() {
             let csv = '\uFEFF';
             csv +=
-                '구분,코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,일자,상호명,vat별도,부가세,vat포함,메모\n' +
+                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,매출행들,수금행들,매입행들,이체행들\n' +
                 csvEscape(
-                    '※ 한 파일에 프로젝트/매출/수금/매입/이체를 함께 입력합니다. 구분=프로젝트|매출|수금|매입|이체. 프로젝트 행에는 요약컬럼을, 테이블행(매출/수금/매입/이체)에는 일자/상호명/vat별도/부가세/vat포함/메모를 입력하세요. vat포함만 채워도 되고(vat별도/부가세는 자동계산), 둘 다 채우면 vat포함을 우선합니다. 날짜는 YYYY-MM-DD.'
+                    '※ 한 프로젝트를 한 행에 입력합니다. 매출행들/수금행들/매입행들/이체행들 형식: 일자|상호명|vat포함|메모 를 ; 로 여러 건 연결. 고급 형식: 일자|상호명|vat별도|부가세|vat포함|메모. 날짜는 YYYY-MM-DD.'
                 ) +
                 '\n' +
-                '프로젝트,,견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,12000000,미수,미발행,8000000,2026-01-15,2026-04-06,2026-04-07,0,,미지급,,,,,,\n' +
-                '매출,26SAMPLE,,,,,,,,,, , ,미발행,, , , , , , ,2026-04-06,(주)예시건설,,,,12000000,1차 매출\n' +
-                '수금,26SAMPLE,,,,,,,,,, , , , , , , , , , ,2026-04-10,(주)예시건설,,,,6000000,1차 수금\n' +
-                '수금,26SAMPLE,,,,,,,,,, , , , , , , , , , ,2026-04-20,(주)예시건설,,,,6000000,2차 수금\n' +
-                '매입,26SAMPLE,,,,,,,,,, , ,미발행,8000000, , , , , , ,2026-04-08,영진인프라,,,,4800000,자재\n' +
-                '이체,26SAMPLE,,,,,,,,,, , , , , , , , , , ,2026-04-15,영진인프라,,,,2880000,1차 이체\n';
+                ',견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,12000000,미수,미발행,8000000,2026-01-15,2026-04-06,2026-04-07,0,,미지급,' +
+                csvEscape('2026-04-06|(주)예시건설|12000000|1차 매출') + ',' +
+                csvEscape('2026-04-10|(주)예시건설|6000000|1차 수금;2026-04-20|(주)예시건설|6000000|2차 수금') + ',' +
+                csvEscape('2026-04-08|영진인프라|4800000|자재') + ',' +
+                csvEscape('2026-04-15|영진인프라|2880000|1차 이체') +
+                '\n';
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -4641,6 +4641,14 @@
                 rowgross: 'rowGross',
                 memo: 'rowMemo',
                 메모: 'rowMemo',
+                salesrows: 'salesRows',
+                매출행들: 'salesRows',
+                paymentrows: 'paymentRows',
+                수금행들: 'paymentRows',
+                purchaserows: 'purchaseRows',
+                매입행들: 'purchaseRows',
+                transferrows: 'transferRows',
+                이체행들: 'transferRows',
             };
             return map[s] || s;
         }
@@ -4921,6 +4929,50 @@
                 return { ok: true, net: n, tax: t, gross: n + t };
             }
 
+            function parsePackedRows(raw, fallbackDate, fallbackName, defaultMemo) {
+                const s = String(raw == null ? '' : raw).trim();
+                if (!s) return { ok: true, rows: [] };
+                const chunks = s
+                    .split(';')
+                    .map(function (x) { return String(x).trim(); })
+                    .filter(Boolean);
+                const outRows = [];
+                for (var ci = 0; ci < chunks.length; ci++) {
+                    var parts = chunks[ci].split('|').map(function (x) { return String(x).trim(); });
+                    if (parts.length < 3) {
+                        return { ok: false, err: '테이블행 컬럼 형식 오류: ' + chunks[ci] };
+                    }
+                    var d = parts[0] || fallbackDate;
+                    if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+                        return { ok: false, err: '테이블행 날짜는 YYYY-MM-DD 형식이어야 합니다.' };
+                    }
+                    var nm = parts[1] || fallbackName || '-';
+                    var net = 0, tax = 0, gross = 0, memo = '';
+                    if (parts.length >= 6) {
+                        // 일자|상호명|vat별도|부가세|vat포함|메모
+                        var n = parseEstimateImportNumber(parts[2]);
+                        var t = parseEstimateImportNumber(parts[3]);
+                        var g = parseEstimateImportNumber(parts[4]);
+                        if (Number.isNaN(n) || Number.isNaN(t) || Number.isNaN(g)) {
+                            return { ok: false, err: '테이블행 금액은 숫자여야 합니다.' };
+                        }
+                        net = Math.round(n || 0);
+                        tax = Math.round(t || 0);
+                        gross = Math.round(g || (net + tax));
+                        memo = parts[5] || defaultMemo || 'CSV';
+                    } else {
+                        // 일자|상호명|vat포함|메모
+                        var g2 = parseEstimateImportNumber(parts[2]);
+                        if (Number.isNaN(g2)) return { ok: false, err: '테이블행 vat포함은 숫자여야 합니다.' };
+                        var p2 = splitNetTaxFromGross(Math.round(g2 || 0));
+                        net = p2.net; tax = p2.tax; gross = p2.gross;
+                        memo = (parts[3] || defaultMemo || 'CSV');
+                    }
+                    outRows.push([d || fallbackDate || new Date().toISOString().slice(0, 10), nm, net, tax, gross, memo]);
+                }
+                return { ok: true, rows: outRows };
+            }
+
             for (var ri = 0; ri < dataRows.length; ri++) {
                 var line = ri + 2;
                 var cells = dataRows[ri];
@@ -4971,7 +5023,45 @@
 
                     applyEstimateDefaultsAndSeed([base]);
                     seedEstimateAggregates(base);
-                    buildFinanceRowsFromSummary(base);
+                    var defaultDate = base.date || new Date().toISOString().slice(0, 10);
+                    var defaultName = String(base.contractor || base.project || '-');
+
+                    var salesPacked = parsePackedRows(rowMap.salesRows, defaultDate, defaultName, 'CSV');
+                    if (!salesPacked.ok) {
+                        previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: salesPacked.err });
+                        continue;
+                    }
+                    var payPacked = parsePackedRows(rowMap.paymentRows, defaultDate, defaultName, 'CSV');
+                    if (!payPacked.ok) {
+                        previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: payPacked.err });
+                        continue;
+                    }
+                    var purchasePacked = parsePackedRows(rowMap.purchaseRows, defaultDate, defaultName, 'CSV');
+                    if (!purchasePacked.ok) {
+                        previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: purchasePacked.err });
+                        continue;
+                    }
+                    var transferPacked = parsePackedRows(rowMap.transferRows, defaultDate, defaultName, 'CSV');
+                    if (!transferPacked.ok) {
+                        previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: transferPacked.err });
+                        continue;
+                    }
+
+                    if (salesPacked.rows.length) {
+                        base.salesRows = salesPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], base.taxIssued ? '발행' : '미발행', '-', r[5], null]; });
+                    }
+                    if (payPacked.rows.length) {
+                        base.paymentRows = payPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], r[5], null]; });
+                    }
+                    if (purchasePacked.rows.length) {
+                        base.purchaseRows = purchasePacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], '미발행', '-', r[5], null]; });
+                    }
+                    if (transferPacked.rows.length) {
+                        base.transferRows = transferPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], r[5], null]; });
+                    }
+                    if (!salesPacked.rows.length && !payPacked.rows.length && !purchasePacked.rows.length && !transferPacked.rows.length) {
+                        buildFinanceRowsFromSummary(base);
+                    }
 
                     previews.push({ line: line, codeDisp: base.code, building: (base.building || '-').slice(0, 40), err: '' });
                     pendingItems.push(base);
