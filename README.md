@@ -106,14 +106,15 @@ npm run dev
 - **경비지출관리:** `index.html#expenses`
 - **사용자관리:** `index.html#users`
 
-### 개별 페이지 (레거시, 참고용)
-- **견적서 관리:** `estimate.html`
+### 개별 HTML (레거시, 참고용 — SPA 미사용 시에만)
 - **업체정보 관리:** `contractors.html`
 - **경비지출 관리:** `expenses.html`
 - **경영실적 관리:** `performance.html`
 - **주간보고:** `weekly.html`
 - **미수금:** `unpaid.html`
 - **사용자관리:** `users.html`
+
+프로젝트 관리(견적)는 **`index.html#estimate`** 만 사용하며, 본문 마크업은 **`public/partials/page-estimate.html`** 입니다. (루트 `estimate.html`은 제거됨.)
 
 ## 🔄 최근 구현된 기능 (2026-03-13)
 
@@ -134,7 +135,7 @@ npm run dev
 ### 1️⃣ 미리보기 모달 최상단 표시
 - **목적:** 파일/이미지 미리보기 시 다른 UI 요소보다 앞에 표시
 - **구현:** `.image-modal` CSS에 `z-index: 3000` 적용
-- **위치:** estimate.html, contractors.html, expenses.html
+- **위치:** `index.html` + `public/partials/page-*.html` (통합 SPA)
 
 ### 2️⃣ 메모(비고) 필드 추가
 - **위치:** 

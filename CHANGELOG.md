@@ -1,5 +1,9 @@
 # 변경 이력 (Change Log)
 
+## 2026-04-08 - 레거시 `estimate.html` 제거
+- 프로젝트 관리 진입: `index.html#estimate` — 본문 `public/partials/page-estimate.html`, 로직 `src/js/app.js`
+- 루트에 있던 단일 페이지 `estimate.html`(레거시) 삭제 — 실제 앱은 사용하지 않음
+
 ## 2026-03-13 - SPA (Single Page Application) 통합 ⭐ **NEW**
 
 ### ✅ 완료된 주요 기능
@@ -217,7 +221,7 @@ window.addEventListener('hashchange', function() {
 
 ### 📁 수정된 파일
 - `index.html` (164KB+) - **NEW** 통합 SPA 메인 페이지
-- `estimate.html` (164KB) - 레거시, 참고용
+- ~~`estimate.html`~~ — 후일 제거됨 (2026-04-08, `public/partials/page-estimate.html`로 대체)
 - `contractors.html` - 레거시, 참고용
 - `expenses.html` - 레거시, 참고용
 - `performance.html` - 레거시, 참고용
