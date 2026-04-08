@@ -1,7 +1,7 @@
 ﻿                <div class="page-header" style="align-items: flex-start;">
                     <div style="min-width: 0;">
                         <h1 class="page-title">미수금 관리</h1>
-                        <p style="font-size: 13px; color: var(--gray-600); margin: 8px 0 0; max-width: 720px;">프로젝트 <strong>매출 내역에 유효한 매출일</strong>이 있고, <strong>VAT포함 매출 합</strong>과 <strong>VAT포함 수금 합</strong>이 원 단위로 완전히 같지 않은 건만 표시합니다(1원 차이 포함). 표시 일자는 매출일 중 가장 늦은 날짜입니다. 아래 분류 필터로 범위를 좁힐 수 있습니다.</p>
+                        <p style="font-size: 13px; color: var(--gray-600); margin: 8px 0 0; max-width: 720px;">프로젝트 <strong>매출 내역에 유효한 매출일</strong>이 있고, <strong>VAT포함 매출 합</strong>과 <strong>VAT포함 수금 합</strong>이 원 단위로 완전히 같지 않은 건만 표시합니다(1원 차이 포함). 표시 일자는 매출일 중 가장 늦은 날짜입니다. 아래에서 대·중·소분류로 범위를 좁힐 수 있습니다.</p>
                     </div>
                     <div class="header-actions">
                         <button class="btn btn-secondary" onclick="downloadUnpaidCSV()">
@@ -24,21 +24,20 @@
                 </div>
 
                 <div class="table-section" style="margin-bottom: 16px;">
-                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
-                        <span style="font-size: 13px; color: var(--gray-600); font-weight: 600;">분류 필터</span>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px;">
-                            대분류
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;">
+                        <label class="unpaid-filter-label" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap;">
+                            <span>대분류</span>
                             <select id="unpaidFilterCat1" class="form-select" style="min-width: 140px;" onchange="onUnpaidFilterChange()"></select>
                         </label>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px;">
-                            중분류
+                        <label class="unpaid-filter-label" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap;">
+                            <span>중분류</span>
                             <select id="unpaidFilterCat2" class="form-select" style="min-width: 140px;" onchange="onUnpaidFilterChange()"></select>
                         </label>
-                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px;">
-                            소분류
+                        <label class="unpaid-filter-label" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap;">
+                            <span>소분류</span>
                             <select id="unpaidFilterCat3" class="form-select" style="min-width: 140px;" onchange="onUnpaidFilterChange()"></select>
                         </label>
-                        <button type="button" class="btn btn-secondary" style="margin-left: 4px;" onclick="clearUnpaidFilters()">필터 초기화</button>
+                        <button type="button" class="btn btn-secondary" onclick="clearUnpaidFilters()">필터 초기화</button>
                     </div>
                 </div>
 
@@ -52,14 +51,11 @@
                                 <th>공사명</th>
                                 <th>매출일자</th>
                                 <th class="text-right">매출금액(vat별도)</th>
-                                <th>대분류</th>
-                                <th>중분류</th>
-                                <th>소분류</th>
                             </tr>
                         </thead>
                         <tbody id="unpaidTableBody">
                             <tr>
-                                <td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                                <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">
                                     미수금 내역이 없습니다
                                 </td>
                             </tr>

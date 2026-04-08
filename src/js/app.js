@@ -7170,11 +7170,11 @@
             return unpaidRoundedSalesGross(e) !== unpaidRoundedPaymentGross(e);
         }
 
+        /** VAT포함 차이를 한 번에 별도로 환산(행별 round(매출총)-round(수금총) 방식과 어긋나 0으로 뭉개지는 경우 방지) */
         function unpaidShortNetFromItem(e) {
-            const revNet = unpaidVatExclusiveFromGross(e.revenue);
-            const payGross = unpaidRoundedPaymentGross(e);
-            const payNet = unpaidVatExclusiveFromGross(payGross);
-            return Math.max(0, revNet - payNet);
+            const revG = unpaidRoundedSalesGross(e);
+            const payG = unpaidRoundedPaymentGross(e);
+            return Math.max(0, Math.round((revG - payG) / 1.1));
         }
 
         function getUnpaidSortedPool() {
@@ -7275,15 +7275,12 @@
             const tbody = document.getElementById('unpaidTableBody');
             if (!tbody) return;
             if (unpaidItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-500);">미수금 내역이 없습니다</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">미수금 내역이 없습니다</td></tr>';
             } else {
                 tbody.innerHTML = unpaidItems.map(function (item, idx) {
                     const salesDate = getUnpaidSalesDisplayDate(item);
                     const revenueNet = unpaidVatExclusiveFromGross(item.revenue);
                     const rowNum = idx + 1;
-                    const c1 = String(item.category1 || '').trim() || '-';
-                    const c2 = String(item.category2 || '').trim() || '-';
-                    const c3 = String(item.category3 || '').trim() || '-';
                     return `
                         <tr>
                             <td>${rowNum}</td>
@@ -7291,9 +7288,6 @@
                             <td>${item.project || ''}</td>
                             <td>${salesDate}</td>
                             <td class="text-right">${revenueNet.toLocaleString()}원</td>
-                            <td>${c1}</td>
-                            <td>${c2}</td>
-                            <td>${c3}</td>
                         </tr>
                     `;
                 }).join('');
@@ -7311,7 +7305,7 @@
             const f = getUnpaidFilterTriple();
             const rows = filterUnpaidPool(pool, f.cat1, f.cat2, f.cat3);
             let csv = '\uFEFF';
-            csv += '순번,건물명,공사명,매출일자,매출금액_vat별도,대분류,중분류,소분류,수금_vat포함,매출_vat포함,미수금_vat별도\n';
+            csv += '순번,건물명,공사명,매출일자,매출금액_vat별도,수금_vat포함,매출_vat포함,미수금_vat별도\n';
             rows.forEach(function (item, idx) {
                 const salesDate = getUnpaidSalesDisplayDate(item);
                 const revenueNet = unpaidVatExclusiveFromGross(item.revenue);
@@ -7324,9 +7318,6 @@
                     escapeCsvField(item.project || ''),
                     escapeCsvField(salesDate),
                     String(revenueNet),
-                    escapeCsvField(item.category1 || ''),
-                    escapeCsvField(item.category2 || ''),
-                    escapeCsvField(item.category3 || ''),
                     String(payG),
                     String(revG),
                     String(shortN),
