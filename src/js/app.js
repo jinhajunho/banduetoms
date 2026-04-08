@@ -7149,28 +7149,123 @@
             }, dates[0]);
         }
 
-        function renderUnpaidData() {
-            const unpaidItems = estimates.filter(function (e) {
-                const cat = String(e.category1 || '').trim();
-                if (cat !== 'B2C') return false;
-                if (e.paidStatus !== '미수' && e.paidStatus !== '부분') return false;
-                return !!getUnpaidSalesDisplayDate(e);
-            }).slice();
-            unpaidItems.sort(function (a, b) {
+        function unpaidVatExclusiveFromGross(gross) {
+            return Math.round((Number(gross) || 0) / 1.1);
+        }
+
+        function unpaidRoundedSalesGross(e) {
+            return Math.round(Number(e.revenue) || 0);
+        }
+
+        function unpaidRoundedPaymentGross(e) {
+            if (e.aggregatePaymentGross == null || e.aggregatePaymentGross === undefined) {
+                seedEstimateAggregates(e);
+            }
+            return Math.round(Number(e.aggregatePaymentGross) || 0);
+        }
+
+        /** 매출일 있음 + VAT포함 매출·수금 원단위 불일치(1원 차이 포함) */
+        function unpaidItemIsMismatch(e) {
+            if (!getUnpaidSalesDisplayDate(e)) return false;
+            return unpaidRoundedSalesGross(e) !== unpaidRoundedPaymentGross(e);
+        }
+
+        function unpaidShortNetFromItem(e) {
+            const revNet = unpaidVatExclusiveFromGross(e.revenue);
+            const payGross = unpaidRoundedPaymentGross(e);
+            const payNet = unpaidVatExclusiveFromGross(payGross);
+            return Math.max(0, revNet - payNet);
+        }
+
+        function getUnpaidSortedPool() {
+            return estimates.filter(unpaidItemIsMismatch).sort(function (a, b) {
                 const aSales = getUnpaidSalesDisplayDate(a);
                 const bSales = getUnpaidSalesDisplayDate(b);
                 if (aSales === bSales) return 0;
                 return aSales < bSales ? 1 : -1;
             });
+        }
 
-            const vatExclusive = (amount) => Math.round((Number(amount) || 0) / 1.1);
-            const fullUnpaidNet = unpaidItems
-                .filter(e => e.paidStatus === '미수')
-                .reduce((sum, item) => sum + vatExclusive(item.revenue), 0);
-            const partialUnpaidNet = unpaidItems
-                .filter(e => e.paidStatus === '부분')
-                .reduce((sum, item) => sum + Math.round(vatExclusive(item.revenue) * 0.5), 0); // 가정: 50% 미수
-            const totalUnpaidNet = fullUnpaidNet + partialUnpaidNet;
+        function unpaidFilterSelectFill(el, values, preferred) {
+            if (!el) return '';
+            const sorted = values.slice().sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+            let keep = preferred && sorted.indexOf(preferred) !== -1 ? preferred : '';
+            el.innerHTML = '';
+            const o0 = document.createElement('option');
+            o0.value = '';
+            o0.textContent = '전체';
+            el.appendChild(o0);
+            sorted.forEach(function (v) {
+                const o = document.createElement('option');
+                o.value = v;
+                o.textContent = v;
+                el.appendChild(o);
+            });
+            el.value = keep;
+            return el.value;
+        }
+
+        function syncUnpaidFilterSelects(pool) {
+            const el1 = document.getElementById('unpaidFilterCat1');
+            const el2 = document.getElementById('unpaidFilterCat2');
+            const el3 = document.getElementById('unpaidFilterCat3');
+            if (!el1 || !el2 || !el3) return;
+
+            const uniq = function (list, getCat) {
+                return Array.from(new Set(list.map(function (x) {
+                    const v = getCat(x);
+                    return String(v == null ? '' : v).trim();
+                }).filter(Boolean)));
+            };
+
+            const v1 = unpaidFilterSelectFill(el1, uniq(pool, function (e) { return e.category1; }), el1.value || '');
+            const p1 = v1 ? pool.filter(function (e) { return String(e.category1 || '').trim() === v1; }) : pool;
+            const v2 = unpaidFilterSelectFill(el2, uniq(p1, function (e) { return e.category2; }), el2.value || '');
+            const p2 = v2 ? p1.filter(function (e) { return String(e.category2 || '').trim() === v2; }) : p1;
+            unpaidFilterSelectFill(el3, uniq(p2, function (e) { return e.category3; }), el3.value || '');
+        }
+
+        function getUnpaidFilterTriple() {
+            const el1 = document.getElementById('unpaidFilterCat1');
+            const el2 = document.getElementById('unpaidFilterCat2');
+            const el3 = document.getElementById('unpaidFilterCat3');
+            return {
+                cat1: el1 && el1.value ? String(el1.value).trim() : '',
+                cat2: el2 && el2.value ? String(el2.value).trim() : '',
+                cat3: el3 && el3.value ? String(el3.value).trim() : '',
+            };
+        }
+
+        function filterUnpaidPool(pool, cat1, cat2, cat3) {
+            return pool.filter(function (e) {
+                if (cat1 && String(e.category1 || '').trim() !== cat1) return false;
+                if (cat2 && String(e.category2 || '').trim() !== cat2) return false;
+                if (cat3 && String(e.category3 || '').trim() !== cat3) return false;
+                return true;
+            });
+        }
+
+        function onUnpaidFilterChange() {
+            renderUnpaidData();
+        }
+
+        function clearUnpaidFilters() {
+            ['unpaidFilterCat1', 'unpaidFilterCat2', 'unpaidFilterCat3'].forEach(function (id) {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            renderUnpaidData();
+        }
+
+        function renderUnpaidData() {
+            const pool = getUnpaidSortedPool();
+            syncUnpaidFilterSelects(pool);
+            const f = getUnpaidFilterTriple();
+            const unpaidItems = filterUnpaidPool(pool, f.cat1, f.cat2, f.cat3);
+
+            const totalUnpaidNet = unpaidItems.reduce(function (sum, item) {
+                return sum + unpaidShortNetFromItem(item);
+            }, 0);
 
             const countEl = document.getElementById('unpaidCount');
             if (countEl) countEl.textContent = unpaidItems.length.toLocaleString() + '건';
@@ -7178,28 +7273,76 @@
             if (totalEl) totalEl.textContent = totalUnpaidNet.toLocaleString() + '원';
 
             const tbody = document.getElementById('unpaidTableBody');
+            if (!tbody) return;
             if (unpaidItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">미수금 내역이 없습니다</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-500);">미수금 내역이 없습니다</td></tr>';
             } else {
-                tbody.innerHTML = unpaidItems.map((item, idx) => {
+                tbody.innerHTML = unpaidItems.map(function (item, idx) {
                     const salesDate = getUnpaidSalesDisplayDate(item);
-                    const revenueNet = vatExclusive(item.revenue);
+                    const revenueNet = unpaidVatExclusiveFromGross(item.revenue);
                     const rowNum = idx + 1;
+                    const c1 = String(item.category1 || '').trim() || '-';
+                    const c2 = String(item.category2 || '').trim() || '-';
+                    const c3 = String(item.category3 || '').trim() || '-';
                     return `
                         <tr>
                             <td>${rowNum}</td>
+                            <td>${item.building || ''}</td>
+                            <td>${item.project || ''}</td>
                             <td>${salesDate}</td>
-                            <td>${item.building}</td>
-                            <td>${item.project}</td>
                             <td class="text-right">${revenueNet.toLocaleString()}원</td>
+                            <td>${c1}</td>
+                            <td>${c2}</td>
+                            <td>${c3}</td>
                         </tr>
                     `;
                 }).join('');
             }
         }
 
+        function escapeCsvField(val) {
+            const s = String(val == null ? '' : val);
+            if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+
         function downloadUnpaidCSV() {
-            alert('CSV 다운로드 기능은 개발 중입니다.');
+            const pool = getUnpaidSortedPool();
+            const f = getUnpaidFilterTriple();
+            const rows = filterUnpaidPool(pool, f.cat1, f.cat2, f.cat3);
+            let csv = '\uFEFF';
+            csv += '순번,건물명,공사명,매출일자,매출금액_vat별도,대분류,중분류,소분류,수금_vat포함,매출_vat포함,미수금_vat별도\n';
+            rows.forEach(function (item, idx) {
+                const salesDate = getUnpaidSalesDisplayDate(item);
+                const revenueNet = unpaidVatExclusiveFromGross(item.revenue);
+                const payG = unpaidRoundedPaymentGross(item);
+                const revG = unpaidRoundedSalesGross(item);
+                const shortN = unpaidShortNetFromItem(item);
+                const line = [
+                    String(idx + 1),
+                    escapeCsvField(item.building || ''),
+                    escapeCsvField(item.project || ''),
+                    escapeCsvField(salesDate),
+                    String(revenueNet),
+                    escapeCsvField(item.category1 || ''),
+                    escapeCsvField(item.category2 || ''),
+                    escapeCsvField(item.category3 || ''),
+                    String(payG),
+                    String(revG),
+                    String(shortN),
+                ].join(',');
+                csv += line + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', '미수금_' + new Date().toISOString().slice(0, 10) + '.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
 
         // ========================================
@@ -11275,6 +11418,8 @@
                 // 주간/미수금
                 downloadWeeklyCSV,
                 downloadUnpaidCSV,
+                onUnpaidFilterChange,
+                clearUnpaidFilters,
 
                 // 업체
                 downloadContractorCSV,
