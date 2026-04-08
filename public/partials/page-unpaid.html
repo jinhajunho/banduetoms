@@ -1,7 +1,7 @@
 ﻿                <div class="page-header" style="align-items: flex-start;">
                     <div style="min-width: 0;">
                         <h1 class="page-title">미수금 관리</h1>
-                        <p style="font-size: 13px; color: var(--gray-600); margin: 8px 0 0; max-width: 720px;">프로젝트 <strong>매출 내역에 유효한 매출일</strong>이 있고, <strong>VAT포함 매출 합</strong>과 <strong>VAT포함 수금 합</strong>이 원 단위로 완전히 같지 않은 건만 표시합니다(1원 차이 포함). 표시 일자는 매출일 중 가장 늦은 날짜입니다. 아래에서 대·중·소분류로 범위를 좁힐 수 있습니다.</p>
+                        <p style="font-size: 13px; color: var(--gray-600); margin: 8px 0 0; max-width: 720px;">프로젝트 <strong>매출 내역에 유효한 매출일</strong>이 있고, <strong>VAT포함 매출 합</strong>과 <strong>VAT포함 수금 합</strong>이 원 단위로 완전히 같지 않은 건만 표시합니다(1원 차이 포함). <strong>총 미수금</strong>은 건별 VAT포함 차이를 별도로 환산해 더한 값이며, 합계가 음수일 때 금액 옆에 <strong>(과수)</strong>가 붙습니다. 아래에서 대·중·소분류로 범위를 좁힐 수 있습니다.</p>
                     </div>
                     <div class="header-actions">
                         <button class="btn btn-secondary" onclick="downloadUnpaidCSV()">
@@ -51,11 +51,12 @@
                                 <th>공사명</th>
                                 <th>매출일자</th>
                                 <th class="text-right">매출금액(vat별도)</th>
+                                <th class="text-right">수금금액(vat별도)</th>
                             </tr>
                         </thead>
                         <tbody id="unpaidTableBody">
                             <tr>
-                                <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                                <td colspan="6" style="text-align: center; padding: 40px; color: var(--gray-500);">
                                     미수금 내역이 없습니다
                                 </td>
                             </tr>

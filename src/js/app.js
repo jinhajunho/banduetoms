@@ -7170,11 +7170,17 @@
             return unpaidRoundedSalesGross(e) !== unpaidRoundedPaymentGross(e);
         }
 
-        /** VAT포함 차이를 한 번에 별도로 환산(행별 round(매출총)-round(수금총) 방식과 어긋나 0으로 뭉개지는 경우 방지) */
-        function unpaidShortNetFromItem(e) {
+        /** VAT포함 차이를 한 번에 별도로 환산(수금이 더 크면 음수·과수) */
+        function unpaidBalanceNetFromItem(e) {
             const revG = unpaidRoundedSalesGross(e);
             const payG = unpaidRoundedPaymentGross(e);
-            return Math.max(0, Math.round((revG - payG) / 1.1));
+            return Math.round((revG - payG) / 1.1);
+        }
+
+        function formatUnpaidSignedWon(amount) {
+            const n = Math.round(Number(amount) || 0);
+            if (n === 0) return '0원';
+            return (n < 0 ? '\u2212' : '') + Math.abs(n).toLocaleString() + '원';
         }
 
         function getUnpaidSortedPool() {
@@ -7263,23 +7269,35 @@
             const f = getUnpaidFilterTriple();
             const unpaidItems = filterUnpaidPool(pool, f.cat1, f.cat2, f.cat3);
 
-            const totalUnpaidNet = unpaidItems.reduce(function (sum, item) {
-                return sum + unpaidShortNetFromItem(item);
+            const totalBalanceNet = unpaidItems.reduce(function (sum, item) {
+                return sum + unpaidBalanceNetFromItem(item);
             }, 0);
 
             const countEl = document.getElementById('unpaidCount');
             if (countEl) countEl.textContent = unpaidItems.length.toLocaleString() + '건';
             const totalEl = document.getElementById('totalUnpaid');
-            if (totalEl) totalEl.textContent = totalUnpaidNet.toLocaleString() + '원';
+            if (totalEl) {
+                totalEl.textContent =
+                    formatUnpaidSignedWon(totalBalanceNet) +
+                    (totalBalanceNet < 0 ? ' (과수)' : '');
+                if (totalBalanceNet < 0) {
+                    totalEl.style.color = 'var(--danger)';
+                } else if (totalBalanceNet > 0) {
+                    totalEl.style.color = 'var(--warning)';
+                } else {
+                    totalEl.style.color = 'var(--primary)';
+                }
+            }
 
             const tbody = document.getElementById('unpaidTableBody');
             if (!tbody) return;
             if (unpaidItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">미수금 내역이 없습니다</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--gray-500);">미수금 내역이 없습니다</td></tr>';
             } else {
                 tbody.innerHTML = unpaidItems.map(function (item, idx) {
                     const salesDate = getUnpaidSalesDisplayDate(item);
                     const revenueNet = unpaidVatExclusiveFromGross(item.revenue);
+                    const paymentNet = unpaidVatExclusiveFromGross(unpaidRoundedPaymentGross(item));
                     const rowNum = idx + 1;
                     return `
                         <tr>
@@ -7288,6 +7306,7 @@
                             <td>${item.project || ''}</td>
                             <td>${salesDate}</td>
                             <td class="text-right">${revenueNet.toLocaleString()}원</td>
+                            <td class="text-right">${paymentNet.toLocaleString()}원</td>
                         </tr>
                     `;
                 }).join('');
@@ -7305,22 +7324,18 @@
             const f = getUnpaidFilterTriple();
             const rows = filterUnpaidPool(pool, f.cat1, f.cat2, f.cat3);
             let csv = '\uFEFF';
-            csv += '순번,건물명,공사명,매출일자,매출금액_vat별도,수금_vat포함,매출_vat포함,미수금_vat별도\n';
+            csv += '순번,건물명,공사명,매출일자,매출금액_vat별도,수금금액_vat별도\n';
             rows.forEach(function (item, idx) {
                 const salesDate = getUnpaidSalesDisplayDate(item);
                 const revenueNet = unpaidVatExclusiveFromGross(item.revenue);
-                const payG = unpaidRoundedPaymentGross(item);
-                const revG = unpaidRoundedSalesGross(item);
-                const shortN = unpaidShortNetFromItem(item);
+                const paymentNet = unpaidVatExclusiveFromGross(unpaidRoundedPaymentGross(item));
                 const line = [
                     String(idx + 1),
                     escapeCsvField(item.building || ''),
                     escapeCsvField(item.project || ''),
                     escapeCsvField(salesDate),
                     String(revenueNet),
-                    String(payG),
-                    String(revG),
-                    String(shortN),
+                    String(paymentNet),
                 ].join(',');
                 csv += line + '\n';
             });
