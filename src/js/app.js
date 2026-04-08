@@ -8590,7 +8590,7 @@
                             <table class="payment-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 100px;">매출일자</th>
+                                        <th style="width: 100px;">매출일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
                                         <th style="width: 120px;">상호명</th>
                                         <th style="width: 92px;">매출금액(vat별도)</th>
                                         <th style="width: 88px;">부가세(vat)</th>
@@ -8625,7 +8625,7 @@
                             <table class="payment-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 100px;">수금일자</th>
+                                        <th style="width: 100px;">수금일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
                                         <th>상호명</th>
                                         <th style="width: 100px;">수금금액(vat별도)</th>
                                         <th style="width: 88px;">부가세(vat)</th>
@@ -8663,7 +8663,7 @@
                             <table class="payment-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 100px;">매입일자</th>
+                                        <th style="width: 100px;">매입일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
                                         <th style="width: 120px;">상호명</th>
                                         <th style="width: 100px;">매입금액(vat별도)</th>
                                         <th style="width: 88px;">부가세(vat)</th>
@@ -8696,7 +8696,7 @@
                             <table class="payment-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 100px;">이체일자</th>
+                                        <th style="width: 100px;">이체일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
                                         <th style="width: 160px;">상호명</th>
                                         <th style="width: 100px;">이체금액(vat별도)</th>
                                         <th style="width: 88px;">부가세(vat)</th>
@@ -8731,9 +8731,9 @@
                         </div>
                         <div class="detail-grid" style="max-width:520px;">
                             <div class="detail-row">
-                                <div class="detail-label">이체일</div>
+                                <div class="detail-label">이체일 <span style="font-weight:400;color:var(--gray-500);font-size:12px;">(선택)</span></div>
                                 <div class="detail-value">
-                                    <input type="date" class="form-input" id="biz_transfer_date" value="${item.businessIncomeTransferDate || ''}" ${(!businessInfoEditMode && !isEditMode && !isNewEstimate) ? 'disabled' : ''}>
+                                    <input type="date" class="form-input" id="biz_transfer_date" value="${item.businessIncomeTransferDate || ''}" title="선택 입력" ${(!businessInfoEditMode && !isEditMode && !isNewEstimate) ? 'disabled' : ''}>
                                 </div>
                             </div>
                             <div class="detail-row">
@@ -8885,9 +8885,9 @@
         function getRowValuesForModal(type, row) {
             if (!row) {
                 if (type === 'sales' || type === 'purchase') {
-                    return [new Date().toISOString().slice(0, 10), '', '', '', '', '미발행', '-', '', null];
+                    return ['', '', '', '', '', '미발행', '-', '', null];
                 }
-                return [new Date().toISOString().slice(0, 10), '', '', '', '', '', null];
+                return ['', '', '', '', '', '', null];
             }
             let values = [];
             if (row.dataset.rowValues) {
@@ -8994,7 +8994,7 @@
                                 : ''}
                         </div>
                         <div style="padding:14px 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
-                            <input id="fm_date" type="date" value="${values[0] || ''}" class="form-input">
+                            <input id="fm_date" type="date" value="${values[0] || ''}" class="form-input" title="선택 입력">
                             <input id="fm_name" type="text" value="${(values[1] || '').replace(/"/g, '&quot;')}" placeholder="상호명" class="form-input">
                             <input id="fm_net" type="number" value="${String(values[2] || '').replace(/,/g, '')}" placeholder="vat별도" class="form-input">
                             <input id="fm_tax" type="number" value="${String(values[3] || '').replace(/,/g, '')}" placeholder="부가세" class="form-input" readonly>
@@ -9052,7 +9052,7 @@
             const net = parseFloat(document.getElementById('fm_net').value || '0', 10) || 0;
             const gross = parseFloat(document.getElementById('fm_gross').value || '0', 10) || 0;
             const memo = document.getElementById('fm_memo').value.trim();
-            if (!date || !name || !gross) { alert('수금일자/상호명/금액은 필수입니다.'); return; }
+            if (!name || !gross) { alert('상호명과 금액(vat포함)은 필수입니다. 일자는 생략할 수 있습니다.'); return; }
             const parts = splitNetTaxFromGross(gross || Math.round(net * 1.1));
             let values;
             if (type === 'sales' || type === 'purchase') {
