@@ -921,6 +921,17 @@
 
         const estimates = [];
 
+        /** 매출 내역 행(values[0])에서 유효한 YYYY-MM-DD만 추출(경영실적·미수 등과 동일 규칙) */
+        function deriveSalesDatesFromSalesRows(salesRows) {
+            const out = [];
+            if (!Array.isArray(salesRows)) return out;
+            salesRows.forEach(function (r) {
+                const dt = r && r[0] != null ? String(r[0]).trim() : '';
+                if (dt && /^\d{4}-\d{2}-\d{2}/.test(dt)) out.push(dt.slice(0, 10));
+            });
+            return out;
+        }
+
         function applyEstimateDefaultsAndSeed(list) {
             (list || []).forEach(function(e) {
                 if (e.startDate || e.endDate) return;
@@ -942,7 +953,11 @@
                 if (e.businessIncomeGross === undefined) e.businessIncomeGross = 0;
                 if (e.businessIncomeTransferDate === undefined) e.businessIncomeTransferDate = '';
                 if (e.businessIncomePaidStatus === undefined) e.businessIncomePaidStatus = '미지급';
-                if (e.salesDates === undefined) e.salesDates = [];
+                if (e.salesRows.length > 0) {
+                    e.salesDates = deriveSalesDatesFromSalesRows(e.salesRows);
+                } else if (!Array.isArray(e.salesDates)) {
+                    e.salesDates = [];
+                }
                 seedEstimateAggregates(e);
                 e.purchaseTaxIssued = derivePurchaseTaxIssuedFromRows(e.purchaseRows);
             });
@@ -1058,6 +1073,9 @@
             if (purchaseGross > 0 && (!item.transferRows || item.transferRows.length === 0)) {
                 const tp = splitNetTaxFromGross(transferGross);
                 item.transferRows = [[d, name, tp.net, tp.tax, tp.gross, '이체(CSV)', null]];
+            }
+            if (item.salesRows && item.salesRows.length > 0) {
+                item.salesDates = deriveSalesDatesFromSalesRows(item.salesRows);
             }
         }
 
@@ -6471,7 +6489,7 @@
         }
 
         function getPerformanceSalesDateList(item) {
-            const raw = (item.salesDates && item.salesDates.length) ? item.salesDates : (item.date ? [item.date] : []);
+            const raw = (item.salesDates && item.salesDates.length) ? item.salesDates : [];
             return raw.map(function (x) { return String(x).trim().slice(0, 10); }).filter(function (d) {
                 return /^\d{4}-\d{2}-\d{2}/.test(d);
             });
@@ -6487,15 +6505,16 @@
 
         function itemMatchesPerformancePeriod(item) {
             const dates = getPerformanceSalesDateList(item);
-            if (performancePeriodMode === 'all') return dates.length > 0;
-            const allDates = dates;
+            if (!dates.length) return false;
 
+            if (performancePeriodMode === 'all') {
+                return true;
+            }
             if (performancePeriodMode === 'month') {
                 const inp = document.getElementById('performanceFilterMonth');
                 const m = inp && inp.value ? inp.value.trim() : '';
                 if (!/^\d{4}-\d{2}$/.test(m)) return true;
-                if (!allDates.length) return false;
-                return allDates.some(function (d) { return d.slice(0, 7) === m; });
+                return dates.some(function (d) { return d.slice(0, 7) === m; });
             }
             if (performancePeriodMode === 'range') {
                 const fromEl = document.getElementById('performanceDateFrom');
@@ -6504,8 +6523,7 @@
                 let to = toEl && toEl.value ? toEl.value : '';
                 if (!from || !to) return true;
                 if (from > to) { const t = from; from = to; to = t; }
-                if (!allDates.length) return false;
-                return allDates.some(function (d) { return d >= from && d <= to; });
+                return dates.some(function (d) { return d >= from && d <= to; });
             }
             return true;
         }
@@ -6671,8 +6689,9 @@
             }
 
             const data = estimates.filter(itemMatchesPerformancePeriod);
-            const sgaData = sgaExpenses.filter(sgaItemMatchesPerformancePeriod);
-            const includeSga = performanceSgaMode === 'include';
+            const toggleSgaOn = performanceSgaMode === 'include';
+            const sgaInEffect = toggleSgaOn && performancePeriodMode !== 'range';
+            const sgaData = sgaInEffect ? sgaExpenses.filter(sgaItemMatchesPerformancePeriod) : [];
             const totalSga = sgaData.reduce(function(sum, item) { return sum + (Number(item.amount) || 0); }, 0);
 
             const avgTotalsAll = getPerformanceAvgUnitTotals(data);
@@ -6680,7 +6699,7 @@
             // KPI 카드 업데이트
             const totalRevenue = data.reduce((sum, item) => sum + (item.revenue || 0), 0);
             const totalPurchase = data.reduce((sum, item) => sum + getItemPurchaseTotal(item), 0);
-            const totalProfit = totalRevenue - totalPurchase - (includeSga ? totalSga : 0);
+            const totalProfit = totalRevenue - totalPurchase - (sgaInEffect ? totalSga : 0);
             const margin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
 
             document.getElementById('kpiRevenue').textContent = totalRevenue.toLocaleString() + '원';
@@ -6693,17 +6712,17 @@
             const kpiSgaCard = document.getElementById('kpiSgaCard');
             const kpiGrid = document.getElementById('performanceKpiGrid');
             if (kpiSga) kpiSga.textContent = totalSga.toLocaleString() + '원';
-            if (kpiSgaCard) kpiSgaCard.style.display = includeSga ? '' : 'none';
+            if (kpiSgaCard) kpiSgaCard.style.display = toggleSgaOn ? '' : 'none';
             if (kpiGrid) {
-                kpiGrid.classList.toggle('kpi-grid--include-sga', includeSga);
-                kpiGrid.classList.toggle('kpi-grid--exclude-sga', !includeSga);
+                kpiGrid.classList.toggle('kpi-grid--include-sga', toggleSgaOn);
+                kpiGrid.classList.toggle('kpi-grid--exclude-sga', !toggleSgaOn);
             }
             const kpiProfitLabel = document.getElementById('kpiProfitLabel');
             const kpiMarginLabel = document.getElementById('kpiMarginLabel');
-            if (kpiProfitLabel) kpiProfitLabel.textContent = includeSga ? '순수익(판관비 포함)' : '순수익';
-            if (kpiMarginLabel) kpiMarginLabel.textContent = includeSga ? '수익률(판관비 포함)' : '수익률';
+            if (kpiProfitLabel) kpiProfitLabel.textContent = sgaInEffect ? '순수익(판관비 포함)' : '순수익';
+            if (kpiMarginLabel) kpiMarginLabel.textContent = sgaInEffect ? '수익률(판관비 포함)' : '수익률';
             const sgaHeader = document.getElementById('performanceSgaHeader');
-            if (sgaHeader) sgaHeader.style.display = includeSga ? '' : 'none';
+            if (sgaHeader) sgaHeader.style.display = sgaInEffect ? '' : 'none';
 
             // 월별 테이블 (매출발행일 기준 월 버킷)
             const byMonth = {};
@@ -6732,17 +6751,17 @@
 
             const monthlyData = Object.values(byMonth).map(stats => ({
                 ...stats,
-                profit: stats.revenue - stats.purchase - (includeSga ? stats.sga : 0),
-                margin: stats.revenue > 0 ? ((stats.revenue - stats.purchase - (includeSga ? stats.sga : 0)) / stats.revenue * 100) : 0,
+                profit: stats.revenue - stats.purchase - (sgaInEffect ? stats.sga : 0),
+                margin: stats.revenue > 0 ? ((stats.revenue - stats.purchase - (sgaInEffect ? stats.sga : 0)) / stats.revenue * 100) : 0,
                 avgUnitRounded: stats.unitCount > 0 ? Math.round(stats.unitRevSum / stats.unitCount) : 0
             })).sort((a, b) => b.month.localeCompare(a.month));
 
             const monthlyBody = document.getElementById('performanceMonthlyTableBody');
             const perfMonthlyTable = document.querySelector('#perf-right-panel-monthly table');
-            if (perfMonthlyTable) perfMonthlyTable.classList.toggle('perf-monthly--sga', includeSga);
+            if (perfMonthlyTable) perfMonthlyTable.classList.toggle('perf-monthly--sga', sgaInEffect);
             if (monthlyBody) {
                 if (monthlyData.length === 0) {
-                    monthlyBody.innerHTML = '<tr><td colspan="' + (includeSga ? 8 : 7) + '" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
+                    monthlyBody.innerHTML = '<tr><td colspan="' + (sgaInEffect ? 8 : 7) + '" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
                 } else {
                     const totals = monthlyData.reduce((sum, item) => ({
                         count: sum.count + item.count,
@@ -6760,7 +6779,7 @@
                             <td class="text-right">${item.count}건</td>
                             <td class="text-right">${item.revenue.toLocaleString()}원</td>
                             <td class="text-right">${item.purchase.toLocaleString()}원</td>
-                            ${includeSga ? `<td class="text-right">${(item.sga || 0).toLocaleString()}원</td>` : ''}
+                            ${sgaInEffect ? `<td class="text-right">${(item.sga || 0).toLocaleString()}원</td>` : ''}
                             <td class="text-right">${item.profit.toLocaleString()}원</td>
                             <td class="text-right">${item.margin.toFixed(1)}%</td>
                             ${formatPerformanceAvgUnitTd(item.unitCount, item.avgUnitRounded)}
@@ -6771,7 +6790,7 @@
                             <td class="text-right">${totals.count}건</td>
                             <td class="text-right">${totals.revenue.toLocaleString()}원</td>
                             <td class="text-right">${totals.purchase.toLocaleString()}원</td>
-                            ${includeSga ? `<td class="text-right">${(totals.sga || 0).toLocaleString()}원</td>` : ''}
+                            ${sgaInEffect ? `<td class="text-right">${(totals.sga || 0).toLocaleString()}원</td>` : ''}
                             <td class="text-right">${totals.profit.toLocaleString()}원</td>
                             <td class="text-right">${totalMargin.toFixed(1)}%</td>
                             ${formatPerformanceAvgUnitTd(avgTotalsAll.unitCount, avgTotalsAll.avgRounded)}
@@ -6806,7 +6825,7 @@
                     row.unitCount++;
                 }
             });
-            const sgaShareFactorOverall = includeSga && totalRevenue > 0 ? totalSga / totalRevenue : 0;
+            const sgaShareFactorOverall = sgaInEffect && totalRevenue > 0 ? totalSga / totalRevenue : 0;
 
             const categoryOverallArr = Object.values(categoryOverallByKey).map(s => ({
                 ...s,
@@ -6853,7 +6872,7 @@
                         subUnitCount += row.unitCount || 0;
                         i++;
                     }
-                    const subAllocatedSga = includeSga ? Math.round(subRev * sgaShareFactorOverall) : 0;
+                    const subAllocatedSga = sgaInEffect ? Math.round(subRev * sgaShareFactorOverall) : 0;
                     const subProfit = subRev - subPur - subAllocatedSga;
                     const subMargin = subRev > 0 ? ((subProfit / subRev) * 100) : 0;
                     const subAvgRounded = subUnitCount > 0 ? Math.round(subUnitRevSum / subUnitCount) : 0;
@@ -6919,7 +6938,7 @@
             const categoryMonthlyArr = Object.values(categoryMonthlyByKey).map(s => ({
                 ...s,
                 profit: (function() {
-                    if (!includeSga) return s.revenue - s.purchase;
+                    if (!sgaInEffect) return s.revenue - s.purchase;
                     const monthRowsRevenue = Object.values(categoryMonthlyByKey)
                         .filter(function(r) { return r.month === s.month; })
                         .reduce(function(sum, r) { return sum + (r.revenue || 0); }, 0);
@@ -6932,8 +6951,8 @@
                     const monthRowsRevenue = Object.values(categoryMonthlyByKey)
                         .filter(function(r) { return r.month === s.month; })
                         .reduce(function(sum, r) { return sum + (r.revenue || 0); }, 0);
-                    const monthSga = includeSga ? (monthlySgaMap[s.month] || 0) : 0;
-                    const allocated = includeSga && monthRowsRevenue > 0 ? Math.round((s.revenue / monthRowsRevenue) * monthSga) : 0;
+                    const monthSga = sgaInEffect ? (monthlySgaMap[s.month] || 0) : 0;
+                    const allocated = sgaInEffect && monthRowsRevenue > 0 ? Math.round((s.revenue / monthRowsRevenue) * monthSga) : 0;
                     return ((s.revenue - s.purchase - allocated) / s.revenue * 100);
                 })(),
                 avgUnitRounded: s.unitCount > 0 ? Math.round(s.unitRevSum / s.unitCount) : 0
@@ -6957,7 +6976,7 @@
 
                 function flushSubtotalIfNeeded() {
                     if (!subKey) return;
-                    const monthSga = includeSga ? (monthlySgaMap[subMonthKey] || 0) : 0;
+                    const monthSga = sgaInEffect ? (monthlySgaMap[subMonthKey] || 0) : 0;
                     const subProfit = subRev - subPur - monthSga;
                     const subMargin = subRev > 0 ? ((subProfit / subRev) * 100) : 0;
                     const subAvgRounded = subUnitCount > 0 ? Math.round(subUnitRevSum / subUnitCount) : 0;
@@ -9190,21 +9209,20 @@
             let salesTotal = 0, paymentDone = 0, purchaseTotal = 0, transferDone = 0;
             let salesNet = 0, purchaseNet = 0;
             let salesRowCnt = 0, paymentRowCnt = 0, purchaseRowCnt = 0, transferRowCnt = 0;
-            const salesDates = [];
             if (salesBody) Array.from(salesBody.rows).forEach(function (r) {
                 if ((r.getAttribute('data-row-type') || 'sales') !== 'sales') return;
                 salesRowCnt++;
                 salesTotal += getRowGrossFromValues(r, 4);
                 salesNet += getRowNetFromValues(r, 2);
-                let dt = '';
-                if (r.dataset && r.dataset.rowValues) {
-                    const v = JSON.parse(r.dataset.rowValues);
-                    dt = (v[0] || '').trim();
-                } else if (r.cells && r.cells[0]) {
-                    dt = (r.cells[0].textContent || '').trim();
-                }
-                if (dt && /^\d{4}-\d{2}-\d{2}/.test(dt)) salesDates.push(dt.slice(0, 10));
             });
+            const salesRowsSnap = salesBody
+                ? Array.from(salesBody.rows)
+                    .filter(function (r) { return (r.getAttribute('data-row-type') || '') === 'sales'; })
+                    .map(function (r) { return JSON.parse(r.dataset.rowValues || '[]'); })
+                : null;
+            const salesDates = deriveSalesDatesFromSalesRows(
+                salesRowsSnap || (estRow && estRow.salesRows) || []
+            );
             if (payBody) Array.from(payBody.rows).forEach(function (r) {
                 if ((r.getAttribute('data-row-type') || '') !== 'payment') return;
                 paymentRowCnt++;
@@ -10563,7 +10581,8 @@
                     aggregateSalesGross: currentEditItem.aggregateSalesGross,
                     aggregatePaymentGross: currentEditItem.aggregatePaymentGross,
                     aggregatePurchaseGross: currentEditItem.aggregatePurchaseGross,
-                    aggregateTransferGross: currentEditItem.aggregateTransferGross
+                    aggregateTransferGross: currentEditItem.aggregateTransferGross,
+                    salesDates: deriveSalesDatesFromSalesRows(currentEditItem.salesRows || []),
                 };
                 seedEstimateAggregates(newEstimate);
 
