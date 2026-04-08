@@ -1,4 +1,4 @@
-/** public/partials/page-performance.html — 경영실적관리 본문 단일 소스 (#performanceDatePickerPanel은 index.html에 유지) */
+/** public/partials/page-performance.html — 경영실적관리 단일 소스(본문 + #performanceDatePickerPanel) */
 const PARTIAL_URL = '/partials/page-performance.html';
 
 export async function ensurePerformancePartialMounted() {

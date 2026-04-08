@@ -1,6 +1,6 @@
 /**
  * index.html 진입점: VITE_SUPABASE_* 필수. 세션·프로필이 있으면 app.js 로드, 없으면 login.html로 보냅니다.
- * app.js 로드 전: 페이지 shell partials + 프로젝트 상세 중앙 모달(body). 경비/판관비 CSV·각 등록 패널은 index 유지.
+ * app.js 로드 전: 페이지 shell partials + 프로젝트 상세 중앙 모달(body). 경비/판관비 CSV·각 등록 패널은 index 유지. 경영실적 UI는 page-performance.html에 통합.
  */
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY;
