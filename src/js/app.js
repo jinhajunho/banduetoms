@@ -183,12 +183,19 @@ import { createProjectRegister } from './estimate-project-register.js';
                 showPage('dashboard'); // 기본 페이지: 대시보드
             }
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
-                Promise.all([syncEstimatesFromServer(), syncCategoryMastersFromServer()]).then(function () {
+                function refreshCategoryUiAfterSync() {
                     syncCategoryMastersFromEstimates();
                     renderCategoryMasterTables();
                     if (typeof refreshCategoryFilterOptionsAll === 'function') {
                         refreshCategoryFilterOptionsAll();
                     }
+                }
+                // 대시보드 캘린더는 견적 목록만 있으면 되므로 분류 마스터 API 완료를 기다리지 않음
+                syncEstimatesFromServer().then(function () {
+                    refreshCategoryUiAfterSync();
+                });
+                syncCategoryMastersFromServer().then(function () {
+                    refreshCategoryUiAfterSync();
                 });
                 // 대시보드·견적에 필요한 API와 경쟁하지 않도록 경비/판관/업체 목록은 유휴 시점에 로드
                 const runBgSync = function () {

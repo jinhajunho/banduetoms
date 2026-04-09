@@ -125,8 +125,9 @@ export function createDashboard(api) {
         return false;
     }
 
-    function getDashboardEventsForDate(dateStr) {
-        return getDashboardEvents().reduce((acc, event) => {
+    /** 캘린더 한 칸에 표시할 이벤트(이미 getDashboardEvents 형태의 목록이 주어질 때 한 번만 순회) */
+    function collectDashboardEventsForDate(dateStr, eventsList) {
+        return eventsList.reduce((acc, event) => {
             const rangeMeta = getEventRangeMetaForDate(event, dateStr);
             const hasCalendarAnchor = !!(event.startDate || event.endDate);
             let shouldShow = false;
@@ -159,10 +160,16 @@ export function createDashboard(api) {
         });
     }
 
+    function getDashboardEventsForDate(dateStr) {
+        return collectDashboardEventsForDate(dateStr, getDashboardEvents());
+    }
+
     const DASHBOARD_PERIOD_LANE_H = 22;
     const DASHBOARD_PERIOD_LANE_GAP = 2;
 
     let dashboardPeriodOverlayObserverReady = false;
+    /** rAF로 overlay 그릴 때 견적 스냅샷(매 셀마다 map 반복 방지) */
+    let pendingCalendarEventsForOverlay = null;
 
     function dashboardEventPassesCalendarFilters(event) {
         const hasCalendarAnchor = !!(event.startDate || event.endDate);
@@ -172,10 +179,11 @@ export function createDashboard(api) {
         return true;
     }
 
-    function getDashboardMultiDayPeriodEvents() {
+    function getDashboardMultiDayPeriodEvents(eventsList) {
+        const source = eventsList != null ? eventsList : getDashboardEvents();
         const out = [];
         const seen = new Set();
-        getDashboardEvents().forEach(function (event) {
+        source.forEach(function (event) {
             const start = normalizeYmd(event.startDate);
             const end = normalizeYmd(event.endDate);
             if (!start || !end) return;
@@ -207,8 +215,9 @@ export function createDashboard(api) {
         });
     }
 
-    function scheduleDashboardPeriodOverlay() {
+    function scheduleDashboardPeriodOverlay(eventsList) {
         ensureDashboardPeriodOverlayObserver();
+        pendingCalendarEventsForOverlay = eventsList != null ? eventsList : null;
         requestAnimationFrame(function () {
             requestAnimationFrame(function () {
                 renderDashboardPeriodOverlay();
@@ -246,7 +255,9 @@ export function createDashboard(api) {
             return { el: el, dateStr: el.getAttribute('data-date') || '' };
         });
 
-        const periodItems = getDashboardMultiDayPeriodEvents();
+        const eventsForPeriod = pendingCalendarEventsForOverlay;
+        pendingCalendarEventsForOverlay = null;
+        const periodItems = getDashboardMultiDayPeriodEvents(eventsForPeriod);
         if (periodItems.length === 0) {
             overlay.setAttribute('aria-hidden', 'true');
             return;
@@ -391,7 +402,7 @@ export function createDashboard(api) {
         return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
     }
 
-    function fillDashboardCalendarDayCell(dayDiv, dateStr, isOtherMonth, dayNumberDisplay) {
+    function fillDashboardCalendarDayCell(dayDiv, dateStr, isOtherMonth, dayNumberDisplay, dayEventsPrecomputed) {
         dayDiv.className = 'calendar-day' + (isOtherMonth ? ' other-month' : '');
         dayDiv.setAttribute('data-date', dateStr);
 
@@ -404,7 +415,10 @@ export function createDashboard(api) {
         dayDiv.innerHTML = '<div class="day-number">' + dayNumberDisplay + '</div>';
         const eventsContainer = document.createElement('div');
         eventsContainer.className = 'calendar-day-events';
-        const dayEvents = getDashboardEventsForDate(dateStr);
+        const dayEvents =
+            dayEventsPrecomputed != null
+                ? dayEventsPrecomputed
+                : getDashboardEventsForDate(dateStr);
         const cellEvents = dayEvents.filter(function (e) {
             return !e._isPeriod;
         });
@@ -451,6 +465,25 @@ export function createDashboard(api) {
 
         titleEl.textContent = dashboardCalendarYear + '년 ' + (dashboardCalendarMonth + 1) + '월';
 
+        const eventsList = api.getEstimates().map(function (e) {
+            return {
+                id: e.code,
+                code: e.code || '',
+                building: e.building || '',
+                project: e.project || '',
+                manager: e.manager || '',
+                contractor: e.contractor || '',
+                status: e.status || '견적',
+                startDate: e.startDate || '',
+                endDate: e.endDate || '',
+                date: e.date || '',
+                amount: e.revenue || 0
+            };
+        });
+
+        const gridDates = [];
+        const dayCells = [];
+
         for (let i = firstDayOfWeek - 1; i >= 0; i--) {
             const day = prevLastDate - i;
             const ds =
@@ -459,9 +492,8 @@ export function createDashboard(api) {
                 String(prevMonthIdx + 1).padStart(2, '0') +
                 '-' +
                 String(day).padStart(2, '0');
-            const dayDiv = document.createElement('div');
-            fillDashboardCalendarDayCell(dayDiv, ds, true, day);
-            grid.appendChild(dayDiv);
+            gridDates.push(ds);
+            dayCells.push({ dateStr: ds, isOtherMonth: true, dayNumberDisplay: day });
         }
 
         for (let day = 1; day <= lastDate; day++) {
@@ -471,9 +503,8 @@ export function createDashboard(api) {
                 String(dashboardCalendarMonth + 1).padStart(2, '0') +
                 '-' +
                 String(day).padStart(2, '0');
-            const dayDiv = document.createElement('div');
-            fillDashboardCalendarDayCell(dayDiv, dateStr, false, day);
-            grid.appendChild(dayDiv);
+            gridDates.push(dateStr);
+            dayCells.push({ dateStr: dateStr, isOtherMonth: false, dayNumberDisplay: day });
         }
 
         const remainingDays = 42 - (firstDayOfWeek + lastDate);
@@ -484,12 +515,30 @@ export function createDashboard(api) {
                 String(nextMonthIdx + 1).padStart(2, '0') +
                 '-' +
                 String(day).padStart(2, '0');
+            gridDates.push(ds);
+            dayCells.push({ dateStr: ds, isOtherMonth: true, dayNumberDisplay: day });
+        }
+
+        const byDate = new Map();
+        for (let gi = 0; gi < gridDates.length; gi++) {
+            const ds = gridDates[gi];
+            byDate.set(ds, collectDashboardEventsForDate(ds, eventsList));
+        }
+
+        for (let ci = 0; ci < dayCells.length; ci++) {
+            const cell = dayCells[ci];
             const dayDiv = document.createElement('div');
-            fillDashboardCalendarDayCell(dayDiv, ds, true, day);
+            fillDashboardCalendarDayCell(
+                dayDiv,
+                cell.dateStr,
+                cell.isOtherMonth,
+                cell.dayNumberDisplay,
+                byDate.get(cell.dateStr)
+            );
             grid.appendChild(dayDiv);
         }
 
-        scheduleDashboardPeriodOverlay();
+        scheduleDashboardPeriodOverlay(eventsList);
     }
 
     function dashboardChangeMonth(delta) {
