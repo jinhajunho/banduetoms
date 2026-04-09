@@ -71,6 +71,29 @@ function bpsApplyShellNavFromProfileBootstrap(bp) {
     document.documentElement.classList.add('bps-shell-nav-ready');
 }
 
+/** 프로필 수신 직후(app.js 전): 좌측 하단 사용자 정보 갱신 */
+function bpsApplyShellUserInfoFromProfileBootstrap(bp) {
+    if (!bp) return;
+    const avatarEl = document.getElementById('sidebarUserAvatar');
+    const nameEl = document.getElementById('sidebarUserName');
+    const roleEl = document.getElementById('sidebarUserRole');
+    if (nameEl) {
+        const displayName =
+            (bp.type === 'external' && bp.contractorName)
+                ? String(bp.contractorName || '').trim()
+                : String(bp.name || '').trim();
+        nameEl.textContent = displayName || '—';
+    }
+    if (roleEl) {
+        roleEl.textContent = String(bp.role || '').trim() || '—';
+    }
+    if (avatarEl) {
+        const base = (nameEl && nameEl.textContent ? nameEl.textContent : '') || '';
+        avatarEl.textContent = base ? base.trim().slice(0, 1) : '—';
+    }
+    document.documentElement.classList.add('bps-shell-user-ready');
+}
+
 async function loadAppWithShellPartials() {
     const [
         estimateMod,
@@ -197,6 +220,7 @@ async function main() {
     };
 
     bpsApplyShellNavFromProfileBootstrap(window.__bpsProfileBootstrap);
+    bpsApplyShellUserInfoFromProfileBootstrap(window.__bpsProfileBootstrap);
 
     await loadAppWithShellPartials();
     window.dispatchEvent(new Event('DOMContentLoaded'));

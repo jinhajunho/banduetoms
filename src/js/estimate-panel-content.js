@@ -29,11 +29,10 @@ export function createRenderPanelContent(api) {
         const bizVals = api.computeBizTaxFromGross(item.businessIncomeGross);
         const profitNetTotals = api.getProfitNetTotalsByCode(item.code, item.revenue, item.purchase, item.businessIncomeGross);
         const bizAmtEditable =
-            isExternalContractorView ||
             api.getBusinessInfoEditMode() ||
             api.getIsEditMode() ||
             api.getIsNewEstimate();
-        const bizTitleEditing = api.getBusinessInfoEditMode() || isExternalContractorView;
+        const bizTitleEditing = api.getBusinessInfoEditMode();
         document.getElementById('sharedPanelTitle').textContent = api.getIsNewEstimate()
             ? ('프로젝트 등록' + (item && item.code ? ` · ${item.code}` : ''))
             : (api.getIsEditMode() ? '프로젝트 수정' + codeLabel : '프로젝트 상세' + codeLabel);

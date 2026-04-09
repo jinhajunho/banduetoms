@@ -179,6 +179,11 @@
             visibility: hidden;
         }
 
+        /* 로그인 직후 프로필 반영 전: 좌측 하단 사용자 정보(방준호/관리자 고정값) 플래시 방지 */
+        html:not(.bps-shell-user-ready) .sidebar .user-section {
+            visibility: hidden;
+        }
+
         .nav-item {
             display: flex;
             align-items: center;

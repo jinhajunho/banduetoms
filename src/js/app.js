@@ -150,6 +150,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     const base = (nameEl && nameEl.textContent ? nameEl.textContent : '') || '';
                     avatarEl.textContent = base ? base.trim().slice(0, 1) : '—';
                 }
+                document.documentElement.classList.add('bps-shell-user-ready');
             }
             try {
                 if (
@@ -6795,16 +6796,6 @@ import { createProjectRegister } from './estimate-project-register.js';
                         '<option value="start">진행일</option>' +
                         '<option value="end">완료일</option>';
                     if (['date', 'sales', 'start', 'end'].indexOf(prev) !== -1) basis.value = prev;
-                }
-            }
-            const typeGrp = document.getElementById('filterEstimateTypeGroup');
-            const typeSel = document.getElementById('filterEstimateType');
-            if (typeGrp && typeSel) {
-                if (isCurrentUserExternalContractor()) {
-                    typeGrp.style.display = '';
-                } else {
-                    typeGrp.style.display = 'none';
-                    typeSel.value = '';
                 }
             }
         }

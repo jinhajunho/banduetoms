@@ -12,8 +12,8 @@ export function renderEstimateTable(api, options) {
     const filterCategory2 = document.getElementById('filterCategory2').value;
     const filterCategory3 = document.getElementById('filterCategory3').value;
     const filterEstimateTypeEl = document.getElementById('filterEstimateType');
-    const filterEstimateType =
-        !canSeeMonetary && filterEstimateTypeEl ? (filterEstimateTypeEl.value || '') : '';
+    const filterTaxBizTypeEl = document.getElementById('filterTaxBizType');
+    const filterEstimateType = filterTaxBizTypeEl ? (filterTaxBizTypeEl.value || '') : '';
     const filterTax = document.getElementById('filterTax').value;
     const filterCashflow = document.getElementById('filterCashflow')?.value || '';
     const filterSearch = document.getElementById('filterSearch').value.toLowerCase();
@@ -174,6 +174,7 @@ export function bindEstimateListInteractions(api) {
     const filterCategory2 = document.getElementById('filterCategory2');
     const filterCategory3 = document.getElementById('filterCategory3');
     const filterEstimateType = document.getElementById('filterEstimateType');
+    const filterTaxBizType = document.getElementById('filterTaxBizType');
     const filterTax = document.getElementById('filterTax');
     const filterCashflow = document.getElementById('filterCashflow');
     const filterSearch = document.getElementById('filterSearch');
@@ -181,6 +182,7 @@ export function bindEstimateListInteractions(api) {
     if (filterCategory2) filterCategory2.addEventListener('change', api.renderTable);
     if (filterCategory3) filterCategory3.addEventListener('change', api.renderTable);
     if (filterEstimateType) filterEstimateType.addEventListener('change', api.renderTable);
+    if (filterTaxBizType) filterTaxBizType.addEventListener('change', api.renderTable);
     if (filterTax) filterTax.addEventListener('change', api.renderTable);
     if (filterCashflow) filterCashflow.addEventListener('change', api.renderTable);
     if (filterSearch) filterSearch.addEventListener('input', api.renderTable);

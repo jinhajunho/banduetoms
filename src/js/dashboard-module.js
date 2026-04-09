@@ -7,6 +7,17 @@ export function createDashboard(api) {
     let dashboardCalendarSearchTerm = '';
 
     function getDashboardEvents() {
+        function toNum(v) {
+            const n = parseFloat(String(v == null ? '' : v).replace(/원/g, '').replace(/,/g, '').trim(), 10);
+            return isNaN(n) ? 0 : n;
+        }
+        function purchaseNetFromRows(rows) {
+            if (!Array.isArray(rows) || rows.length === 0) return 0;
+            return rows.reduce(function (sum, r) {
+                // values[2] = vat별도(매입)
+                return sum + toNum(r && r[2] != null ? r[2] : 0);
+            }, 0);
+        }
         return api.getEstimates().map(e => ({
             id: e.code,
             code: e.code || '',
@@ -21,6 +32,7 @@ export function createDashboard(api) {
             amount: e.revenue || 0,
             // 캘린더 일정 상세: "매입정보 탭의 매입액"에 직접 연동
             purchase: e.purchase || 0,
+            purchaseNet: purchaseNetFromRows(e.purchaseRows),
             // 캘린더 일정 상세: "사업소득 탭의 사업소득금액"에 직접 연동
             businessIncomeGross: e.businessIncomeGross || 0,
         }));
@@ -564,8 +576,8 @@ export function createDashboard(api) {
         const statusClass = event.status === '완료' ? 'completed' : 'progress';
         const codeDisplay = (event.code || event.id || '').toString() || '-';
         const contractorAmountView = typeof api.isCurrentUserExternalContractor === 'function' && api.isCurrentUserExternalContractor();
-        const amountLabel = contractorAmountView ? '매입금액' : '매출금액';
-        const amountNum = contractorAmountView ? (event.purchase || 0) : (event.amount || 0);
+        const amountLabel = contractorAmountView ? '매입금액(vat별도)' : '매출금액';
+        const amountNum = contractorAmountView ? (event.purchaseNet || 0) : (event.amount || 0);
         const bizLabel = '사업소득금액';
         const bizNum = event.businessIncomeGross || 0;
         body.innerHTML = '<div class="modal-info"><div class="info-label">코드</div><div class="info-value" style="font-family: ui-monospace, monospace; font-weight: 600;">' + codeDisplay + '</div></div>' +
