@@ -174,6 +174,11 @@
             padding: 16px 0;
         }
 
+        /* 도급사: app.js 적용 전 한 프레임 동안 허용 외 메뉴가 보이지 않도록(부트스트랩에서 클래스 부여) */
+        html.bps-bootstrap-contractor-nav .nav-menu .nav-item[data-page]:not([data-page="dashboard"]):not([data-page="estimate"]) {
+            display: none !important;
+        }
+
         .nav-item {
             display: flex;
             align-items: center;
@@ -4704,6 +4709,10 @@
             color: var(--gray-700);
             border-bottom: 1px solid var(--gray-200);
             white-space: nowrap;
+        }
+
+        .payment-table.payment-table--purchase-head-center thead th {
+            text-align: center;
         }
 
         .payment-table th:first-child {

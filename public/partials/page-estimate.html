@@ -107,6 +107,16 @@
                         <!-- 상단 우측: (대/중/소) + (세금계산서/입금상태) 2행 가로 묶음 -->
                         <div class="estimate-filter-right">
                             <div class="estimate-filter-right-row estimate-filter-right-row--single">
+                                <!-- 도급사만 표시: applyEstimatePageRoleLabels 로 display 토글 -->
+                                <div class="filter-group" id="filterEstimateTypeGroup" style="display: none;">
+                                    <label class="filter-label">구분</label>
+                                    <select class="filter-select" id="filterEstimateType" title="과세유형(도급사 전용)">
+                                        <option value="">전체</option>
+                                        <option value="세금계산서">세금계산서</option>
+                                        <option value="사업소득">사업소득</option>
+                                        <option value="__tax_or_biz__">세금계산서/사업소득</option>
+                                    </select>
+                                </div>
                                 <div class="filter-group">
                                     <label class="filter-label">대분류</label>
                                     <select class="filter-select" id="filterCategory1">

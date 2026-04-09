@@ -11,6 +11,9 @@ export function renderEstimateTable(api, options) {
     const filterCategory1 = document.getElementById('filterCategory1').value;
     const filterCategory2 = document.getElementById('filterCategory2').value;
     const filterCategory3 = document.getElementById('filterCategory3').value;
+    const filterEstimateTypeEl = document.getElementById('filterEstimateType');
+    const filterEstimateType =
+        !canSeeMonetary && filterEstimateTypeEl ? (filterEstimateTypeEl.value || '') : '';
     const filterTax = document.getElementById('filterTax').value;
     const filterCashflow = document.getElementById('filterCashflow')?.value || '';
     const filterSearch = document.getElementById('filterSearch').value.toLowerCase();
@@ -23,6 +26,11 @@ export function renderEstimateTable(api, options) {
         if (filterCategory1 && item.category1 !== filterCategory1) return false;
         if (filterCategory2 && item.category2 !== filterCategory2) return false;
         if (filterCategory3 && (item.category3 || '') !== filterCategory3) return false;
+        if (filterEstimateType) {
+            if (filterEstimateType === '__tax_or_biz__') {
+                if (item.type !== '세금계산서' && item.type !== '사업소득') return false;
+            } else if ((item.type || '') !== filterEstimateType) return false;
+        }
 
         if (filterTax) {
             if (canSeeMonetary) {
@@ -97,6 +105,14 @@ export function renderEstimateTable(api, options) {
             ? `<button type="button" class="badge ${statusBadgeClass} status-popover-trigger" onclick="openStatusPopover(event, ${codeJs})">${item.status}</button>`
             : `<span class="badge ${statusBadgeClass}">${item.status}</span>`;
 
+        const amountPairHtml = canSeeMonetary
+            ? `<div class="table-amount-pair">
+                        ${revenueCellHtml}
+                        <span class="table-amount-slash">/</span>
+                        <span class="table-amount-chip ${purchaseAmountChipClass}">${purchaseAmount.toLocaleString()}원</span>
+                    </div>`
+            : `<span class="table-amount-chip ${purchaseAmountChipClass}">${purchaseAmount.toLocaleString()}원</span>`;
+
         return `
             <tr class="table-row-clickable" data-code="${api.escapeHtmlAttr(String(item.code != null ? item.code : ''))}">
                 <td onclick="event.stopPropagation()">
@@ -108,11 +124,7 @@ export function renderEstimateTable(api, options) {
                 <td>${item.building}</td>
                 <td>${item.project}</td>
                 <td>
-                    <div class="table-amount-pair">
-                        ${revenueCellHtml}
-                        <span class="table-amount-slash">/</span>
-                        <span class="table-amount-chip ${purchaseAmountChipClass}">${purchaseAmount.toLocaleString()}원</span>
-                    </div>
+                    ${amountPairHtml}
                 </td>
                 <td>${cashflowCellHtml}</td>
                 <td>${item.contractor || '-'}</td>
@@ -161,12 +173,14 @@ export function bindEstimateListInteractions(api) {
     const filterCategory1 = document.getElementById('filterCategory1');
     const filterCategory2 = document.getElementById('filterCategory2');
     const filterCategory3 = document.getElementById('filterCategory3');
+    const filterEstimateType = document.getElementById('filterEstimateType');
     const filterTax = document.getElementById('filterTax');
     const filterCashflow = document.getElementById('filterCashflow');
     const filterSearch = document.getElementById('filterSearch');
     if (filterCategory1) filterCategory1.addEventListener('change', api.renderTable);
     if (filterCategory2) filterCategory2.addEventListener('change', api.renderTable);
     if (filterCategory3) filterCategory3.addEventListener('change', api.renderTable);
+    if (filterEstimateType) filterEstimateType.addEventListener('change', api.renderTable);
     if (filterTax) filterTax.addEventListener('change', api.renderTable);
     if (filterCashflow) filterCashflow.addEventListener('change', api.renderTable);
     if (filterSearch) filterSearch.addEventListener('input', api.renderTable);
@@ -244,6 +258,9 @@ export function initEstimateListFiltersModule(api) {
             if (c1) c1.value = '';
             if (c2) c2.value = '';
             if (c3) c3.value = '';
+
+            const fType = document.getElementById('filterEstimateType');
+            if (fType) fType.value = '';
 
             const tax = document.getElementById('filterTax');
             if (tax) tax.value = '';

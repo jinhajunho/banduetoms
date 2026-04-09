@@ -141,6 +141,14 @@ async function main() {
             : [],
     };
 
+    if (profile.type === 'external' && mapDbRoleToUi(profile.role) === '도급사') {
+        document.documentElement.classList.add('bps-bootstrap-contractor-nav');
+        document.querySelectorAll('.nav-item[data-page]').forEach(function (el) {
+            const p = el.getAttribute('data-page') || '';
+            el.style.display = p === 'dashboard' || p === 'estimate' ? '' : 'none';
+        });
+    }
+
     await loadAppWithShellPartials();
     window.dispatchEvent(new Event('DOMContentLoaded'));
 }

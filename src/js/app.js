@@ -278,6 +278,16 @@ import { createProjectRegister } from './estimate-project-register.js';
             return out;
         }
 
+        function derivePurchaseDatesFromPurchaseRows(purchaseRows) {
+            const out = [];
+            if (!Array.isArray(purchaseRows)) return out;
+            purchaseRows.forEach(function (r) {
+                const dt = r && r[0] != null ? String(r[0]).trim() : '';
+                if (dt && /^\d{4}-\d{2}-\d{2}/.test(dt)) out.push(dt.slice(0, 10));
+            });
+            return out;
+        }
+
         function applyEstimateDefaultsAndSeed(list) {
             (list || []).forEach(function (e, i) {
                 if (e.category3 === undefined) e.category3 = '지원';
@@ -798,16 +808,19 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
 
         function readBusinessIncomeFormIntoItem(target) {
-            if (!target || (target.type !== '세금계산서' && target.type !== '사업소득')) return;
+            if (!target) return;
+            if (!isCurrentUserExternalContractor() && target.type !== '세금계산서' && target.type !== '사업소득') return;
             const d = document.getElementById('biz_transfer_date');
             const g = document.getElementById('biz_gross');
             const paid = document.querySelector('input[name="biz_paid"]:checked');
             const grossSrc = (g && g.value !== '' && g.value != null) ? g.value : target.businessIncomeGross;
             const comp = computeBizTaxFromGross(grossSrc);
-            if (d) target.businessIncomeTransferDate = d.value || '';
+            if (!isCurrentUserExternalContractor()) {
+                if (d) target.businessIncomeTransferDate = d.value || '';
+                if (paid) target.businessIncomePaidStatus = paid.value === '지급' ? '지급' : '미지급';
+            }
             target.businessIncomeGross = comp.gross;
             target.businessIncomeNetPay = comp.net;
-            if (paid) target.businessIncomePaidStatus = paid.value === '지급' ? '지급' : '미지급';
         }
 
         function syncBusinessIncomeDerived() {
@@ -1335,6 +1348,12 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (!dates.length) return false;
                 return dates.some(function (d) { return d >= range.from && d <= range.to; });
             }
+            if (basis === 'purchase') {
+                const dates = derivePurchaseDatesFromPurchaseRows(item.purchaseRows || []);
+                if (!range) return true;
+                if (!dates.length) return false;
+                return dates.some(function (d) { return d >= range.from && d <= range.to; });
+            }
             const d = item.date ? String(item.date).trim().slice(0, 10) : '';
             if (!range) return true;
             if (!d) return false;
@@ -1357,6 +1376,11 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (basis === 'sales') {
                 const raw = (item.salesDates && item.salesDates.length) ? item.salesDates : (item.date ? [item.date] : []);
                 const dates = raw.map(function (x) { return String(x).trim().slice(0, 10); }).filter(Boolean);
+                if (!dates.length) return empty;
+                return dates.reduce(function (max, d) { return d > max ? d : max; }, dates[0]);
+            }
+            if (basis === 'purchase') {
+                const dates = derivePurchaseDatesFromPurchaseRows(item.purchaseRows || []);
                 if (!dates.length) return empty;
                 return dates.reduce(function (max, d) { return d > max ? d : max; }, dates[0]);
             }
@@ -6608,11 +6632,32 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             const basis = document.getElementById('filterDateBasis');
             if (basis) {
-                Array.prototype.forEach.call(basis.options, function (opt) {
-                    if (opt.value === 'sales') {
-                        opt.textContent = isCurrentUserExternalContractor() ? '매입일자' : '매출일자';
-                    }
-                });
+                const prev = basis.value;
+                if (isCurrentUserExternalContractor()) {
+                    basis.innerHTML =
+                        '<option value="date">등록일</option>' +
+                        '<option value="end">완료일</option>' +
+                        '<option value="purchase">매입일</option>';
+                    if (prev === 'date' || prev === 'end' || prev === 'purchase') basis.value = prev;
+                    else basis.value = 'date';
+                } else {
+                    basis.innerHTML =
+                        '<option value="date">등록일</option>' +
+                        '<option value="sales">매출일자</option>' +
+                        '<option value="start">진행일</option>' +
+                        '<option value="end">완료일</option>';
+                    if (['date', 'sales', 'start', 'end'].indexOf(prev) !== -1) basis.value = prev;
+                }
+            }
+            const typeGrp = document.getElementById('filterEstimateTypeGroup');
+            const typeSel = document.getElementById('filterEstimateType');
+            if (typeGrp && typeSel) {
+                if (isCurrentUserExternalContractor()) {
+                    typeGrp.style.display = '';
+                } else {
+                    typeGrp.style.display = 'none';
+                    typeSel.value = '';
+                }
             }
         }
 

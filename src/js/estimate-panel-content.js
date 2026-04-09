@@ -11,7 +11,7 @@ export function createRenderPanelContent(api) {
             : '';
         const canViewSalesTab = !isExternalContractorView;
         const canViewPurchaseTab = item.type === '세금계산서';
-        const canViewBusinessTab = !isExternalContractorView && (item.type === '세금계산서' || item.type === '사업소득');
+        const canViewBusinessTab = isExternalContractorView || item.type === '세금계산서' || item.type === '사업소득';
         const canViewProfitTab = !isExternalContractorView && (item.type === '세금계산서' || item.type === '사업소득');
         const allowedTabs = ['basic'];
         if (canViewSalesTab) allowedTabs.push('sales');
@@ -317,12 +317,12 @@ export function createRenderPanelContent(api) {
                             <div class="payment-list-title">
                                 <i class="fas fa-building"></i> 매입 내역 (업체별)
                             </div>
-                            <button class="btn-add-payment" onclick="addPurchaseRow('${item.code}')">
+                            <button type="button" class="btn-add-payment" onclick="addPurchaseRow('${item.code}')">
                                 <i class="fas fa-plus"></i> 매입 추가
                             </button>
                         </div>
                         <div class="payment-table-wrap">
-                        <table class="payment-table">
+                        <table class="payment-table ${isExternalContractorView ? 'payment-table--purchase-head-center' : ''}">
                             <thead>
                                 <tr>
                                     <th style="width: 100px;">매입일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
@@ -350,9 +350,11 @@ export function createRenderPanelContent(api) {
                             <div class="payment-list-title">
                                 <i class="fas fa-exchange-alt"></i> 이체 내역 (날짜별)
                             </div>
-                            <button class="btn-add-payment" onclick="addTransferRow('${item.code}')">
+                            ${!isExternalContractorView ? `
+                            <button type="button" class="btn-add-payment" onclick="addTransferRow('${item.code}')">
                                 <i class="fas fa-plus"></i> 이체 추가
                             </button>
+                            ` : ''}
                         </div>
                         <div class="payment-table-wrap">
                         <table class="payment-table">
@@ -395,7 +397,7 @@ export function createRenderPanelContent(api) {
                         <div class="detail-row">
                             <div class="detail-label">이체일 <span style="font-weight:400;color:var(--gray-500);font-size:12px;">(선택)</span></div>
                             <div class="detail-value">
-                                <input type="date" class="form-input" id="biz_transfer_date" value="${item.businessIncomeTransferDate || ''}" title="선택 입력" ${(!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''}>
+                                <input type="date" class="form-input" id="biz_transfer_date" value="${item.businessIncomeTransferDate || ''}" title="선택 입력" ${isExternalContractorView || (!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''}>
                             </div>
                         </div>
                         <div class="detail-row">
@@ -431,12 +433,12 @@ export function createRenderPanelContent(api) {
                         <div class="detail-row" style="align-items:start;">
                             <div class="detail-label" style="padding-top:8px;">지급 여부</div>
                             <div class="detail-value" style="padding-top:8px; display:flex; gap:20px; align-items:center;">
-                                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
-                                    <input type="radio" name="biz_paid" value="지급" ${item.businessIncomePaidStatus === '지급' ? 'checked' : ''} ${(!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''} onchange="markPanelDirtyIfChanged()">
+                                <label style="display:inline-flex;align-items:center;gap:6px;cursor:${isExternalContractorView ? 'default' : 'pointer'};">
+                                    <input type="radio" name="biz_paid" value="지급" ${item.businessIncomePaidStatus === '지급' ? 'checked' : ''} ${isExternalContractorView || (!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''} onchange="markPanelDirtyIfChanged()">
                                     <span>지급</span>
                                 </label>
-                                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
-                                    <input type="radio" name="biz_paid" value="미지급" ${item.businessIncomePaidStatus !== '지급' ? 'checked' : ''} ${(!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''} onchange="markPanelDirtyIfChanged()">
+                                <label style="display:inline-flex;align-items:center;gap:6px;cursor:${isExternalContractorView ? 'default' : 'pointer'};">
+                                    <input type="radio" name="biz_paid" value="미지급" ${item.businessIncomePaidStatus !== '지급' ? 'checked' : ''} ${isExternalContractorView || (!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''} onchange="markPanelDirtyIfChanged()">
                                     <span>미지급</span>
                                 </label>
                             </div>

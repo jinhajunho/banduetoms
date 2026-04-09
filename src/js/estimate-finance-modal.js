@@ -50,6 +50,7 @@ export function createEstimateFinanceModal(api) {
 
     function onFinanceRowClick(event, row, type) {
         if (!row) return;
+        if (type === 'transfer' && isExtContractor()) return;
         if ((row.getAttribute('data-row-type') || '') === 'unpaid') return;
         const t = event && event.target;
         if (t && t.closest && t.closest('.file-link')) return;
@@ -132,12 +133,16 @@ export function createEstimateFinanceModal(api) {
                 '<td style="font-weight:600;">' + won(values[3]) + '</td>' +
                 '<td style="font-weight:600;">' + won(values[4]) + '</td>' +
                 '<td>' + formatMemoCell(values, type) + '</td>';
-            row.setAttribute('onclick', "onFinanceRowClick(event, this, '" + type + "')");
+            if (!(type === 'transfer' && isExtContractor())) {
+                row.setAttribute('onclick', "onFinanceRowClick(event, this, '" + type + "')");
+            }
         }
         row.setAttribute('data-row-type', type);
         row.setAttribute('data-saved', 'true');
         row.dataset.rowValues = JSON.stringify(values);
-        row.classList.add('finance-row-clickable');
+        if (!(type === 'transfer' && isExtContractor())) {
+            row.classList.add('finance-row-clickable');
+        }
     }
 
     function renderFinanceTablesFromItem(item) {
