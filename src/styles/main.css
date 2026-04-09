@@ -4762,6 +4762,14 @@
             color: var(--gray-400);
         }
 
+        .finance-memo-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+            text-align: left;
+        }
+
         /* 상호명/업체명: 줄바꿈 허용 (겹침 방지) */
         .payment-table:has(thead th:nth-child(7)) td:first-child {
             width: 120px;

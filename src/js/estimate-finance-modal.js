@@ -17,6 +17,9 @@ export function createEstimateFinanceModal(api) {
     const stampMeta = typeof api.stampFinanceRowMemoMetaAfterEdit === 'function'
         ? api.stampFinanceRowMemoMetaAfterEdit.bind(api)
         : function () {};
+    const isExtContractor = typeof api.isCurrentUserExternalContractor === 'function'
+        ? api.isCurrentUserExternalContractor.bind(api)
+        : function () { return false; };
 
     let financeModalState = null;
 
@@ -73,7 +76,7 @@ export function createEstimateFinanceModal(api) {
         if (!row) {
             let v;
             if (type === 'sales' || type === 'purchase') {
-                v = ['', '', '', '', '', '미발행', '-', '', null];
+                v = ['', '', '', '', '', '미발행', '-', '', '', { contractorBy: '', internalBy: '' }];
             } else {
                 v = ['', '', '', '', '', '', null];
             }
@@ -176,6 +179,21 @@ export function createEstimateFinanceModal(api) {
         const modalFileId = 'modal-file-' + Date.now();
         financeModalState = { type: type, code: code, row: row, modalFileId: modalFileId, rowFileId: row ? (row.dataset.rowFileId || '') : '' };
 
+        const spMemoFields = (function () {
+            if (type !== 'sales' && type !== 'purchase') {
+                return '<input id="fm_memo" type="text" value="' + String(values[5] || '').replace(/"/g, '&quot;') + '" placeholder="메모" class="form-input" style="grid-column:1 / -1;">';
+            }
+            const cEsc = String(values[7] != null ? values[7] : '').replace(/"/g, '&quot;');
+            const iEsc = String(values[8] != null ? values[8] : '').replace(/"/g, '&quot;');
+            if (isExtContractor()) {
+                return '<input id="fm_memo" type="text" value="' + cEsc + '" placeholder="메모(도급사)" class="form-input" style="grid-column:1 / -1;">';
+            }
+            return '<label style="grid-column:1 / -1;font-size:12px;color:#64748b;margin:0;">도급사 메모 <span style="font-weight:400;">(내부 계정은 수정 불가)</span></label>' +
+                '<input id="fm_memo_contractor" type="text" readonly class="form-input" style="grid-column:1 / -1;background:#f8fafc;cursor:not-allowed;" value="' + cEsc + '" title="도급사가 입력한 메모입니다. 유지하려면 금액 등만 수정하세요.">' +
+                '<label style="grid-column:1 / -1;font-size:12px;color:#64748b;margin:4px 0 0 0;">내부 메모</label>' +
+                '<input id="fm_memo_internal" type="text" value="' + iEsc + '" placeholder="회계/관리 전용 메모" class="form-input" style="grid-column:1 / -1;">';
+        })();
+
         root.innerHTML = `
                 <div style="position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:2000;display:flex;align-items:center;justify-content:center;">
                     <div style="width:min(760px,92vw);background:#fff;border-radius:12px;border:1px solid #e5e7eb;box-shadow:0 16px 40px rgba(0,0,0,.2);">
@@ -194,7 +212,7 @@ export function createEstimateFinanceModal(api) {
                             ${type === 'sales' || type === 'purchase'
                 ? '<select id="fm_taxbill" class="form-select"><option value="미발행"' + (values[5] === '미발행' ? ' selected' : '') + '>미발행</option><option value="발행"' + (values[5] === '발행' ? ' selected' : '') + '>발행</option></select>'
                 : '<span></span>'}
-                            <input id="fm_memo" type="text" value="${String((type === 'sales' || type === 'purchase') ? (values[7] || '') : (values[5] || '')).replace(/"/g, '&quot;')}" placeholder="메모" class="form-input" style="grid-column:1 / -1;">
+                            ${spMemoFields}
                             ${type === 'sales' || type === 'purchase'
                 ? '<div style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;"><input type="file" id="' + modalFileId + '" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, \'' + modalFileId + '\')"><button type="button" class="btn-file-upload" onclick="document.getElementById(\'' + modalFileId + '\').click()">업로드</button><button type="button" class="btn-file-view" onclick="showFileList(\'' + modalFileId + '\')">첨부 보기' + (fileCount > 0 ? ' (' + fileCount + ')' : '') + '</button></div>'
                 : ''}
@@ -244,14 +262,27 @@ export function createEstimateFinanceModal(api) {
         const name = document.getElementById('fm_name').value.trim();
         const net = parseFloat(document.getElementById('fm_net').value || '0', 10) || 0;
         const gross = parseFloat(document.getElementById('fm_gross').value || '0', 10) || 0;
-        const memo = document.getElementById('fm_memo').value.trim();
         if (!name || !gross) { alert('상호명과 금액(vat포함)은 필수입니다. 일자는 생략할 수 있습니다.'); return; }
         const parts = api.splitNetTaxFromGross(gross || Math.round(net * 1.1));
         let values;
         if (type === 'sales' || type === 'purchase') {
             const taxbill = document.getElementById('fm_taxbill').value;
-            values = [date, name, parts.net.toLocaleString(), parts.tax.toLocaleString(), parts.gross.toLocaleString(), taxbill, '-', memo, null];
+            var cMemo = '';
+            var iMemo = '';
+            if (isExtContractor()) {
+                const fm = document.getElementById('fm_memo');
+                cMemo = fm ? fm.value.trim() : '';
+                iMemo = (prevSnap && prevSnap[8] != null) ? String(prevSnap[8]) : '';
+            } else {
+                const fc = document.getElementById('fm_memo_contractor');
+                const fi = document.getElementById('fm_memo_internal');
+                cMemo = fc ? fc.value.trim() : (prevSnap ? String(prevSnap[7] || '') : '');
+                iMemo = fi ? fi.value.trim() : '';
+            }
+            values = [date, name, parts.net.toLocaleString(), parts.tax.toLocaleString(), parts.gross.toLocaleString(), taxbill, '-', cMemo, iMemo, null];
         } else {
+            const fm = document.getElementById('fm_memo');
+            const memo = fm ? fm.value.trim() : '';
             values = [date, name, parts.net.toLocaleString(), parts.tax.toLocaleString(), parts.gross.toLocaleString(), memo, null];
         }
         ensureMeta(values, type);

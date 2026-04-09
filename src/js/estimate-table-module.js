@@ -25,8 +25,14 @@ export function renderEstimateTable(api, options) {
         if (filterCategory3 && (item.category3 || '') !== filterCategory3) return false;
 
         if (filterTax) {
-            if (filterTax === '발행완료' && !item.taxIssued) return false;
-            if (filterTax === '미발행' && (item.taxIssued || item.type !== '세금계산서')) return false;
+            if (canSeeMonetary) {
+                if (filterTax === '발행완료' && !item.taxIssued) return false;
+                if (filterTax === '미발행' && (item.taxIssued || item.type !== '세금계산서')) return false;
+            } else {
+                const pIssued = api.derivePurchaseTaxIssuedForEstimateFilter(item);
+                if (filterTax === '발행완료' && !pIssued) return false;
+                if (filterTax === '미발행' && (pIssued || item.type !== '세금계산서')) return false;
+            }
         }
 
         if (filterCashflow) {
@@ -40,9 +46,11 @@ export function renderEstimateTable(api, options) {
             const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
             const netDone = biz.gross <= 0 ? true : item.businessIncomePaidStatus === '지급';
             const cashflowAllDone = payDone && xferDone && netDone;
+            const contractorCashflowDone = xferDone && netDone;
+            const cashflowDone = canSeeMonetary ? cashflowAllDone : contractorCashflowDone;
 
-            if (filterCashflow === '입금완료' && !cashflowAllDone) return false;
-            if (filterCashflow === '미입금' && cashflowAllDone) return false;
+            if (filterCashflow === '입금완료' && !cashflowDone) return false;
+            if (filterCashflow === '미입금' && cashflowDone) return false;
         }
 
         if (filterSearch) {
@@ -81,7 +89,9 @@ export function renderEstimateTable(api, options) {
         const revenueCellHtml = canSeeMonetary
             ? `<span class="table-amount-chip ${salesAmountChipClass}">${item.revenue.toLocaleString()}원</span>`
             : `<span class="table-amount-dash">-</span>`;
-        const cashflowCellHtml = canSeeMonetary ? api.renderCashflowTripleCell(item) : '<span class="table-amount-dash">-</span>';
+        const cashflowCellHtml = canSeeMonetary
+            ? api.renderCashflowTripleCell(item)
+            : api.renderCashflowTransferNetCell(item);
         const codeJs = JSON.stringify(String(item.code != null ? item.code : ''));
         const statusCellHtml = canSeeMonetary
             ? `<button type="button" class="badge ${statusBadgeClass} status-popover-trigger" onclick="openStatusPopover(event, ${codeJs})">${item.status}</button>`

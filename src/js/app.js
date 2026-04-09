@@ -374,16 +374,19 @@ import { createProjectRegister } from './estimate-project-register.js';
             const paidGross = Number(item.aggregatePaymentGross) || 0;
             const transferGross = Number(item.aggregateTransferGross) || 0;
 
-            function sysInternalMeta() {
+            function sysSalesPurchaseMeta() {
+                return { contractorBy: '', internalBy: '' };
+            }
+            function sysPaymentTransferMeta() {
                 return { by: '', kind: 'internal' };
             }
-            // META: sales/purchase 행은 마지막 인덱스 8, 수금/이체는 6
+            // META: 매출/매입 10칸 — 7 도급사메모, 8 내부메모, 9 메타 ; 수금/이체는 6
 
             // 매출 1행
             if (revenueGross > 0 && (!item.salesRows || item.salesRows.length === 0)) {
                 const p = splitNetTaxFromGross(revenueGross);
                 item.salesRows = [
-                    [d, name, p.net, p.tax, p.gross, item.taxIssued ? '발행' : '미발행', '-', 'CSV 자동', sysInternalMeta()],
+                    [d, name, p.net, p.tax, p.gross, item.taxIssued ? '발행' : '미발행', '-', 'CSV 자동', '', sysSalesPurchaseMeta()],
                 ];
             }
 
@@ -400,19 +403,19 @@ import { createProjectRegister } from './estimate-project-register.js';
                         : item.paidStatus === '부분'
                           ? '부분 수금(CSV)'
                           : '미수(CSV)';
-                item.paymentRows = [[d, name, pp.net, pp.tax, pp.gross, memo, sysInternalMeta()]];
+                item.paymentRows = [[d, name, pp.net, pp.tax, pp.gross, memo, sysPaymentTransferMeta()]];
             }
 
             // 매입 1행
             if (purchaseGross > 0 && (!item.purchaseRows || item.purchaseRows.length === 0)) {
                 const p2 = splitNetTaxFromGross(purchaseGross);
-                item.purchaseRows = [[d, name, p2.net, p2.tax, p2.gross, '미발행', '-', 'CSV 자동', sysInternalMeta()]];
+                item.purchaseRows = [[d, name, p2.net, p2.tax, p2.gross, '미발행', '-', 'CSV 자동', '', sysSalesPurchaseMeta()]];
             }
 
             // 이체 1행 (매입이 있으면 기본 이체도 표에 보여줌)
             if (purchaseGross > 0 && (!item.transferRows || item.transferRows.length === 0)) {
                 const tp = splitNetTaxFromGross(transferGross);
-                item.transferRows = [[d, name, tp.net, tp.tax, tp.gross, '이체(CSV)', sysInternalMeta()]];
+                item.transferRows = [[d, name, tp.net, tp.tax, tp.gross, '이체(CSV)', sysPaymentTransferMeta()]];
             }
             if (item.salesRows && item.salesRows.length > 0) {
                 item.salesDates = deriveSalesDatesFromSalesRows(item.salesRows);
@@ -862,6 +865,30 @@ import { createProjectRegister } from './estimate-project-register.js';
             return '<div class="table-amount-pair table-cashflow-triple">' + payHtml + '<span class="table-amount-slash">/</span>' + xferHtml + '<span class="table-amount-slash">/</span>' + netHtml + '</div>';
         }
 
+        /** 도급사 목록: 수금 제외, 이체·차인지급(사업소득 순지급)만 표시 */
+        function renderCashflowTransferNetCell(item) {
+            const purchaseGross = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
+            const transfer = item.aggregateTransferGross != null ? item.aggregateTransferGross : 0;
+            const biz = computeBizTaxFromGross(item.businessIncomeGross);
+            const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
+            const xferHtml = transfer <= 0 ? tableAmountDash() : tableCashflowChip(transfer, xferDone);
+            let netHtml;
+            if (biz.gross <= 0) netHtml = tableAmountDash();
+            else if (item.businessIncomePaidStatus === '지급') netHtml = '<span class="table-amount-chip table-amount-chip--issued">' + biz.net.toLocaleString() + '원</span>';
+            else netHtml = '<span class="table-amount-chip table-amount-chip--not-issued">' + biz.net.toLocaleString() + '원</span>';
+            return '<div class="table-amount-pair table-cashflow-triple">' + xferHtml + '<span class="table-amount-slash">/</span>' + netHtml + '</div>';
+        }
+
+        /** 견적 목록 세금계산서 필터(도급사): 매입 측 발행 여부 — projectSalesPurchaseChipClass(매입)과 동일 기준 */
+        function derivePurchaseTaxIssuedForEstimateFilter(item) {
+            if (!item || item.type !== '세금계산서') return false;
+            const purchaseAmount = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
+            if (purchaseAmount <= 0) return false;
+            if (item.purchaseTaxIssued === true) return true;
+            if (item.purchaseTaxIssued === false) return false;
+            return derivePurchaseTaxIssuedFromRows(item.purchaseRows || []);
+        }
+
         /** 대/중/소분류 마스터 — 기본 목록은 DB(category_settings) 시드 또는 서버 동기화로 채움 */
         let category1Master = [];
         let category2Master = [];
@@ -1114,12 +1141,28 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        /** 견적 목록 분류 필터: 내부·도급사 공통으로 “볼 수 있는 행”만 기준(도급사는 권한 내 프로젝트만) */
+        function getEstimatesVisibleForCategoryFilter() {
+            return estimates.filter(function (e) {
+                return canCurrentUserAccessEstimateItem(e);
+            });
+        }
+
+        function uniqueCategoryValuesFromList(list, field) {
+            var seen = {};
+            (list || []).forEach(function (e) {
+                var v = e && e[field] != null ? String(e[field]).trim() : '';
+                if (v) seen[v] = true;
+            });
+            return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+        }
+
         function refreshCategory1FilterOptions() {
             var sel = document.getElementById('filterCategory1');
             if (!sel) return;
             var prev = sel.value;
-            var names = category1Master.filter(function (m) { return m.active; }).map(function (m) { return m.name; });
-            names.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+            var vis = getEstimatesVisibleForCategoryFilter();
+            var names = uniqueCategoryValuesFromList(vis, 'category1');
             sel.innerHTML = '';
             var optAll = document.createElement('option');
             optAll.value = '';
@@ -1135,13 +1178,18 @@ import { createProjectRegister } from './estimate-project-register.js';
             else sel.value = '';
         }
 
-        // 중분류 필터: 마스터 활성 목록
+        // 중분류: 선택된 대분류와 함께 실제로 존재하는 조합만 옵션으로 표시
         function refreshCategory2FilterOptions() {
             var sel = document.getElementById('filterCategory2');
             if (!sel) return;
             var prev = sel.value;
-            var names = category2Master.filter(function (m) { return m.active; }).map(function (m) { return m.name; });
-            names.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+            var c1El = document.getElementById('filterCategory1');
+            var c1 = c1El && c1El.value ? String(c1El.value).trim() : '';
+            var vis = getEstimatesVisibleForCategoryFilter();
+            if (c1) {
+                vis = vis.filter(function (e) { return String(e.category1 || '').trim() === c1; });
+            }
+            var names = uniqueCategoryValuesFromList(vis, 'category2');
             sel.innerHTML = '';
             var optAll = document.createElement('option');
             optAll.value = '';
@@ -1161,8 +1209,14 @@ import { createProjectRegister } from './estimate-project-register.js';
             var sel = document.getElementById('filterCategory3');
             if (!sel) return;
             var prev = sel.value;
-            var names = category3Master.filter(function (m) { return m.active; }).map(function (m) { return m.name; });
-            names.sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+            var c1El = document.getElementById('filterCategory1');
+            var c2El = document.getElementById('filterCategory2');
+            var c1 = c1El && c1El.value ? String(c1El.value).trim() : '';
+            var c2 = c2El && c2El.value ? String(c2El.value).trim() : '';
+            var vis = getEstimatesVisibleForCategoryFilter();
+            if (c1) vis = vis.filter(function (e) { return String(e.category1 || '').trim() === c1; });
+            if (c2) vis = vis.filter(function (e) { return String(e.category2 || '').trim() === c2; });
+            var names = uniqueCategoryValuesFromList(vis, 'category3');
             sel.innerHTML = '';
             var optAll = document.createElement('option');
             optAll.value = '';
@@ -1986,6 +2040,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 getEstimateSortKey: getEstimateSortKey,
                 projectSalesPurchaseChipClass: projectSalesPurchaseChipClass,
                 renderCashflowTripleCell: renderCashflowTripleCell,
+                renderCashflowTransferNetCell: renderCashflowTransferNetCell,
+                derivePurchaseTaxIssuedForEstimateFilter: derivePurchaseTaxIssuedForEstimateFilter,
                 escapeHtmlAttr: escapeHtmlAttr,
                 updateEstimatePaginationUI: updateEstimatePaginationUI,
             }, options);
@@ -4194,13 +4250,13 @@ import { createProjectRegister } from './estimate-project-register.js';
                     }
 
                     if (salesPacked.rows.length) {
-                        base.salesRows = salesPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], base.taxIssued ? '발행' : '미발행', '-', r[5], null]; });
+                        base.salesRows = salesPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], base.taxIssued ? '발행' : '미발행', '-', r[5], '', { contractorBy: '', internalBy: '' }]; });
                     }
                     if (payPacked.rows.length) {
                         base.paymentRows = payPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], r[5], null]; });
                     }
                     if (purchasePacked.rows.length) {
-                        base.purchaseRows = purchasePacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], '미발행', '-', r[5], null]; });
+                        base.purchaseRows = purchasePacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], '미발행', '-', r[5], '', { contractorBy: '', internalBy: '' }]; });
                     }
                     if (transferPacked.rows.length) {
                         base.transferRows = transferPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], r[5], null]; });
@@ -4285,7 +4341,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     if (taxTxt === '발행완료') taxTxt = '발행';
                     if (taxTxt === '') taxTxt = '미발행';
                     if (!Array.isArray(base2.salesRows)) base2.salesRows = [];
-                    base2.salesRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, (taxTxt === '발행' ? '발행' : '미발행'), '-', memo || 'CSV', null]);
+                    base2.salesRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, (taxTxt === '발행' ? '발행' : '미발행'), '-', memo || 'CSV', '', { contractorBy: '', internalBy: '' }]);
                 } else if (kind === 'payment') {
                     if (!Array.isArray(base2.paymentRows)) base2.paymentRows = [];
                     base2.paymentRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, memo || 'CSV', null]);
@@ -4294,7 +4350,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     if (taxTxt2 === '발행완료') taxTxt2 = '발행';
                     if (taxTxt2 === '') taxTxt2 = '미발행';
                     if (!Array.isArray(base2.purchaseRows)) base2.purchaseRows = [];
-                    base2.purchaseRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, (taxTxt2 === '발행' ? '발행' : '미발행'), '-', memo || 'CSV', null]);
+                    base2.purchaseRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, (taxTxt2 === '발행' ? '발행' : '미발행'), '-', memo || 'CSV', '', { contractorBy: '', internalBy: '' }]);
                 } else if (kind === 'transfer') {
                     if (!Array.isArray(base2.transferRows)) base2.transferRows = [];
                     base2.transferRows.push([dt || (base2.date || new Date().toISOString().slice(0, 10)), nm, amt.net, amt.tax, amt.gross, memo || 'CSV', null]);
@@ -7479,17 +7535,96 @@ import { createProjectRegister } from './estimate-project-register.js';
             values[4] = net > 0 ? Math.round(net * 1.1).toLocaleString() : '';
         }
 
-        /** 금융 행 메모 메타: 도급사·내부 구분 (sales/purchase → 인덱스 8, payment/transfer → 6) */
+        /** 금융 행 메모: 매출/매입 메타 인덱스 9, 수금/이체 6 */
         function financeRowMetaIndex(type) {
-            return (type === 'sales' || type === 'purchase') ? 8 : 6;
+            return (type === 'sales' || type === 'purchase') ? 9 : 6;
+        }
+        function migrateFinanceRowMetaV1ToV2(m) {
+            if (!m || typeof m !== 'object' || Array.isArray(m)) return { contractorBy: '', internalBy: '' };
+            if (m.contractorBy !== undefined || m.internalBy !== undefined) {
+                return { contractorBy: String(m.contractorBy || ''), internalBy: String(m.internalBy || '') };
+            }
+            if (m.kind === 'contractor') return { contractorBy: String(m.by || ''), internalBy: '' };
+            if (m.kind === 'internal') return { contractorBy: '', internalBy: String(m.by || '') };
+            return { contractorBy: '', internalBy: '' };
+        }
+        function getFinanceRowMetaV2(values, type) {
+            if (type !== 'sales' && type !== 'purchase') return { contractorBy: '', internalBy: '' };
+            ensureFinanceRowMetaSlot(values, type);
+            const m = values[9];
+            return migrateFinanceRowMetaV1ToV2(m);
+        }
+        /**
+         * 매출/매입 10칸: […세금계산서,'-', 도급사메모, 내부메모, 메타V2]
+         * 9칸 이하·구 단일메모는 여기서 10칸으로 승격.
+         */
+        function canonicalizeSalesOrPurchaseRowValues(values, type) {
+            if (!values || !Array.isArray(values) || (type !== 'sales' && type !== 'purchase')) return;
+            if (values.length >= 10) {
+                if (values[9] && typeof values[9] === 'object' && values[9].kind && values[9].contractorBy === undefined) {
+                    values[9] = migrateFinanceRowMetaV1ToV2(values[9]);
+                }
+                return;
+            }
+            if (values.length === 9) {
+                var date = values[0];
+                var name = values[1];
+                var net = values[2];
+                var tax = values[3];
+                var gross = values[4];
+                var taxbill = values[5];
+                var dash = values[6];
+                var oldMemo = values[7];
+                var oldMeta = values[8];
+                var cMemo = '';
+                var iMemo = '';
+                if (oldMeta && oldMeta.kind === 'contractor') {
+                    cMemo = String(oldMemo != null ? oldMemo : '');
+                } else if (oldMeta && oldMeta.kind === 'internal') {
+                    iMemo = String(oldMemo != null ? oldMemo : '');
+                } else {
+                    iMemo = String(oldMemo != null ? oldMemo : '');
+                }
+                values.length = 0;
+                values.push(date, name, net, tax, gross, taxbill, dash, cMemo, iMemo, migrateFinanceRowMetaV1ToV2(oldMeta));
+                return;
+            }
+            if (values.length < 5) return;
+            var date2 = values[0];
+            var name2 = values[1];
+            var net2 = values[2];
+            var tax2 = values[3];
+            var gross2 = values[4];
+            var rest = values.slice(5);
+            var taxbill2 = '미발행';
+            var dash2 = '-';
+            var memo2 = '';
+            var tailMeta = null;
+            if (rest[0] === '미발행' || rest[0] === '발행') {
+                taxbill2 = rest[0];
+                dash2 = rest[1] != null ? rest[1] : '-';
+                memo2 = rest[2] != null ? rest[2] : '';
+                tailMeta = rest.length > 3 ? rest[3] : null;
+            } else {
+                memo2 = rest[0] != null ? rest[0] : '';
+                tailMeta = rest.length > 1 ? rest[1] : null;
+            }
+            var cM = '';
+            var iM = '';
+            if (tailMeta && tailMeta.kind === 'contractor') cM = String(memo2 || '');
+            else iM = String(memo2 || '');
+            values.length = 0;
+            values.push(date2, name2, net2, tax2, gross2, taxbill2, dash2, cM, iM, migrateFinanceRowMetaV1ToV2(tailMeta));
         }
         function ensureFinanceRowMetaSlot(values, type) {
             if (!values) return;
+            if (type === 'sales' || type === 'purchase') canonicalizeSalesOrPurchaseRowValues(values, type);
             const ix = financeRowMetaIndex(type);
             while (values.length <= ix) values.push(null);
         }
         function getFinanceRowMemoMeta(values, type) {
             ensureFinanceRowMetaSlot(values, type);
+            if (type === 'sales' || type === 'purchase') return null;
             const m = values[financeRowMetaIndex(type)];
             if (m && typeof m === 'object' && !Array.isArray(m) && m.kind) return m;
             return null;
@@ -7497,8 +7632,16 @@ import { createProjectRegister } from './estimate-project-register.js';
         function shouldMaskFinanceMemoForContractor(values, type) {
             if (!isCurrentUserExternalContractor()) return false;
             ensureFinanceRowMetaSlot(values, type);
+            if (type === 'sales' || type === 'purchase') {
+                const cMemo = String(values[7] != null ? values[7] : '').trim();
+                if (!cMemo) return false;
+                const m = getFinanceRowMetaV2(values, type);
+                const uid = String(currentUserAccessProfile.userId || '').trim();
+                if (m.contractorBy && m.contractorBy === uid) return false;
+                return true;
+            }
             const meta = getFinanceRowMemoMeta(values, type);
-            const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
+            const memoIx = 5;
             const memoText = String(values[memoIx] != null ? values[memoIx] : '').trim();
             if (!meta) return memoText.length > 0;
             const uid = String(currentUserAccessProfile.userId || '').trim();
@@ -7507,7 +7650,33 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
         function formatFinanceMemoCellHtml(values, type) {
             if (!values) return '';
-            const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
+            ensureFinanceRowMetaSlot(values, type);
+            if (type === 'sales' || type === 'purchase') {
+                const cMemo = String(values[7] != null ? values[7] : '');
+                const iMemo = String(values[8] != null ? values[8] : '');
+                if (isCurrentUserExternalContractor()) {
+                    if (shouldMaskFinanceMemoForContractor(values, type)) {
+                        return '<span class="finance-memo-masked">—</span>';
+                    }
+                    return escapeHtml(cMemo);
+                }
+                const parts = [];
+                if (cMemo.trim()) {
+                    parts.push(
+                        '<span class="finance-memo-pill finance-memo-pill--contractor">도급사</span>' +
+                        '<span class="finance-memo-body">' + escapeHtml(cMemo) + '</span>'
+                    );
+                }
+                if (iMemo.trim()) {
+                    parts.push(
+                        '<span class="finance-memo-pill finance-memo-pill--internal">내부</span>' +
+                        '<span class="finance-memo-body">' + escapeHtml(iMemo) + '</span>'
+                    );
+                }
+                if (!parts.length) return '';
+                return '<div class="finance-memo-stack">' + parts.join('') + '</div>';
+            }
+            const memoIx = 5;
             const rawMemo = String(values[memoIx] != null ? values[memoIx] : '');
             if (isCurrentUserExternalContractor()) {
                 if (shouldMaskFinanceMemoForContractor(values, type)) {
@@ -7531,6 +7700,9 @@ import { createProjectRegister } from './estimate-project-register.js';
         function cloneFinanceRowValuesForContractorModal(values, type) {
             const copy = values.slice();
             ensureFinanceRowMetaSlot(copy, type);
+            if (type === 'sales' || type === 'purchase') {
+                copy[8] = '';
+            }
             if (shouldMaskFinanceMemoForContractor(copy, type)) {
                 const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
                 copy[memoIx] = '';
@@ -7539,17 +7711,38 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
         function stampFinanceRowMemoMetaAfterEdit(values, type, prevValues) {
             if (!values) return;
+            if (prevValues && (type === 'sales' || type === 'purchase' || type === 'payment' || type === 'transfer')) {
+                ensureFinanceRowMetaSlot(prevValues, type);
+            }
             ensureFinanceRowMetaSlot(values, type);
             const ix = financeRowMetaIndex(type);
             const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
             const uid = String(currentUserAccessProfile.userId || '').trim();
+
+            if (type === 'sales' || type === 'purchase') {
+                var pm = prevValues ? getFinanceRowMetaV2(prevValues, type) : { contractorBy: '', internalBy: '' };
+                if (isCurrentUserExternalContractor()) {
+                    values[8] = prevValues && prevValues[8] != null ? prevValues[8] : '';
+                    var c7 = String(values[7] != null ? values[7] : '');
+                    values[9] = {
+                        contractorBy: c7.trim() ? uid : '',
+                        internalBy: pm.internalBy || '',
+                    };
+                    return;
+                }
+                if (String(values[8] != null ? values[8] : '').trim()) {
+                    values[9] = { contractorBy: pm.contractorBy || '', internalBy: uid };
+                } else {
+                    values[9] = { contractorBy: pm.contractorBy || '', internalBy: '' };
+                }
+                return;
+            }
 
             if (isCurrentUserExternalContractor()) {
                 if (!prevValues) {
                     values[ix] = { by: uid, kind: 'contractor' };
                     return;
                 }
-                ensureFinanceRowMetaSlot(prevValues, type);
                 const prevMeta = getFinanceRowMemoMeta(prevValues, type);
                 const prevMemo = String(prevValues[memoIx] != null ? prevValues[memoIx] : '');
                 if (!prevMeta && prevMemo.trim()) {
@@ -7596,6 +7789,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             formatFinanceMemoCellHtml: formatFinanceMemoCellHtml,
             cloneFinanceRowValuesForContractorModal: cloneFinanceRowValuesForContractorModal,
             stampFinanceRowMemoMetaAfterEdit: stampFinanceRowMemoMetaAfterEdit,
+            isCurrentUserExternalContractor: isCurrentUserExternalContractor,
         });
         const {
             paymentRowMenuHtml,
