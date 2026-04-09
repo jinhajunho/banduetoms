@@ -106,13 +106,6 @@ npm run dev
 - **경비지출관리:** `index.html#expenses`
 - **사용자관리:** `index.html#users`
 
-### 개별 HTML (레거시, 참고용 — SPA 미사용 시에만)
-- **업체정보 관리:** `contractors.html`
-- **경비지출 관리:** `expenses.html`
-- **주간보고:** `weekly.html`
-- **미수금:** `unpaid.html`
-- **사용자관리:** `users.html`
-
 프로젝트 관리(견적)는 **`index.html#estimate`** — 본문 **`public/partials/page-estimate.html`**.  
 경영실적관리는 **`index.html#performance`** — 본문 **`public/partials/page-performance.html`**(기간별 날짜 패널 `#performanceDatePickerPanel` 포함). 루트 `estimate.html` / `performance.html` 은 제거됨.
 
