@@ -464,6 +464,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                 applyEstimateDefaultsAndSeed(list);
                 estimates.splice(0, estimates.length, ...list);
                 renderTable();
+                // 첫 진입 시 showPage('dashboard')가 서버 동기화보다 먼저 돌아 캘린더가 비는 문제 방지
+                const dashPage = document.getElementById('page-dashboard');
+                if (dashPage && dashPage.classList.contains('active')) {
+                    renderDashboard();
+                }
                 return true;
             }).catch(function () {
                 return false;
