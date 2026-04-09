@@ -6813,6 +6813,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (['all', '견적', '진행', '완료', '보류'].indexOf(prev) !== -1) basis.value = prev;
                 else basis.value = 'all';
             }
+            // 외부 계정은 업로드/양식 다운로드 버튼 숨김 (CSV 다운로드는 유지)
+            const csvUploadBtn = document.getElementById('estimateCsvUploadBtn');
+            const csvTemplateBtn = document.getElementById('estimateCsvTemplateBtn');
+            if (csvUploadBtn) csvUploadBtn.style.display = isCurrentUserExternalContractor() ? 'none' : '';
+            if (csvTemplateBtn) csvTemplateBtn.style.display = isCurrentUserExternalContractor() ? 'none' : '';
             // 내부 계정: 수금상태(미수금/수금완료)로 라벨/옵션 정리. 도급사 계정은 기존(입금상태) 유지.
             const cashflowSel = document.getElementById('filterCashflow');
             const cashflowLabel = document.getElementById('filterCashflowLabel');
