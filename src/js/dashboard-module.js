@@ -584,7 +584,16 @@ export function createDashboard(api) {
         const codeDisplay = (resolved.code || resolved.id || '').toString() || '-';
         const contractorAmountView = typeof api.isCurrentUserExternalContractor === 'function' && api.isCurrentUserExternalContractor();
         const amountLabel = contractorAmountView ? '매입금액(vat별도)' : '매출금액';
-        const amountNum = contractorAmountView ? (resolved.purchaseNet || 0) : (resolved.amount || 0);
+        function computePurchaseNetNow(est) {
+            const rows = est && Array.isArray(est.purchaseRows) ? est.purchaseRows : [];
+            if (rows.length === 0) return 0;
+            return rows.reduce(function (sum, r) {
+                // values[2] = vat별도(매입)
+                const n = parseFloat(String(r && r[2] != null ? r[2] : '').replace(/원/g, '').replace(/,/g, '').trim(), 10);
+                return sum + (isNaN(n) ? 0 : n);
+            }, 0);
+        }
+        const amountNum = contractorAmountView ? computePurchaseNetNow(resolved) : (resolved.amount || 0);
         const bizLabel = '사업소득금액';
         const bizNum = resolved.businessIncomeGross || 0;
         body.innerHTML = '<div class="modal-info"><div class="info-label">코드</div><div class="info-value" style="font-family: ui-monospace, monospace; font-weight: 600;">' + codeDisplay + '</div></div>' +
