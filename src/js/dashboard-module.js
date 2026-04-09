@@ -19,7 +19,10 @@ export function createDashboard(api) {
             endDate: e.endDate || '',
             date: e.date || '',
             amount: e.revenue || 0,
-            purchase: e.purchase || 0
+            // 캘린더 일정 상세: "매입정보 탭의 매입액"에 직접 연동
+            purchase: e.purchase || 0,
+            // 캘린더 일정 상세: "사업소득 탭의 사업소득금액"에 직접 연동
+            businessIncomeGross: e.businessIncomeGross || 0,
         }));
     }
 
@@ -563,6 +566,8 @@ export function createDashboard(api) {
         const contractorAmountView = typeof api.isCurrentUserExternalContractor === 'function' && api.isCurrentUserExternalContractor();
         const amountLabel = contractorAmountView ? '매입금액' : '매출금액';
         const amountNum = contractorAmountView ? (event.purchase || 0) : (event.amount || 0);
+        const bizLabel = '사업소득금액';
+        const bizNum = event.businessIncomeGross || 0;
         body.innerHTML = '<div class="modal-info"><div class="info-label">코드</div><div class="info-value" style="font-family: ui-monospace, monospace; font-weight: 600;">' + codeDisplay + '</div></div>' +
             '<div class="modal-info"><div class="info-label">건물명</div><div class="info-value">' + (event.building || '-') + '</div></div>' +
             '<div class="modal-info"><div class="info-label">프로젝트명</div><div class="info-value">' + (event.project || '-') + '</div></div>' +
@@ -571,6 +576,7 @@ export function createDashboard(api) {
             (event.endDate ? '<div class="modal-info"><div class="info-label">완료일</div><div class="info-value">' + event.endDate + '</div></div>' : '') +
             '<div class="modal-info"><div class="info-label">상태</div><div class="info-value"><span class="status-badge ' + statusClass + '">' + event.status + '</span></div></div>' +
             '<div class="modal-info"><div class="info-label">' + amountLabel + '</div><div class="info-value">' + amountNum.toLocaleString() + '원</div></div>' +
+            '<div class="modal-info"><div class="info-label">' + bizLabel + '</div><div class="info-value">' + bizNum.toLocaleString() + '원</div></div>' +
             '<div class="dashboard-event-modal-actions">' +
                 '<button type="button" class="btn btn-primary dashboard-event-goto-project-btn"><i class="fas fa-external-link-alt"></i> 프로젝트 관리에서 보기</button>' +
             '</div>';
