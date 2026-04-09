@@ -4735,6 +4735,33 @@
             cursor: pointer;
         }
 
+        /* 금융 행 메모: 내부 / 도급사 구분 (내부 계정 전용 표시) */
+        .finance-memo-pill {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.2;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 6px;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        .finance-memo-pill--internal {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        .finance-memo-pill--contractor {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+        .finance-memo-body {
+            vertical-align: middle;
+        }
+        .finance-memo-masked {
+            color: var(--gray-400);
+        }
+
         /* 상호명/업체명: 줄바꿈 허용 (겹침 방지) */
         .payment-table:has(thead th:nth-child(7)) td:first-child {
             width: 120px;

@@ -2,6 +2,22 @@
  * 견적 패널 재무 행 ⋮ 메뉴, 행 렌더, 매출·매입·수금·이체 모달 및 동일내역 피커
  */
 export function createEstimateFinanceModal(api) {
+    const ensureMeta = typeof api.ensureFinanceRowMetaSlot === 'function'
+        ? api.ensureFinanceRowMetaSlot.bind(api)
+        : function () {};
+    const formatMemoCell = typeof api.formatFinanceMemoCellHtml === 'function'
+        ? api.formatFinanceMemoCellHtml.bind(api)
+        : function (values, type) {
+            const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
+            return String(values && values[memoIx] != null ? values[memoIx] : '');
+        };
+    const cloneForModal = typeof api.cloneFinanceRowValuesForContractorModal === 'function'
+        ? api.cloneFinanceRowValuesForContractorModal.bind(api)
+        : function (values) { return values.slice(); };
+    const stampMeta = typeof api.stampFinanceRowMemoMetaAfterEdit === 'function'
+        ? api.stampFinanceRowMemoMetaAfterEdit.bind(api)
+        : function () {};
+
     let financeModalState = null;
 
     function paymentRowMenuHtml() {
@@ -55,10 +71,14 @@ export function createEstimateFinanceModal(api) {
 
     function getRowValuesForModal(type, row) {
         if (!row) {
+            let v;
             if (type === 'sales' || type === 'purchase') {
-                return ['', '', '', '', '', '미발행', '-', '', null];
+                v = ['', '', '', '', '', '미발행', '-', '', null];
+            } else {
+                v = ['', '', '', '', '', '', null];
             }
-            return ['', '', '', '', '', '', null];
+            ensureMeta(v, type);
+            return cloneForModal(v, type);
         }
         let values = [];
         if (row.dataset.rowValues) {
@@ -70,7 +90,8 @@ export function createEstimateFinanceModal(api) {
         if (type === 'sales' || type === 'purchase') { api.migrateSalesRowValuesIfOld(values); api.normalizeSalesVatIncluded(values); }
         if (type === 'payment') { api.migratePaymentRowValuesIfOld(values); api.normalizePaymentVatValues(values); }
         if (type === 'transfer') { api.migratePaymentRowValuesIfOld(values); api.normalizePaymentVatValues(values); }
-        return values;
+        ensureMeta(values, type);
+        return cloneForModal(values, type);
     }
 
     function renderFinanceRow(row, type, values, rowFileId) {
@@ -96,7 +117,7 @@ export function createEstimateFinanceModal(api) {
                 '<td style="font-weight:600;">' + won(values[4]) + '</td>' +
                 '<td>' + taxbillHtml + '</td>' +
                 '<td>' + fileCell + '</td>' +
-                '<td>' + (values[7] || '') + '</td>';
+                '<td>' + formatMemoCell(values, type) + '</td>';
             row.setAttribute('onclick', "onFinanceRowClick(event, this, '" + type + "')");
             if (rowFileId) row.dataset.rowFileId = rowFileId;
             else row.removeAttribute('data-row-file-id');
@@ -107,7 +128,7 @@ export function createEstimateFinanceModal(api) {
                 '<td style="font-weight:600;">' + won(values[2]) + '</td>' +
                 '<td style="font-weight:600;">' + won(values[3]) + '</td>' +
                 '<td style="font-weight:600;">' + won(values[4]) + '</td>' +
-                '<td>' + (values[5] || '') + '</td>';
+                '<td>' + formatMemoCell(values, type) + '</td>';
             row.setAttribute('onclick', "onFinanceRowClick(event, this, '" + type + "')");
         }
         row.setAttribute('data-row-type', type);
@@ -135,6 +156,7 @@ export function createEstimateFinanceModal(api) {
             if (!body) return;
             body.innerHTML = '';
             (rows || []).forEach(function (values) {
+                ensureMeta(values, type);
                 const tr = document.createElement('tr');
                 renderFinanceRow(tr, type, values, '');
                 body.appendChild(tr);
@@ -217,6 +239,7 @@ export function createEstimateFinanceModal(api) {
         const type = financeModalState.type;
         const code = financeModalState.code;
         const row = financeModalState.row;
+        const prevSnap = (row && row.dataset.rowValues) ? JSON.parse(row.dataset.rowValues) : null;
         const date = document.getElementById('fm_date').value;
         const name = document.getElementById('fm_name').value.trim();
         const net = parseFloat(document.getElementById('fm_net').value || '0', 10) || 0;
@@ -231,6 +254,8 @@ export function createEstimateFinanceModal(api) {
         } else {
             values = [date, name, parts.net.toLocaleString(), parts.tax.toLocaleString(), parts.gross.toLocaleString(), memo, null];
         }
+        ensureMeta(values, type);
+        stampMeta(values, type, prevSnap);
         let targetRow = row;
         if (!targetRow) {
             const tbody = document.getElementById(

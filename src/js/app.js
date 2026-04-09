@@ -276,14 +276,6 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
 
         function applyEstimateDefaultsAndSeed(list) {
-            (list || []).forEach(function(e) {
-                if (e.startDate || e.endDate) return;
-                var d = e.date ? String(e.date).trim().slice(0, 10) : '';
-                if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return;
-                e.startDate = d;
-                e.endDate = d;
-            });
-
             (list || []).forEach(function (e, i) {
                 if (e.category3 === undefined) e.category3 = '지원';
                 if (!e.code || String(e.code).trim() === '') {
@@ -382,11 +374,16 @@ import { createProjectRegister } from './estimate-project-register.js';
             const paidGross = Number(item.aggregatePaymentGross) || 0;
             const transferGross = Number(item.aggregateTransferGross) || 0;
 
+            function sysInternalMeta() {
+                return { by: '', kind: 'internal' };
+            }
+            // META: sales/purchase 행은 마지막 인덱스 8, 수금/이체는 6
+
             // 매출 1행
             if (revenueGross > 0 && (!item.salesRows || item.salesRows.length === 0)) {
                 const p = splitNetTaxFromGross(revenueGross);
                 item.salesRows = [
-                    [d, name, p.net, p.tax, p.gross, item.taxIssued ? '발행' : '미발행', '-', 'CSV 자동', null],
+                    [d, name, p.net, p.tax, p.gross, item.taxIssued ? '발행' : '미발행', '-', 'CSV 자동', sysInternalMeta()],
                 ];
             }
 
@@ -403,19 +400,19 @@ import { createProjectRegister } from './estimate-project-register.js';
                         : item.paidStatus === '부분'
                           ? '부분 수금(CSV)'
                           : '미수(CSV)';
-                item.paymentRows = [[d, name, pp.net, pp.tax, pp.gross, memo, null]];
+                item.paymentRows = [[d, name, pp.net, pp.tax, pp.gross, memo, sysInternalMeta()]];
             }
 
             // 매입 1행
             if (purchaseGross > 0 && (!item.purchaseRows || item.purchaseRows.length === 0)) {
                 const p2 = splitNetTaxFromGross(purchaseGross);
-                item.purchaseRows = [[d, name, p2.net, p2.tax, p2.gross, '미발행', '-', 'CSV 자동', null]];
+                item.purchaseRows = [[d, name, p2.net, p2.tax, p2.gross, '미발행', '-', 'CSV 자동', sysInternalMeta()]];
             }
 
             // 이체 1행 (매입이 있으면 기본 이체도 표에 보여줌)
             if (purchaseGross > 0 && (!item.transferRows || item.transferRows.length === 0)) {
                 const tp = splitNetTaxFromGross(transferGross);
-                item.transferRows = [[d, name, tp.net, tp.tax, tp.gross, '이체(CSV)', null]];
+                item.transferRows = [[d, name, tp.net, tp.tax, tp.gross, '이체(CSV)', sysInternalMeta()]];
             }
             if (item.salesRows && item.salesRows.length > 0) {
                 item.salesDates = deriveSalesDatesFromSalesRows(item.salesRows);
@@ -513,9 +510,19 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         /** 금융 행(매출/수금/매입/이체) 편집 후 `estimates` 스냅샷을 Supabase에 반영 */
         function persistEstimateToServerByCode(code) {
-            const ix = findEstimateIndexByCode(code);
-            if (ix === -1) return Promise.resolve({ ok: false, error: '항목을 찾을 수 없습니다.' });
-            return upsertEstimateToServer(estimates[ix]);
+            const k = estimateCodeKey(code);
+            const ix = findEstimateIndexByCode(k);
+            if (ix !== -1) return upsertEstimateToServer(estimates[ix]);
+            // 신규 등록 중에는 아직 `estimates`에 없고 패널의 `currentEditItem`만 존재함
+            if (
+                currentEditItem &&
+                estimateCodeKey(currentEditItem.code) === k
+            ) {
+                const item = { ...currentEditItem };
+                applyEstimateDefaultsAndSeed([item]);
+                return upsertEstimateToServer(item);
+            }
+            return Promise.resolve({ ok: false, error: '항목을 찾을 수 없습니다.' });
         }
 
         function deleteEstimateFromServer(code) {
@@ -7472,6 +7479,107 @@ import { createProjectRegister } from './estimate-project-register.js';
             values[4] = net > 0 ? Math.round(net * 1.1).toLocaleString() : '';
         }
 
+        /** 금융 행 메모 메타: 도급사·내부 구분 (sales/purchase → 인덱스 8, payment/transfer → 6) */
+        function financeRowMetaIndex(type) {
+            return (type === 'sales' || type === 'purchase') ? 8 : 6;
+        }
+        function ensureFinanceRowMetaSlot(values, type) {
+            if (!values) return;
+            const ix = financeRowMetaIndex(type);
+            while (values.length <= ix) values.push(null);
+        }
+        function getFinanceRowMemoMeta(values, type) {
+            ensureFinanceRowMetaSlot(values, type);
+            const m = values[financeRowMetaIndex(type)];
+            if (m && typeof m === 'object' && !Array.isArray(m) && m.kind) return m;
+            return null;
+        }
+        function shouldMaskFinanceMemoForContractor(values, type) {
+            if (!isCurrentUserExternalContractor()) return false;
+            ensureFinanceRowMetaSlot(values, type);
+            const meta = getFinanceRowMemoMeta(values, type);
+            const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
+            const memoText = String(values[memoIx] != null ? values[memoIx] : '').trim();
+            if (!meta) return memoText.length > 0;
+            const uid = String(currentUserAccessProfile.userId || '').trim();
+            if (meta.kind === 'contractor' && meta.by === uid) return false;
+            return true;
+        }
+        function formatFinanceMemoCellHtml(values, type) {
+            if (!values) return '';
+            const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
+            const rawMemo = String(values[memoIx] != null ? values[memoIx] : '');
+            if (isCurrentUserExternalContractor()) {
+                if (shouldMaskFinanceMemoForContractor(values, type)) {
+                    return '<span class="finance-memo-masked">—</span>';
+                }
+                return escapeHtml(rawMemo);
+            }
+            const meta = getFinanceRowMemoMeta(values, type);
+            let tag = '';
+            if (!meta && rawMemo.trim()) {
+                tag = '<span class="finance-memo-pill finance-memo-pill--internal">내부</span>';
+            } else if (meta && meta.kind === 'contractor') {
+                tag = '<span class="finance-memo-pill finance-memo-pill--contractor">도급사</span>';
+            } else if (meta && meta.kind === 'internal') {
+                tag = '<span class="finance-memo-pill finance-memo-pill--internal">내부</span>';
+            }
+            const body = escapeHtml(rawMemo);
+            if (!tag) return body;
+            return tag + '<span class="finance-memo-body">' + body + '</span>';
+        }
+        function cloneFinanceRowValuesForContractorModal(values, type) {
+            const copy = values.slice();
+            ensureFinanceRowMetaSlot(copy, type);
+            if (shouldMaskFinanceMemoForContractor(copy, type)) {
+                const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
+                copy[memoIx] = '';
+            }
+            return copy;
+        }
+        function stampFinanceRowMemoMetaAfterEdit(values, type, prevValues) {
+            if (!values) return;
+            ensureFinanceRowMetaSlot(values, type);
+            const ix = financeRowMetaIndex(type);
+            const memoIx = (type === 'sales' || type === 'purchase') ? 7 : 5;
+            const uid = String(currentUserAccessProfile.userId || '').trim();
+
+            if (isCurrentUserExternalContractor()) {
+                if (!prevValues) {
+                    values[ix] = { by: uid, kind: 'contractor' };
+                    return;
+                }
+                ensureFinanceRowMetaSlot(prevValues, type);
+                const prevMeta = getFinanceRowMemoMeta(prevValues, type);
+                const prevMemo = String(prevValues[memoIx] != null ? prevValues[memoIx] : '');
+                if (!prevMeta && prevMemo.trim()) {
+                    values[memoIx] = prevMemo;
+                    values[ix] = null;
+                    return;
+                }
+                if (prevMeta && prevMeta.kind === 'internal') {
+                    values[memoIx] = prevMemo;
+                    values[ix] = prevMeta;
+                    return;
+                }
+                if (prevMeta && prevMeta.kind === 'contractor' && prevMeta.by !== uid) {
+                    values[memoIx] = prevMemo;
+                    values[ix] = prevMeta;
+                    return;
+                }
+                values[ix] = { by: uid, kind: 'contractor' };
+                return;
+            }
+            const prevMetaIn = prevValues && getFinanceRowMemoMeta(prevValues, type);
+            const prevMemoIn = prevValues ? String(prevValues[memoIx] != null ? prevValues[memoIx] : '') : '';
+            const newMemoIn = String(values[memoIx] != null ? values[memoIx] : '');
+            if (prevMetaIn && prevMetaIn.kind === 'contractor' && prevMemoIn === newMemoIn) {
+                values[ix] = prevMetaIn;
+                return;
+            }
+            values[ix] = { by: uid, kind: 'internal' };
+        }
+
         const estimateFinanceModal = createEstimateFinanceModal({
             splitNetTaxFromGross: splitNetTaxFromGross,
             migrateSalesRowValuesIfOld: migrateSalesRowValuesIfOld,
@@ -7484,6 +7592,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             markPanelDirtyIfChanged: markPanelDirtyIfChanged,
             persistEstimateToServerByCode: persistEstimateToServerByCode,
             showToast: showToast,
+            ensureFinanceRowMetaSlot: ensureFinanceRowMetaSlot,
+            formatFinanceMemoCellHtml: formatFinanceMemoCellHtml,
+            cloneFinanceRowValuesForContractorModal: cloneFinanceRowValuesForContractorModal,
+            stampFinanceRowMemoMetaAfterEdit: stampFinanceRowMemoMetaAfterEdit,
         });
         const {
             paymentRowMenuHtml,
