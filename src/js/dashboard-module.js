@@ -573,20 +573,27 @@ export function createDashboard(api) {
         const modal = document.getElementById('dashboardEventModal');
         const body = document.getElementById('dashboardEventModalBody');
         if (!modal || !body) return;
+        // 캘린더 셀에서 전달된 event는 렌더 시점 스냅샷일 수 있으므로,
+        // 모달은 항상 최신 estimates 목록에서 다시 조회해 금액을 계산합니다.
+        const rawCode = (event && (event.code || event.id) != null) ? String(event.code || event.id).trim() : '';
+        const latest = rawCode
+            ? (api.getEstimates().find(function (e) { return String(e && e.code != null ? e.code : '').trim() === rawCode; }) || null)
+            : null;
+        const resolved = latest || event || {};
         const statusClass = event.status === '완료' ? 'completed' : 'progress';
-        const codeDisplay = (event.code || event.id || '').toString() || '-';
+        const codeDisplay = (resolved.code || resolved.id || '').toString() || '-';
         const contractorAmountView = typeof api.isCurrentUserExternalContractor === 'function' && api.isCurrentUserExternalContractor();
         const amountLabel = contractorAmountView ? '매입금액(vat별도)' : '매출금액';
-        const amountNum = contractorAmountView ? (event.purchaseNet || 0) : (event.amount || 0);
+        const amountNum = contractorAmountView ? (resolved.purchaseNet || 0) : (resolved.amount || 0);
         const bizLabel = '사업소득금액';
-        const bizNum = event.businessIncomeGross || 0;
+        const bizNum = resolved.businessIncomeGross || 0;
         body.innerHTML = '<div class="modal-info"><div class="info-label">코드</div><div class="info-value" style="font-family: ui-monospace, monospace; font-weight: 600;">' + codeDisplay + '</div></div>' +
-            '<div class="modal-info"><div class="info-label">건물명</div><div class="info-value">' + (event.building || '-') + '</div></div>' +
-            '<div class="modal-info"><div class="info-label">프로젝트명</div><div class="info-value">' + (event.project || '-') + '</div></div>' +
-            '<div class="modal-info"><div class="info-label">담당자</div><div class="info-value">' + (event.manager || '-') + '</div></div>' +
-            (event.startDate ? '<div class="modal-info"><div class="info-label">진행일</div><div class="info-value">' + event.startDate + '</div></div>' : '') +
-            (event.endDate ? '<div class="modal-info"><div class="info-label">완료일</div><div class="info-value">' + event.endDate + '</div></div>' : '') +
-            '<div class="modal-info"><div class="info-label">상태</div><div class="info-value"><span class="status-badge ' + statusClass + '">' + event.status + '</span></div></div>' +
+            '<div class="modal-info"><div class="info-label">건물명</div><div class="info-value">' + (resolved.building || '-') + '</div></div>' +
+            '<div class="modal-info"><div class="info-label">프로젝트명</div><div class="info-value">' + (resolved.project || '-') + '</div></div>' +
+            '<div class="modal-info"><div class="info-label">담당자</div><div class="info-value">' + (resolved.manager || '-') + '</div></div>' +
+            (resolved.startDate ? '<div class="modal-info"><div class="info-label">진행일</div><div class="info-value">' + resolved.startDate + '</div></div>' : '') +
+            (resolved.endDate ? '<div class="modal-info"><div class="info-label">완료일</div><div class="info-value">' + resolved.endDate + '</div></div>' : '') +
+            '<div class="modal-info"><div class="info-label">상태</div><div class="info-value"><span class="status-badge ' + statusClass + '">' + (resolved.status || '-') + '</span></div></div>' +
             '<div class="modal-info"><div class="info-label">' + amountLabel + '</div><div class="info-value">' + amountNum.toLocaleString() + '원</div></div>' +
             '<div class="modal-info"><div class="info-label">' + bizLabel + '</div><div class="info-value">' + bizNum.toLocaleString() + '원</div></div>' +
             '<div class="dashboard-event-modal-actions">' +
@@ -594,7 +601,6 @@ export function createDashboard(api) {
             '</div>';
         modal.classList.add('active');
         const gotoBtn = body.querySelector('.dashboard-event-goto-project-btn');
-        const rawCode = (event.code || event.id || '').toString().trim();
         if (gotoBtn) {
             if (!rawCode || rawCode === '-') {
                 gotoBtn.disabled = true;

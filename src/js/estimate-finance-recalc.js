@@ -182,7 +182,7 @@ export function createFinanceRecalc(api) {
         }
         let bizGrossForProfit = estRow ? (estRow.businessIncomeGross || 0) : 0;
         const bizInput = document.getElementById('biz_gross');
-        if (bizInput && currentEditItem && api.estimateCodeKey(currentEditItem.code) === codeKey && (currentEditItem.type === '세금계산서' || currentEditItem.type === '사업소득')) {
+        if (bizInput && currentEditItem && api.estimateCodeKey(currentEditItem.code) === codeKey && (currentEditItem.type === '세금계산서' || currentEditItem.type === '사업소득' || currentEditItem.type === '세금계산서/사업소득')) {
             bizGrossForProfit = api.computeBizTaxFromGross(bizInput.value).gross;
         }
         updateProfitAnalysisSummary(code, salesNet, purchaseNet, bizGrossForProfit);

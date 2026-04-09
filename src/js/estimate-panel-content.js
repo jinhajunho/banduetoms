@@ -10,9 +10,10 @@ export function createRenderPanelContent(api) {
             ? String(profile.contractorName || item.contractor || '').trim()
             : '';
         const canViewSalesTab = !isExternalContractorView;
-        const canViewPurchaseTab = item.type === '세금계산서';
-        const canViewBusinessTab = isExternalContractorView || item.type === '세금계산서' || item.type === '사업소득';
-        const canViewProfitTab = !isExternalContractorView && (item.type === '세금계산서' || item.type === '사업소득');
+        const isTaxOrBiz = item.type === '세금계산서' || item.type === '사업소득' || item.type === '세금계산서/사업소득';
+        const canViewPurchaseTab = item.type === '세금계산서' || item.type === '세금계산서/사업소득';
+        const canViewBusinessTab = isExternalContractorView || isTaxOrBiz;
+        const canViewProfitTab = !isExternalContractorView && isTaxOrBiz;
         const allowedTabs = ['basic'];
         if (canViewSalesTab) allowedTabs.push('sales');
         if (canViewPurchaseTab) allowedTabs.push('purchase');
@@ -184,7 +185,7 @@ export function createRenderPanelContent(api) {
                                     <select class="form-select form-select-inline edit-input" id="edit_type" style="display: none;">
                                         <option value="세금계산서" ${item.type === '세금계산서' ? 'selected' : ''}>세금계산서</option>
                                         <option value="사업소득" ${item.type === '사업소득' ? 'selected' : ''}>사업소득</option>
-                                        <option value="자체인력" ${item.type === '자체인력' ? 'selected' : ''}>자체인력</option>
+                                        <option value="세금계산서/사업소득" ${item.type === '세금계산서/사업소득' ? 'selected' : ''}>세금계산서/사업소득</option>
                                     </select>
                                 </div>
                             </div>

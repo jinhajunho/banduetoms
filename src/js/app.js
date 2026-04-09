@@ -934,7 +934,7 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         function readBusinessIncomeFormIntoItem(target) {
             if (!target) return;
-            if (!isCurrentUserExternalContractor() && target.type !== '세금계산서' && target.type !== '사업소득') return;
+            if (!isCurrentUserExternalContractor() && target.type !== '세금계산서' && target.type !== '사업소득' && target.type !== '세금계산서/사업소득') return;
             const d = document.getElementById('biz_transfer_date');
             const g = document.getElementById('biz_gross');
             const paid = document.querySelector('input[name="biz_paid"]:checked');
@@ -4156,8 +4156,8 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             if (rowMap.type != null && String(rowMap.type).trim() !== '') {
                 var t = String(rowMap.type).trim();
-                if (!/^(세금계산서|사업소득|자체인력)$/.test(t)) {
-                    return '과세유형(type)은 세금계산서, 사업소득, 자체인력 중 하나여야 합니다.';
+                if (!/^(세금계산서|사업소득|세금계산서\/사업소득|자체인력)$/.test(t)) {
+                    return '과세유형(type)은 세금계산서, 사업소득, 세금계산서/사업소득, 자체인력 중 하나여야 합니다.';
                 }
                 item.type = t;
             }

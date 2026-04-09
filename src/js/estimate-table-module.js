@@ -11,9 +11,6 @@ export function renderEstimateTable(api, options) {
     const filterCategory1 = document.getElementById('filterCategory1').value;
     const filterCategory2 = document.getElementById('filterCategory2').value;
     const filterCategory3 = document.getElementById('filterCategory3').value;
-    const filterEstimateTypeEl = document.getElementById('filterEstimateType');
-    const filterTaxBizTypeEl = document.getElementById('filterTaxBizType');
-    const filterEstimateType = filterTaxBizTypeEl ? (filterTaxBizTypeEl.value || '') : '';
     const filterTax = document.getElementById('filterTax').value;
     const filterCashflow = document.getElementById('filterCashflow')?.value || '';
     const filterSearch = document.getElementById('filterSearch').value.toLowerCase();
@@ -26,12 +23,6 @@ export function renderEstimateTable(api, options) {
         if (filterCategory1 && item.category1 !== filterCategory1) return false;
         if (filterCategory2 && item.category2 !== filterCategory2) return false;
         if (filterCategory3 && (item.category3 || '') !== filterCategory3) return false;
-        if (filterEstimateType) {
-            if (filterEstimateType === '__tax_or_biz__') {
-                if (item.type !== '세금계산서' && item.type !== '사업소득') return false;
-            } else if ((item.type || '') !== filterEstimateType) return false;
-        }
-
         if (filterTax) {
             if (canSeeMonetary) {
                 if (filterTax === '발행완료' && !item.taxIssued) return false;
@@ -174,7 +165,6 @@ export function bindEstimateListInteractions(api) {
     const filterCategory2 = document.getElementById('filterCategory2');
     const filterCategory3 = document.getElementById('filterCategory3');
     const filterEstimateType = document.getElementById('filterEstimateType');
-    const filterTaxBizType = document.getElementById('filterTaxBizType');
     const filterTax = document.getElementById('filterTax');
     const filterCashflow = document.getElementById('filterCashflow');
     const filterSearch = document.getElementById('filterSearch');
@@ -182,7 +172,6 @@ export function bindEstimateListInteractions(api) {
     if (filterCategory2) filterCategory2.addEventListener('change', api.renderTable);
     if (filterCategory3) filterCategory3.addEventListener('change', api.renderTable);
     if (filterEstimateType) filterEstimateType.addEventListener('change', api.renderTable);
-    if (filterTaxBizType) filterTaxBizType.addEventListener('change', api.renderTable);
     if (filterTax) filterTax.addEventListener('change', api.renderTable);
     if (filterCashflow) filterCashflow.addEventListener('change', api.renderTable);
     if (filterSearch) filterSearch.addEventListener('input', api.renderTable);

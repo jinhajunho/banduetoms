@@ -69,7 +69,7 @@ export async function saveEstimateChanges(api) {
             contractor: cur.contractor,
             revenue: cur.revenue || 0,
             paidStatus: cur.paidStatus,
-            purchase: (cur.type === '세금계산서' || cur.type === '사업소득') ? (cur.purchase || 0) : 0,
+            purchase: (cur.type === '세금계산서' || cur.type === '사업소득' || cur.type === '세금계산서/사업소득') ? (cur.purchase || 0) : 0,
             taxIssued: !!cur.taxIssued,
             purchaseTaxIssued: api.derivePurchaseTaxIssuedFromRows(cur.purchaseRows || []),
             hasSales: false,
