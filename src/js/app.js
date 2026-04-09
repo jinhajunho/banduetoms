@@ -76,6 +76,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
 
             if (pageName === 'dashboard') renderDashboard();
+            if (pageName === 'estimate') renderTable();
             if (pageName === 'performance') renderPerformanceData();
             if (pageName === 'weekly') renderWeeklyReport();
             if (pageName === 'expenses') {
@@ -165,12 +166,13 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return;
             }
 
-            // ========================================
-            // 대시보드 본문 — public/partials/page-dashboard.html (로그인 통과 후·showPage 전)
-            // ========================================
+            // 대시보드 본문 — index-bootstrap에서 선마운트될 수 있음
             try {
-                const { ensureDashboardPartialMounted } = await import('./dashboard-partial-loader.js');
-                await ensureDashboardPartialMounted();
+                const dashShell = document.getElementById('page-dashboard');
+                if (!dashShell || dashShell.getAttribute('data-dashboard-partial-loaded') !== '1') {
+                    const { ensureDashboardPartialMounted } = await import('./dashboard-partial-loader.js');
+                    await ensureDashboardPartialMounted();
+                }
             } catch (e) {
                 console.error(e);
             }
@@ -478,7 +480,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                 const list = r.body.items.map(function (x) { return { ...x }; });
                 applyEstimateDefaultsAndSeed(list);
                 estimates.splice(0, estimates.length, ...list);
-                renderTable();
+                const estPage = document.getElementById('page-estimate');
+                if (estPage && estPage.classList.contains('active')) {
+                    renderTable();
+                }
                 // 첫 진입 시 showPage('dashboard')가 서버 동기화보다 먼저 돌아 캘린더가 비는 문제 방지
                 const dashPage = document.getElementById('page-dashboard');
                 if (dashPage && dashPage.classList.contains('active')) {
@@ -2004,8 +2009,7 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         initEstimateListFilters();
 
-        // 초기 렌더링
-        renderTable();
+        // 초기 렌더링(대시보드 기본 진입 시 무거운 견적 테이블 DOM은 생성하지 않음 — showPage('estimate')·sync 시 렌더)
         renderCategoryMasterTables();
 
         // ========================================

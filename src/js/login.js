@@ -68,6 +68,16 @@ async function run() {
     const params = new URLSearchParams(window.location.search);
     const nextPage = params.get('next') || 'dashboard';
 
+    try {
+        const pf = document.createElement('link');
+        pf.rel = 'prefetch';
+        pf.as = 'document';
+        pf.href = new URL('index.html', window.location.href).href;
+        document.head.appendChild(pf);
+    } catch (_pref) {
+        /* ignore */
+    }
+
     function setLoginError(message) {
         if (!loginErrorEl) return;
         if (message) {
@@ -182,28 +192,60 @@ async function run() {
         if (!uid) return setLoginError('아이디를 입력하세요.');
         if (!pw) return setLoginError('비밀번호를 입력하세요.');
 
+        var prevBtnText = loginSubmitBtn ? loginSubmitBtn.textContent : '';
+        if (loginSubmitBtn) {
+            loginSubmitBtn.disabled = true;
+            loginSubmitBtn.textContent = '로그인 중…';
+        }
+
         try {
             await syncModeUI();
             if (!remoteActive) {
+                if (loginSubmitBtn) {
+                    loginSubmitBtn.disabled = false;
+                    loginSubmitBtn.textContent = prevBtnText;
+                }
                 return setLoginError('비활성 계정입니다. 관리자에게 문의하세요.');
             }
             if (remoteRequiresSet) {
                 const pw2 = String(
                     loginPasswordConfirm && loginPasswordConfirm.value ? loginPasswordConfirm.value : ''
                 ).trim();
-                if (pw.length < 6) return setLoginError('비밀번호는 6자 이상으로 입력하세요.');
-                if (pw !== pw2) return setLoginError('비밀번호 확인이 일치하지 않습니다.');
+                if (pw.length < 6) {
+                    if (loginSubmitBtn) {
+                        loginSubmitBtn.disabled = false;
+                        loginSubmitBtn.textContent = prevBtnText;
+                    }
+                    return setLoginError('비밀번호는 6자 이상으로 입력하세요.');
+                }
+                if (pw !== pw2) {
+                    if (loginSubmitBtn) {
+                        loginSubmitBtn.disabled = false;
+                        loginSubmitBtn.textContent = prevBtnText;
+                    }
+                    return setLoginError('비밀번호 확인이 일치하지 않습니다.');
+                }
                 await postSetPassword(uid, pw);
             }
             const { error } = await supabase.auth.signInWithPassword({
                 email: virtualEmail(uid),
                 password: pw,
             });
-            if (error) return setLoginError(supabaseAuthErrorToMessage(error));
+            if (error) {
+                if (loginSubmitBtn) {
+                    loginSubmitBtn.disabled = false;
+                    loginSubmitBtn.textContent = prevBtnText;
+                }
+                return setLoginError(supabaseAuthErrorToMessage(error));
+            }
             sessionStorage.setItem(AUTH_USER_KEY, uid);
             setLoginError('');
             window.location.href = 'index.html#' + nextPage;
         } catch (err) {
+            if (loginSubmitBtn) {
+                loginSubmitBtn.disabled = false;
+                loginSubmitBtn.textContent = prevBtnText;
+            }
             setLoginError(err && err.message ? String(err.message) : '처리에 실패했습니다.');
         }
     });

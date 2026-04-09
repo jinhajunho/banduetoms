@@ -34,6 +34,7 @@ async function loadAppWithShellPartials() {
         sgaMod,
         usersMod,
         projectMod,
+        dashboardMod,
     ] = await Promise.all([
         import('./estimate-partial-loader.js'),
         import('./performance-partial-loader.js'),
@@ -44,7 +45,9 @@ async function loadAppWithShellPartials() {
         import('./sga-partial-loader.js'),
         import('./users-partial-loader.js'),
         import('./project-detail-modal-loader.js'),
+        import('./dashboard-partial-loader.js'),
     ]);
+    const appPromise = import('./app.js');
     await Promise.all([
         estimateMod.ensureEstimatePartialMounted(),
         performanceMod.ensurePerformancePartialMounted(),
@@ -55,8 +58,9 @@ async function loadAppWithShellPartials() {
         sgaMod.ensureSgaPagePartialMounted(),
         usersMod.ensureUsersPagePartialMounted(),
         projectMod.ensureProjectDetailModalMounted(),
+        dashboardMod.ensureDashboardPartialMounted(),
+        appPromise,
     ]);
-    await import('./app.js');
 }
 
 async function main() {
