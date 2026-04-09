@@ -76,7 +76,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
 
             if (pageName === 'dashboard') renderDashboard();
-            if (pageName === 'estimate') renderTable();
+            if (pageName === 'estimate') {
+                applyEstimatePageRoleLabels();
+                renderTable();
+            }
             if (pageName === 'performance') renderPerformanceData();
             if (pageName === 'weekly') renderWeeklyReport();
             if (pageName === 'expenses') {
@@ -6590,6 +6593,29 @@ import { createProjectRegister } from './estimate-project-register.js';
             return normalizeAccountType(currentUserAccessProfile.type) === 'external' && currentUserAccessProfile.role === '도급사';
         }
 
+        /** 프로젝트 목록 표 헤더·기준일 라벨: 도급사에게는 매출/수금 문구 제거 */
+        function applyEstimatePageRoleLabels() {
+            const thPair = document.getElementById('estimateListThAmountPair');
+            const thCash = document.getElementById('estimateListThCashflow');
+            if (thPair && thCash) {
+                if (isCurrentUserExternalContractor()) {
+                    thPair.textContent = '매입액';
+                    thCash.textContent = '이체액 / 차인지급액';
+                } else {
+                    thPair.textContent = '매출액 / 매입액';
+                    thCash.textContent = '수금액 / 이체액 / 차인지급액';
+                }
+            }
+            const basis = document.getElementById('filterDateBasis');
+            if (basis) {
+                Array.prototype.forEach.call(basis.options, function (opt) {
+                    if (opt.value === 'sales') {
+                        opt.textContent = isCurrentUserExternalContractor() ? '매입일자' : '매출일자';
+                    }
+                });
+            }
+        }
+
         function canCurrentUserSeeEstimateMonetary() {
             return !isCurrentUserExternalContractor();
         }
@@ -7358,7 +7384,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 getEstimates: function () { return estimates; },
                 showPage: showPage,
                 renderTable: renderTable,
-                openPanel: openPanel
+                openPanel: openPanel,
+                isCurrentUserExternalContractor: isCurrentUserExternalContractor
             });
             renderDashboard = d.renderDashboard;
             dashboardChangeMonth = d.dashboardChangeMonth;

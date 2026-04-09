@@ -19,7 +19,9 @@ export function createRenderPanelContent(api) {
         if (canViewBusinessTab) allowedTabs.push('business');
         if (canViewProfitTab) allowedTabs.push('profit');
         let activePanelTabId = api.getActivePanelTabId();
-        if (!allowedTabs.includes(activePanelTabId)) {
+        if (api.getIsNewEstimate()) {
+            activePanelTabId = 'basic';
+        } else if (!allowedTabs.includes(activePanelTabId)) {
             activePanelTabId = canViewPurchaseTab ? 'purchase' : 'basic';
         }
         api.setActivePanelTabId(activePanelTabId);
