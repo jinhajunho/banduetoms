@@ -1475,6 +1475,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const basisEl = document.getElementById('filterDateBasis');
             const basis = basisEl ? basisEl.value : 'date';
             const range = getEstimateFilterDateRange();
+            if (basis === 'all') return true;
+            if (basis === '견적' || basis === '진행' || basis === '완료' || basis === '보류') {
+                return String(item && item.status ? item.status : '') === basis;
+            }
 
             if (basis === 'start') {
                 const d = item.startDate ? String(item.startDate).trim().slice(0, 10) : '';
@@ -1513,6 +1517,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const basisEl = document.getElementById('filterDateBasis');
             const basis = basisEl ? basisEl.value : 'date';
             const empty = '0000-01-01';
+            if (basis === '견적' || basis === '진행' || basis === '완료' || basis === '보류' || basis === 'all') {
+                const d0 = item.date ? String(item.date).trim().slice(0, 10) : '';
+                return d0 || empty;
+            }
             if (basis === 'start') {
                 const d = item.startDate ? String(item.startDate).trim().slice(0, 10) : '';
                 return d || empty;
@@ -6782,20 +6790,14 @@ import { createProjectRegister } from './estimate-project-register.js';
             const basis = document.getElementById('filterDateBasis');
             if (basis) {
                 const prev = basis.value;
-                if (isCurrentUserExternalContractor()) {
-                    basis.innerHTML =
-                        '<option value="date">등록일</option>' +
-                        '<option value="end">완료일</option>' +
-                        '<option value="purchase">매입일</option>';
-                    if (prev === 'date' || prev === 'end' || prev === 'purchase') basis.value = prev;
-                    else basis.value = 'date';
-                } else {
-                    basis.innerHTML =
-                        '<option value="date">등록일</option>' +
-                        '<option value="sales">매출일자</option>' +
-                        '<option value="end">완료일</option>';
-                    if (['date', 'sales', 'end'].indexOf(prev) !== -1) basis.value = prev;
-                }
+                basis.innerHTML =
+                    '<option value="all">전체</option>' +
+                    '<option value="견적">견적</option>' +
+                    '<option value="진행">진행</option>' +
+                    '<option value="완료">완료</option>' +
+                    '<option value="보류">보류</option>';
+                if (['all', '견적', '진행', '완료', '보류'].indexOf(prev) !== -1) basis.value = prev;
+                else basis.value = 'all';
             }
             // 내부 계정: 수금상태(미수금/수금완료)로 라벨/옵션 정리. 도급사 계정은 기존(입금상태) 유지.
             const cashflowSel = document.getElementById('filterCashflow');

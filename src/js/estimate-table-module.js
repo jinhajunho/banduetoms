@@ -25,8 +25,16 @@ export function renderEstimateTable(api, options) {
         if (filterCategory3 && (item.category3 || '') !== filterCategory3) return false;
         if (filterTax) {
             if (canSeeMonetary) {
-                if (filterTax === '발행완료' && !item.taxIssued) return false;
-                if (filterTax === '미발행' && (item.taxIssued || item.type !== '세금계산서')) return false;
+                const salesGross = item.aggregateSalesGross != null ? item.aggregateSalesGross : (item.revenue || 0);
+                const purchaseGross = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
+                const hasSales = Number(salesGross) > 0;
+                const hasPurchase = Number(purchaseGross) > 0;
+                const salesIssued = !hasSales || item.taxIssued === true;
+                const purchaseIssued = !hasPurchase || api.derivePurchaseTaxIssuedForEstimateFilter(item) === true;
+                const allIssued = salesIssued && purchaseIssued;
+                const hasAnyInvoiceTarget = hasSales || hasPurchase;
+                if (filterTax === '발행완료' && !allIssued) return false;
+                if (filterTax === '미발행' && (!hasAnyInvoiceTarget || allIssued)) return false;
             } else {
                 const pIssued = api.derivePurchaseTaxIssuedForEstimateFilter(item);
                 if (filterTax === '발행완료' && !pIssued) return false;
@@ -243,7 +251,7 @@ export function initEstimateListFiltersModule(api) {
             api.setEstimateDatePreset('all');
 
             const basis = document.getElementById('filterDateBasis');
-            if (basis) basis.value = 'date';
+            if (basis) basis.value = 'all';
 
             const c1 = document.getElementById('filterCategory1');
             const c2 = document.getElementById('filterCategory2');

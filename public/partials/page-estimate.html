@@ -45,7 +45,7 @@
                             <div class="estimate-filter-left-row">
                                 <div class="estimate-filter-basis">
                                     <div class="estimate-filter-basis-top">
-                                        <label class="filter-label estimate-filter-basis-label">기준일</label>
+                                        <label class="filter-label estimate-filter-basis-label">기준필터</label>
                                         <div class="estimate-filter-left-actions estimate-filter-left-actions--compact">
                                             <div class="estimate-filter-presets" role="group" aria-label="기간 빠른 선택">
                                                 <button type="button" class="btn-filter-preset active estimate-filter-preset" data-preset="all">전체</button>
@@ -94,11 +94,12 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <select class="filter-select" id="filterDateBasis" title="날짜 필터 기준">
-                                        <option value="date">등록일</option>
-                                        <option value="sales">매출일자</option>
-                                        <option value="start">진행일</option>
-                                        <option value="end">완료일</option>
+                                    <select class="filter-select" id="filterDateBasis" title="상태 필터 기준">
+                                        <option value="all">전체</option>
+                                        <option value="견적">견적</option>
+                                        <option value="진행">진행</option>
+                                        <option value="완료">완료</option>
+                                        <option value="보류">보류</option>
                                     </select>
                                 </div>
                             </div>
