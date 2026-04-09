@@ -27,12 +27,22 @@ export async function saveEstimateChanges(api) {
         if (editManagerEl) api.getCurrentEditItem().manager = editManagerEl.value;
         const editTypeEl = document.getElementById('edit_type');
         if (editTypeEl) api.getCurrentEditItem().type = editTypeEl.value;
-        const contractorCheck = api.validateContractorSelectionById('edit_contractor');
-        if (!contractorCheck.ok) {
-            api.setSaveLoading(false);
-            return;
+        if (api.isCurrentUserExternalContractor()) {
+            const cn = String(api.getCurrentUserAccessProfile().contractorName || '').trim();
+            if (!cn) {
+                alert('계정에 연결된 도급사명이 없습니다. 관리자에게 문의하세요.');
+                api.setSaveLoading(false);
+                return;
+            }
+            api.getCurrentEditItem().contractor = cn;
+        } else {
+            const contractorCheck = api.validateContractorSelectionById('edit_contractor');
+            if (!contractorCheck.ok) {
+                api.setSaveLoading(false);
+                return;
+            }
+            api.getCurrentEditItem().contractor = contractorCheck.value;
         }
-        api.getCurrentEditItem().contractor = contractorCheck.value;
 
         const cur = api.getCurrentEditItem();
         if (!cur || !cur.building || !cur.project) {
@@ -116,12 +126,22 @@ export async function saveEstimateChanges(api) {
         cur.project = document.getElementById('edit_project').value;
         cur.manager = document.getElementById('edit_manager').value;
         cur.type = document.getElementById('edit_type').value;
-        const contractorCheck2 = api.validateContractorSelectionById('edit_contractor');
-        if (!contractorCheck2.ok) {
-            api.setSaveLoading(false);
-            return;
+        if (api.isCurrentUserExternalContractor()) {
+            const cn2 = String(api.getCurrentUserAccessProfile().contractorName || '').trim();
+            if (!cn2) {
+                alert('계정에 연결된 도급사명이 없습니다. 관리자에게 문의하세요.');
+                api.setSaveLoading(false);
+                return;
+            }
+            cur.contractor = cn2;
+        } else {
+            const contractorCheck2 = api.validateContractorSelectionById('edit_contractor');
+            if (!contractorCheck2.ok) {
+                api.setSaveLoading(false);
+                return;
+            }
+            cur.contractor = contractorCheck2.value;
         }
-        cur.contractor = contractorCheck2.value;
         cur.revenue = parseInt(document.getElementById('edit_revenue').value, 10) || 0;
         cur.paidStatus = document.getElementById('edit_paidStatus').value;
         cur.taxIssued = document.getElementById('edit_taxIssued').value === 'true';

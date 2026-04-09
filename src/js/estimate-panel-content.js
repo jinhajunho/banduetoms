@@ -3,8 +3,12 @@
  * app.js에서 api 주입 후 할당합니다.
  */
 export function createRenderPanelContent(api) {
-    return function renderPanelContent(item) {
+        return function renderPanelContent(item) {
         const isExternalContractorView = api.isCurrentUserExternalContractor();
+        const profile = api.getCurrentUserAccessProfile();
+        const lockedContractorName = isExternalContractorView
+            ? String(profile.contractorName || item.contractor || '').trim()
+            : '';
         const canViewSalesTab = !isExternalContractorView;
         const canViewPurchaseTab = item.type === '세금계산서';
         const canViewBusinessTab = !isExternalContractorView && (item.type === '세금계산서' || item.type === '사업소득');
@@ -180,13 +184,20 @@ export function createRenderPanelContent(api) {
                             <div class="basic-info-row">
                                 <div class="basic-info-label">도급사</div>
                                 <div class="basic-info-value">
-                                    <span class="detail-list-value">${item.contractor || '-'}</span>
+                                    <span class="detail-list-value">${isExternalContractorView ? (lockedContractorName || '-') : (item.contractor || '-')}</span>
+                                    ${isExternalContractorView ? `
+                                    <span class="edit-input" style="display: none; width: 100%;">
+                                        <input type="text" class="form-input form-input-inline" readonly value="${api.escapeHtml(lockedContractorName)}" title="외부 도급사 계정은 본인 소속 업체명으로 고정됩니다." style="background: var(--gray-100); cursor: not-allowed;">
+                                        <input type="hidden" id="edit_contractor" value="${api.escapeHtml(lockedContractorName)}">
+                                    </span>
+                                    ` : `
                                     <span class="edit-input" style="display: none; width: 100%;">
                                         <input type="text" class="form-input form-input-inline" id="edit_contractor" list="contractorListEdit" value="${api.escapeHtml(item.contractor || '')}" placeholder="도급사 검색/선택">
                                         <datalist id="contractorListEdit">
                                             ${api.getContractorDatalistOptionsHtml()}
                                         </datalist>
                                     </span>
+                                    `}
                                 </div>
                             </div>
                             <div class="basic-info-row">

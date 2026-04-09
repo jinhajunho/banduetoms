@@ -12,6 +12,11 @@ export function createProjectRegister(api) {
         const today = new Date().toISOString().slice(0, 10);
 
         const profile = api.getCurrentUserAccessProfile();
+        const isExternalContractor =
+            profile.type === 'external' && profile.role === '도급사';
+        const contractorInitial = isExternalContractor
+            ? String(profile.contractorName || '').trim()
+            : '';
         api.setCurrentEditItem({
             code: newCode,
             date: today,
@@ -26,7 +31,7 @@ export function createProjectRegister(api) {
             manager: profile.name || '방준호',
             createdBy: profile.userId || '',
             type: '세금계산서',
-            contractor: '',
+            contractor: contractorInitial,
             revenue: 0,
             paidStatus: '미수',
             purchase: 0,

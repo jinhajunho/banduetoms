@@ -6599,14 +6599,46 @@ import { createProjectRegister } from './estimate-project-register.js';
             renderUserManagePageAccess();
         }
 
+        function userManageExternalNameSeed(displayName, contractorName) {
+            const c = String(contractorName || '').trim();
+            if (c && findContractorByName(c)) return c;
+            const n = String(displayName || '').trim();
+            if (n && findContractorByName(n)) return n;
+            return c || '';
+        }
+
+        function syncUserManageNameFieldByAccountType() {
+            const typeInput = document.querySelector('input[name="userManageType"]:checked');
+            const ext = typeInput && normalizeAccountType(typeInput.value) === 'external';
+            const wIn = document.getElementById('userManageNameInternalWrap');
+            const wEx = document.getElementById('userManageNameExternalWrap');
+            const nameInp = document.getElementById('userManageName');
+            const nameSel = document.getElementById('userManageNameContractor');
+            const label = document.getElementById('userManageNameLabel');
+            if (!wIn || !wEx || !nameInp || !nameSel) return;
+            if (ext) {
+                wIn.style.display = 'none';
+                wEx.style.display = '';
+                if (label) label.textContent = '소속 도급사(업체명)';
+                const fromText = String(nameInp.value || '').trim();
+                const seed = fromText && findContractorByName(fromText) ? fromText : String(nameSel.value || '').trim();
+                nameSel.innerHTML = getContractorSelectOptionsHtml(seed);
+            } else {
+                wIn.style.display = '';
+                wEx.style.display = 'none';
+                if (label) label.textContent = '이름';
+                const v = String(nameSel.value || '').trim();
+                if (v && findContractorByName(v)) nameInp.value = v;
+            }
+        }
+
         function updateUserManagePanelByType() {
             const typeInput = document.querySelector('input[name="userManageType"]:checked');
             const roleSelect = document.getElementById('userManageRole');
-            const contractorRow = document.getElementById('userManageContractorRow');
             const type = typeInput ? typeInput.value : 'internal';
             const prevRole = roleSelect ? roleSelect.value : '';
             renderUserRoleOptions(roleSelect, type, prevRole);
-            if (contractorRow) contractorRow.style.display = normalizeAccountType(type) === 'external' ? '' : 'none';
+            syncUserManageNameFieldByAccountType();
             renderUserManagePageAccess();
         }
 
@@ -6838,10 +6870,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             const typeValue = normalizeAccountType(type);
             const roleValue = role || '';
             const contractorValue = contractorName || '';
-            const contractorOptionsHtml = contractors.map(function (c) {
-                const nm = String(c.name || '').trim();
-                return '<option value="' + escapeHtmlAttr(nm) + '"' + (nm === contractorValue ? ' selected' : '') + '>' + escapeHtmlAttr(nm) + '</option>';
-            }).join('');
+            const externalNameSeed = userManageExternalNameSeed(name, contractorValue);
+            const contractorSelectInner = getContractorSelectOptionsHtml(externalNameSeed);
             panelBody.className = 'panel-body view-mode';
             panelBody.innerHTML = `
                 <div class="user-manage-panel">
@@ -6852,22 +6882,9 @@ import { createProjectRegister } from './estimate-project-register.js';
 
                     <div id="userManageTabBasic" class="tab-panel active">
                         <div class="user-manage-card">
-                            <div class="user-manage-card-title">기본정보</div>
-                            <div class="user-manage-card-desc">비밀번호는 로그인 페이지에서 본인이 직접 설정/입력합니다.</div>
+                            <div class="user-manage-card-title">유형</div>
                             <div class="panel-form-row">
-                                <label class="panel-form-label">이름</label>
-                                <input type="text" class="form-input" id="userManageName" value="${escapeHtmlAttr(name || '')}">
-                            </div>
-                            <div class="panel-form-row">
-                                <label class="panel-form-label">아이디</label>
-                                <input type="text" class="form-input" id="userManageUserId" value="${escapeHtmlAttr(userId || '')}">
-                            </div>
-                        </div>
-
-                        <div class="user-manage-card">
-                            <div class="user-manage-card-title">권한설정</div>
-                            <div class="panel-form-row">
-                                <label class="panel-form-label">유형</label>
+                                <label class="panel-form-label">계정 유형</label>
                                 <div class="user-manage-radio-group">
                                     <label class="user-manage-radio">
                                         <input type="radio" name="userManageType" value="internal" ${typeValue === 'internal' ? 'checked' : ''} onchange="updateUserManagePanelByType()">
@@ -6879,16 +6896,34 @@ import { createProjectRegister } from './estimate-project-register.js';
                                     </label>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="user-manage-card">
+                            <div class="user-manage-card-title">기본정보</div>
+                            <div class="user-manage-card-desc">비밀번호는 로그인 페이지에서 본인이 직접 설정/입력합니다.</div>
+                            <div class="panel-form-row">
+                                <label class="panel-form-label" id="userManageNameLabel">${typeValue === 'external' ? '소속 도급사(업체명)' : '이름'}</label>
+                                <div id="userManageNameInternalWrap" style="display: ${typeValue === 'internal' ? 'block' : 'none'};">
+                                    <input type="text" class="form-input" id="userManageName" value="${escapeHtmlAttr(typeValue === 'internal' ? (name || '') : '')}">
+                                </div>
+                                <div id="userManageNameExternalWrap" style="display: ${typeValue === 'external' ? 'block' : 'none'};">
+                                    <select id="userManageNameContractor" class="form-select" title="업체정보관리에 등록된 도급사만 선택 가능합니다.">
+                                        ${contractorSelectInner}
+                                    </select>
+                                    <p class="user-manage-card-desc" style="margin-top: 8px; margin-bottom: 0;">업체정보관리에 등록된 도급사만 선택할 수 있습니다.</p>
+                                </div>
+                            </div>
+                            <div class="panel-form-row">
+                                <label class="panel-form-label">아이디</label>
+                                <input type="text" class="form-input" id="userManageUserId" value="${escapeHtmlAttr(userId || '')}">
+                            </div>
+                        </div>
+
+                        <div class="user-manage-card">
+                            <div class="user-manage-card-title">역할</div>
                             <div class="panel-form-row">
                                 <label class="panel-form-label" for="userManageRole">역할</label>
                                 <select id="userManageRole" class="form-select"></select>
-                            </div>
-                            <div class="panel-form-row" id="userManageContractorRow" style="${typeValue === 'external' ? '' : 'display:none;'}">
-                                <label class="panel-form-label" for="userManageContractor">도급사명</label>
-                                <select id="userManageContractor" class="form-select">
-                                    <option value="">선택</option>
-                                    ${contractorOptionsHtml}
-                                </select>
                             </div>
                             ${isCreatingAccount ? '' : `
                             <div class="panel-form-row">
@@ -6912,6 +6947,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             const roleSelect = document.getElementById('userManageRole');
             renderUserRoleOptions(roleSelect, typeValue, roleValue);
             if (roleSelect) roleSelect.addEventListener('change', renderUserManagePageAccess);
+            syncUserManageNameFieldByAccountType();
             renderUserManagePageAccess();
             switchUserManageTab('basic');
 
@@ -6921,27 +6957,34 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         function saveUserManagePanel() {
             const nameInput = document.getElementById('userManageName');
+            const nameContractorSel = document.getElementById('userManageNameContractor');
             const userIdInput = document.getElementById('userManageUserId');
             const typeInput = document.querySelector('input[name="userManageType"]:checked');
             const roleSelect = document.getElementById('userManageRole');
-            const contractorSelect = document.getElementById('userManageContractor');
-            const accountName = String(nameInput ? nameInput.value : '').trim();
-            const accountUserId = String(userIdInput ? userIdInput.value : '').trim();
-            const accountUserIdNorm = accountUserId.toLowerCase();
             const type = typeInput ? normalizeAccountType(typeInput.value) : 'internal';
             const role = roleSelect ? roleSelect.value : '';
-            const contractorName = type === 'external' ? String(contractorSelect ? contractorSelect.value : '').trim() : '';
+            let accountName = '';
+            if (type === 'external') {
+                accountName = String(nameContractorSel ? nameContractorSel.value : '').trim();
+            } else {
+                accountName = String(nameInput ? nameInput.value : '').trim();
+            }
+            const contractorName = type === 'external' ? accountName : '';
+            const accountUserId = String(userIdInput ? userIdInput.value : '').trim();
+            const accountUserIdNorm = accountUserId.toLowerCase();
             const baseAllowed = getBaseAllowedPages(type, role);
             const cleanedExtra = (currentManagingExtraAllowedPages || []).filter(function (p) {
                 return PAGE_ACCESS_ORDER.includes(p) && !baseAllowed.includes(p);
             });
             if (!accountName || !accountUserId) {
-                alert('이름과 아이디는 필수입니다.');
+                alert(type === 'external' ? '소속 도급사(업체명)과 아이디는 필수입니다.' : '이름과 아이디는 필수입니다.');
                 return;
             }
-            if (type === 'external' && role === '도급사' && !contractorName) {
-                alert('외부 도급사 계정은 도급사명을 선택해야 합니다.');
-                return;
+            if (type === 'external' && role === '도급사') {
+                if (!findContractorByName(accountName)) {
+                    alert('업체정보관리에 등록된 도급사만 선택할 수 있습니다.');
+                    return;
+                }
             }
 
             function applyLocalSaveAndClose() {
@@ -8294,9 +8337,18 @@ import { createProjectRegister } from './estimate-project-register.js';
             const editTypeEl = document.getElementById('edit_type');
             if (editTypeEl) currentEditItem.type = editTypeEl.value;
 
-            const contractorCheck = validateContractorSelectionById('edit_contractor');
-            if (!contractorCheck.ok) return;
-            currentEditItem.contractor = contractorCheck.value;
+            if (isCurrentUserExternalContractor()) {
+                const cn = String(currentUserAccessProfile.contractorName || '').trim();
+                if (!cn) {
+                    alert('계정에 연결된 도급사명이 없습니다. 관리자에게 문의하세요.');
+                    return;
+                }
+                currentEditItem.contractor = cn;
+            } else {
+                const contractorCheck = validateContractorSelectionById('edit_contractor');
+                if (!contractorCheck.ok) return;
+                currentEditItem.contractor = contractorCheck.value;
+            }
 
             readBusinessIncomeFormIntoItem(currentEditItem);
 
@@ -8375,6 +8427,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 setSaveLoading: setSaveLoading,
                 getIsNewEstimate: function () { return isNewEstimate; },
                 getCurrentEditItem: function () { return currentEditItem; },
+                isCurrentUserExternalContractor: isCurrentUserExternalContractor,
+                getCurrentUserAccessProfile: function () { return currentUserAccessProfile; },
                 validateContractorSelectionById: validateContractorSelectionById,
                 readBusinessIncomeFormIntoItem: readBusinessIncomeFormIntoItem,
                 derivePurchaseTaxIssuedFromRows: derivePurchaseTaxIssuedFromRows,
@@ -8455,6 +8509,7 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         renderPanelContent = createRenderPanelContent({
             isCurrentUserExternalContractor: isCurrentUserExternalContractor,
+            getCurrentUserAccessProfile: function () { return currentUserAccessProfile; },
             getActivePanelTabId: function () { return activePanelTabId; },
             setActivePanelTabId: function (v) { activePanelTabId = v; },
             getIsNewEstimate: function () { return isNewEstimate; },
@@ -8720,6 +8775,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 openAddUserModal,
                 openUserManagePanelById,
                 switchUserManageTab,
+                toggleUserExtraPageAccess,
                 updateUserManagePanelByType,
                 addMasterItem,
                 toggleMasterActive,
