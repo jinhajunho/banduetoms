@@ -150,14 +150,14 @@ async function run() {
         }
     }
 
-    const storedAuthUserId = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
+    const storedAuthUserId = String(sessionStorage.getItem(AUTH_USER_KEY) || '').trim();
     if (storedAuthUserId) loginUserInput.value = storedAuthUserId;
 
     const supabase = createClient(supabaseUrl, supabaseAnon, {
         auth: {
             persistSession: true,
             autoRefreshToken: true,
-            storage: localStorage,
+            storage: sessionStorage,
         },
     });
     window.__bpsSupabase = supabase;
@@ -200,7 +200,7 @@ async function run() {
                 password: pw,
             });
             if (error) return setLoginError(supabaseAuthErrorToMessage(error));
-            localStorage.setItem(AUTH_USER_KEY, uid);
+            sessionStorage.setItem(AUTH_USER_KEY, uid);
             setLoginError('');
             window.location.href = 'index.html#' + nextPage;
         } catch (err) {

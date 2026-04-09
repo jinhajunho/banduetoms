@@ -1,6 +1,7 @@
 /**
  * index.html 최소 진입: 세션이 없으면 무거운 번들(index-bootstrap, supabase-js) 로드 전에 login.html로 보냅니다.
  * refresh_token이 있으면 access 만료 여부와 관계없이 앱을 로드해 클라이언트가 갱신합니다.
+ * Supabase·bps_auth_userId는 sessionStorage에 두어 브라우저(탭) 종료 후 재접속 시 재로그인합니다.
  */
 function defaultStorageKeyFromUrl(url) {
     try {
@@ -15,13 +16,13 @@ function defaultStorageKeyFromUrl(url) {
 function readStoredSessionJson(url) {
     const primary = defaultStorageKeyFromUrl(url);
     if (primary) {
-        const raw = localStorage.getItem(primary);
+        const raw = sessionStorage.getItem(primary);
         if (raw) return raw;
     }
-    for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
         if (!k || k.indexOf('sb-') !== 0 || !k.endsWith('-auth-token')) continue;
-        const raw = localStorage.getItem(k);
+        const raw = sessionStorage.getItem(k);
         if (raw) return raw;
     }
     return null;
@@ -64,7 +65,7 @@ async function main() {
 
     const raw = readStoredSessionJson(url);
     if (!raw || !looksLikeRecoverableSession(raw)) {
-        localStorage.removeItem('bps_auth_userId');
+        sessionStorage.removeItem('bps_auth_userId');
         try {
             delete window.__bpsProfileBootstrap;
         } catch (e) {

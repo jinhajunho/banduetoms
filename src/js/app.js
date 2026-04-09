@@ -233,7 +233,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (logoutBtn) {
                 logoutBtn.addEventListener('click', function () {
                     var after = function () {
-                        localStorage.removeItem(AUTH_USER_KEY);
+                        sessionStorage.removeItem(AUTH_USER_KEY);
                         window.location.href = 'login.html';
                     };
                     if (window.__bpsSupabase && window.__bpsSupabase.auth) {
@@ -7110,10 +7110,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                             return;
                         }
                         var AUTH_USER_KEY = 'bps_auth_userId';
-                        var authUser = String(localStorage.getItem(AUTH_USER_KEY) || '').trim();
+                        var authUser = String(sessionStorage.getItem(AUTH_USER_KEY) || '').trim();
                         if (authUser.toLowerCase() === uid.toLowerCase()) {
                             await window.__bpsSupabase.auth.signOut();
-                            localStorage.removeItem(AUTH_USER_KEY);
+                            sessionStorage.removeItem(AUTH_USER_KEY);
                             window.location.href = 'login.html';
                             return;
                         }

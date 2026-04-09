@@ -70,7 +70,7 @@ async function main() {
         auth: {
             persistSession: true,
             autoRefreshToken: true,
-            storage: localStorage,
+            storage: sessionStorage,
         },
     });
     window.__bpsSupabase = supabase;
@@ -79,7 +79,7 @@ async function main() {
     const session = sessionData && sessionData.session;
 
     if (!session) {
-        localStorage.removeItem('bps_auth_userId');
+        sessionStorage.removeItem('bps_auth_userId');
         try {
             delete window.__bpsProfileBootstrap;
         } catch (e) {
@@ -98,7 +98,7 @@ async function main() {
     const email = String(session.user.email || '');
     const displayId = email.includes('@') ? email.split('@')[0].trim() : '';
     if (displayId) {
-        localStorage.setItem('bps_auth_userId', displayId);
+        sessionStorage.setItem('bps_auth_userId', displayId);
     }
 
     const { data: profile, error: profileErr } = await supabase
@@ -109,7 +109,7 @@ async function main() {
 
     if (profileErr || !profile || profile.active === false) {
         await supabase.auth.signOut();
-        localStorage.removeItem('bps_auth_userId');
+        sessionStorage.removeItem('bps_auth_userId');
         try {
             delete window.__bpsProfileBootstrap;
         } catch (e) {
