@@ -132,6 +132,25 @@ import { createProjectRegister } from './estimate-project-register.js';
             const AUTH_USER_KEY = 'bps_auth_userId';
 
             let isAuthed = false;
+            function updateSidebarUserInfo() {
+                const avatarEl = document.getElementById('sidebarUserAvatar');
+                const nameEl = document.getElementById('sidebarUserName');
+                const roleEl = document.getElementById('sidebarUserRole');
+                if (nameEl) {
+                    const displayName =
+                        (currentUserAccessProfile.type === 'external' && currentUserAccessProfile.contractorName)
+                            ? String(currentUserAccessProfile.contractorName || '').trim()
+                            : String(currentUserAccessProfile.name || '').trim();
+                    nameEl.textContent = displayName || '—';
+                }
+                if (roleEl) {
+                    roleEl.textContent = String(currentUserAccessProfile.role || '').trim() || '—';
+                }
+                if (avatarEl) {
+                    const base = (nameEl && nameEl.textContent ? nameEl.textContent : '') || '';
+                    avatarEl.textContent = base ? base.trim().slice(0, 1) : '—';
+                }
+            }
             try {
                 if (
                     window.__bpsProfileBootstrap &&
@@ -146,6 +165,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     currentUserAccessProfile.contractorName = String(bp.contractorName || '').trim();
                     currentUserAccessProfile.extraAllowedPages = Array.from(bp.extraAllowedPages || []);
                     isAuthed = true;
+                    updateSidebarUserInfo();
                 }
             } catch (eBoot) {
                 /* ignore */
@@ -6740,8 +6760,9 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
         }
 
+        /** 외부(type: external) 계정 = 도급사 화면·필터. DB role 누락/불일치로 내부처럼 취급되던 문제 방지 */
         function isCurrentUserExternalContractor() {
-            return normalizeAccountType(currentUserAccessProfile.type) === 'external' && currentUserAccessProfile.role === '도급사';
+            return normalizeAccountType(currentUserAccessProfile.type) === 'external';
         }
 
         /** 프로젝트 목록 표 헤더·기준일 라벨: 도급사에게는 매출/수금 문구 제거 */
@@ -6797,11 +6818,12 @@ import { createProjectRegister } from './estimate-project-register.js';
             const myUserId = String(currentUserAccessProfile.userId || '').trim();
             const myName = String(currentUserAccessProfile.name || '').trim();
             const myContractor = String(currentUserAccessProfile.contractorName || '').trim();
+            const effectiveContractor = myContractor || myName;
             const createdBy = String(item.createdBy || '').trim();
             const manager = String(item.manager || '').trim();
             const contractor = String(item.contractor || '').trim();
             const ownCreated = (!!myUserId && createdBy === myUserId) || (!!myName && manager === myName);
-            const sameContractor = !!myContractor && contractor === myContractor;
+            const sameContractor = !!effectiveContractor && contractor === effectiveContractor;
             return ownCreated || sameContractor;
         }
 

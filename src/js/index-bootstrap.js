@@ -179,16 +179,21 @@ async function main() {
         return;
     }
 
-    const uid = String(profile.display_user_id || displayId || '').trim();
+    const uid = String(profile.display_user_id || profile.displayUserId || displayId || '').trim();
+    const typeNorm = profile.type === 'external' ? 'external' : 'internal';
+    /* 외부 계정은 이 제품에서 도급사 전용. role 누락·staff 등이 섞여도 표시·권한 기준은 도급사로 통일 */
+    const roleUi = typeNorm === 'external' ? '도급사' : mapDbRoleToUi(profile.role);
     window.__bpsProfileBootstrap = {
         userId: uid,
         name: String(profile.name || uid).trim(),
-        type: profile.type === 'external' ? 'external' : 'internal',
-        role: mapDbRoleToUi(profile.role),
-        contractorName: String(profile.contractor_name || '').trim(),
+        type: typeNorm,
+        role: roleUi,
+        contractorName: String(profile.contractor_name || profile.contractorName || '').trim(),
         extraAllowedPages: Array.isArray(profile.extra_allowed_pages)
             ? profile.extra_allowed_pages
-            : [],
+            : Array.isArray(profile.extraAllowedPages)
+              ? profile.extraAllowedPages
+              : [],
     };
 
     bpsApplyShellNavFromProfileBootstrap(window.__bpsProfileBootstrap);
