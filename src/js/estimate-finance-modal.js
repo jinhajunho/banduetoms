@@ -24,11 +24,12 @@ export function createEstimateFinanceModal(api) {
     let financeModalState = null;
 
     function paymentRowMenuHtml() {
+        const delHidden = isExtContractor() ? ' style="display:none !important;" aria-hidden="true" tabindex="-1"' : '';
         return '<span class="payment-action-inline">' +
             '<button type="button" class="payment-row-menu-trigger" onclick="event.stopPropagation(); togglePaymentRowInline(this)" title="메뉴"><i class="fas fa-ellipsis-v"></i></button>' +
             '<span class="payment-action-buttons">' +
             '<button type="button" class="payment-inline-btn" onclick="event.stopPropagation(); editRow(this); closePaymentRowInlines();">수정</button>' +
-            '<button type="button" class="payment-inline-btn payment-inline-btn-danger" onclick="event.stopPropagation(); deleteRow(this); closePaymentRowInlines();">삭제</button>' +
+            '<button type="button" class="payment-inline-btn payment-inline-btn-danger" onclick="event.stopPropagation(); deleteRow(this); closePaymentRowInlines();"' + delHidden + '>삭제</button>' +
             '</span></span>';
     }
 
@@ -222,8 +223,14 @@ export function createEstimateFinanceModal(api) {
                 ? '<div style="grid-column:1 / -1;display:flex;align-items:center;gap:8px;"><input type="file" id="' + modalFileId + '" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, \'' + modalFileId + '\')"><button type="button" class="btn-file-upload" onclick="document.getElementById(\'' + modalFileId + '\').click()">업로드</button><button type="button" class="btn-file-view" onclick="showFileList(\'' + modalFileId + '\')">첨부 보기' + (fileCount > 0 ? ' (' + fileCount + ')' : '') + '</button></div>'
                 : ''}
                         </div>
-                        <div style="padding:12px 16px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:8px;">
-                            <button type="button" class="btn btn-primary" onclick="confirmDeleteFinanceRow()" ${isEdit ? 'style="background: var(--danger); border-color: var(--danger);"' : 'style="visibility:hidden"'}>삭제</button>
+                        <div style="padding:12px 16px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                            <button type="button" class="btn btn-primary" id="fm_delete_row_btn" onclick="confirmDeleteFinanceRow()" style="${
+            !isEdit
+                ? 'visibility:hidden;'
+                : isExtContractor()
+                  ? 'display:none;'
+                  : 'background: var(--danger); border-color: var(--danger);'
+        }" ${isEdit && isExtContractor() ? 'aria-hidden="true" tabindex="-1"' : ''}>삭제</button>
                             <div style="display:flex;gap:8px;">
                                 <button type="button" class="btn btn-secondary" onclick="closeFinanceRowModal()">취소</button>
                                 <button type="button" class="btn btn-primary" onclick="saveFinanceRowModal()">저장</button>
@@ -328,6 +335,10 @@ export function createEstimateFinanceModal(api) {
     }
 
     function confirmDeleteFinanceRow() {
+        if (isExtContractor()) {
+            alert('도급사 계정은 테이블 행을 삭제할 수 없습니다.');
+            return;
+        }
         if (!financeModalState || !financeModalState.row) return;
         if (!confirm('이 항목을 삭제하시겠습니까?')) return;
         const code = financeModalState.code;

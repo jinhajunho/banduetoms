@@ -174,9 +174,9 @@
             padding: 16px 0;
         }
 
-        /* 도급사: app.js 적용 전 한 프레임 동안 허용 외 메뉴가 보이지 않도록(부트스트랩에서 클래스 부여) */
-        html.bps-bootstrap-contractor-nav .nav-menu .nav-item[data-page]:not([data-page="dashboard"]):not([data-page="estimate"]) {
-            display: none !important;
+        /* 로그인 직후 프로필·권한 반영 전: 사이드 링크가 한꺼번에 보였다 숨겨지는 플래시 방지 */
+        html:not(.bps-shell-nav-ready) .sidebar .nav-menu {
+            visibility: hidden;
         }
 
         .nav-item {

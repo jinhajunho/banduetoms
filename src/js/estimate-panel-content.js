@@ -28,6 +28,12 @@ export function createRenderPanelContent(api) {
         const codeLabel = item && item.code ? ` · ${item.code}` : '';
         const bizVals = api.computeBizTaxFromGross(item.businessIncomeGross);
         const profitNetTotals = api.getProfitNetTotalsByCode(item.code, item.revenue, item.purchase, item.businessIncomeGross);
+        const bizAmtEditable =
+            isExternalContractorView ||
+            api.getBusinessInfoEditMode() ||
+            api.getIsEditMode() ||
+            api.getIsNewEstimate();
+        const bizTitleEditing = api.getBusinessInfoEditMode() || isExternalContractorView;
         document.getElementById('sharedPanelTitle').textContent = api.getIsNewEstimate()
             ? ('프로젝트 등록' + (item && item.code ? ` · ${item.code}` : ''))
             : (api.getIsEditMode() ? '프로젝트 수정' + codeLabel : '프로젝트 상세' + codeLabel);
@@ -77,7 +83,7 @@ export function createRenderPanelContent(api) {
                             <button type="button" class="btn-basic-info-edit" onclick="startBasicInfoEdit()" style="${api.getBasicInfoEditMode() ? 'display:none;' : ''}">수정</button>
                             <button type="button" class="btn-basic-info-save" onclick="saveBasicInfoEdit()" style="${api.getBasicInfoEditMode() ? '' : 'display:none;'}">저장</button>
                             <button type="button" class="btn-basic-info-cancel" onclick="cancelBasicInfoEdit()" style="${api.getBasicInfoEditMode() ? '' : 'display:none;'}">취소</button>
-                            <button type="button" class="btn-basic-info-delete" onclick="deleteCurrentEstimate()" style="${api.getBasicInfoEditMode() ? 'display:none;' : ''}">삭제</button>
+                            <button type="button" class="btn-basic-info-delete" onclick="deleteCurrentEstimate()" style="${api.getBasicInfoEditMode() || isExternalContractorView ? 'display:none;' : ''}" ${isExternalContractorView ? 'aria-hidden="true" tabindex="-1"' : ''}>삭제</button>
                         </span>
                     </div>
                     <div class="basic-info-grid">
@@ -388,9 +394,9 @@ export function createRenderPanelContent(api) {
                             <i class="fas fa-briefcase" style="color:var(--primary);"></i> 사업소득
                         </span>
                         <span class="basic-info-title-actions" style="${api.getIsNewEstimate() ? 'display:none;' : ''}">
-                            <button type="button" class="btn-basic-info-edit" onclick="startBusinessIncomeEdit()" style="${api.getBusinessInfoEditMode() ? 'display:none;' : ''}">수정</button>
-                            <button type="button" class="btn-basic-info-save" onclick="saveBusinessIncomeEdit()" style="${api.getBusinessInfoEditMode() ? '' : 'display:none;'}">저장</button>
-                            <button type="button" class="btn-basic-info-cancel" onclick="cancelBusinessIncomeEdit()" style="${api.getBusinessInfoEditMode() ? '' : 'display:none;'}">취소</button>
+                            <button type="button" class="btn-basic-info-edit" onclick="startBusinessIncomeEdit()" style="${bizTitleEditing ? 'display:none;' : ''}">수정</button>
+                            <button type="button" class="btn-basic-info-save" onclick="saveBusinessIncomeEdit()" style="${bizTitleEditing ? '' : 'display:none;'}">저장</button>
+                            <button type="button" class="btn-basic-info-cancel" onclick="cancelBusinessIncomeEdit()" style="${bizTitleEditing ? '' : 'display:none;'}">취소</button>
                         </span>
                     </div>
                     <div class="detail-grid" style="max-width:520px;">
@@ -403,31 +409,31 @@ export function createRenderPanelContent(api) {
                         <div class="detail-row">
                             <div class="detail-label">사업소득금액</div>
                             <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_gross" placeholder="세전 금액" min="0" step="1" value="${bizVals.gross}" oninput="syncBusinessIncomeDerived();" ${(!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''}>
+                                <input type="number" class="form-input" id="biz_gross" placeholder="세전 금액" min="0" step="1" value="${bizVals.gross}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'disabled' : ''} ${!bizAmtEditable ? 'style="background:var(--gray-50);"' : ''}>
                             </div>
                         </div>
                         <div class="detail-row">
                             <div class="detail-label">사업소득세 (3%)</div>
                             <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_tax3" readonly value="${bizVals.tax3}" style="background:var(--gray-50);">
+                                <input type="number" class="form-input" id="biz_tax3" min="0" step="1" value="${bizVals.tax3}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
                             </div>
                         </div>
                         <div class="detail-row">
                             <div class="detail-label">지방소득세 (0.3%)</div>
                             <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_tax_local" readonly value="${bizVals.taxLocal}" style="background:var(--gray-50);">
+                                <input type="number" class="form-input" id="biz_tax_local" min="0" step="1" value="${bizVals.taxLocal}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
                             </div>
                         </div>
                         <div class="detail-row">
                             <div class="detail-label">세금합계 (3.3%)</div>
                             <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_tax_total" readonly value="${bizVals.taxTotal}" style="background:var(--gray-50);">
+                                <input type="number" class="form-input" id="biz_tax_total" min="0" step="1" value="${bizVals.taxTotal}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
                             </div>
                         </div>
                         <div class="detail-row">
                             <div class="detail-label">차인지급액</div>
                             <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_net" readonly value="${bizVals.net}" style="background:var(--gray-50);">
+                                <input type="number" class="form-input" id="biz_net" min="0" step="1" value="${bizVals.net}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
                             </div>
                         </div>
                         <div class="detail-row" style="align-items:start;">

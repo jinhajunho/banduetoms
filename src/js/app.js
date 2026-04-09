@@ -328,6 +328,106 @@ import { createProjectRegister } from './estimate-project-register.js';
             return { gross, tax3, taxLocal, taxTotal, net };
         }
 
+        /** 사업소득세 입력 → 세전 gross (반올림 세액과 가장 잘 맞는 값) */
+        function grossFromBizTax3(target) {
+            const t = Math.max(0, Math.round(Number(target) || 0));
+            if (t === 0) return 0;
+            const g0 = Math.max(0, Math.round(t / 0.03));
+            let bestG = g0;
+            let bestDiff = Infinity;
+            const span = Math.min(2000, Math.max(80, Math.round(t / 30 + 50)));
+            const lo = Math.max(0, g0 - span);
+            const hi = Math.min(9000000000000000, g0 + span);
+            for (let g = lo; g <= hi; g++) {
+                const d = Math.abs(computeBizTaxFromGross(g).tax3 - t);
+                if (d < bestDiff) {
+                    bestDiff = d;
+                    bestG = g;
+                }
+            }
+            return bestG;
+        }
+
+        /** 지방소득세 입력 → 세전 gross */
+        function grossFromBizTaxLocal(target) {
+            const t = Math.max(0, Math.round(Number(target) || 0));
+            if (t === 0) return 0;
+            const g0 = Math.max(0, Math.round(t / 0.003));
+            let bestG = g0;
+            let bestDiff = Infinity;
+            const span = Math.min(5000, Math.max(200, Math.round(t / 5 + 80)));
+            const lo = Math.max(0, g0 - span);
+            const hi = Math.min(9000000000000000, g0 + span);
+            for (let g = lo; g <= hi; g++) {
+                const d = Math.abs(computeBizTaxFromGross(g).taxLocal - t);
+                if (d < bestDiff) {
+                    bestDiff = d;
+                    bestG = g;
+                }
+            }
+            return bestG;
+        }
+
+        /** 세금합계(사업소득세+지방소득세)로 gross 역산 */
+        function grossFromBizTaxTotal(target) {
+            const t = Math.max(0, Math.round(Number(target) || 0));
+            if (t === 0) return 0;
+            let lo = 0;
+            let hi = Math.min(9000000000000000, Math.ceil(t / 0.033) + 5000000);
+            let found = -1;
+            while (lo <= hi) {
+                const mid = Math.floor((lo + hi) / 2);
+                const c = computeBizTaxFromGross(mid);
+                if (c.taxTotal < t) lo = mid + 1;
+                else if (c.taxTotal > t) hi = mid - 1;
+                else {
+                    found = mid;
+                    break;
+                }
+            }
+            if (found >= 0) return found;
+            let best = Math.max(0, hi);
+            let bestDiff = Math.abs(computeBizTaxFromGross(best).taxTotal - t);
+            for (let g = Math.max(0, hi - 25); g <= lo + 25; g++) {
+                const d = Math.abs(computeBizTaxFromGross(g).taxTotal - t);
+                if (d < bestDiff) {
+                    bestDiff = d;
+                    best = g;
+                }
+            }
+            return best;
+        }
+
+        /** 차인지급액(순지급)으로 세전 gross 역산 — 세액은 원 단위 반올림 가정 */
+        function grossFromBizNet(target) {
+            const n = Math.max(0, Math.round(Number(target) || 0));
+            if (n === 0) return 0;
+            let lo = 0;
+            let hi = Math.min(9000000000000000, Math.max(n * 2, n + 50000000));
+            let found = -1;
+            while (lo <= hi) {
+                const mid = Math.floor((lo + hi) / 2);
+                const cn = computeBizTaxFromGross(mid).net;
+                if (cn < n) lo = mid + 1;
+                else if (cn > n) hi = mid - 1;
+                else {
+                    found = mid;
+                    break;
+                }
+            }
+            if (found >= 0) return found;
+            let best = Math.max(0, hi);
+            let bestDiff = Math.abs(computeBizTaxFromGross(best).net - n);
+            for (let g = Math.max(0, hi - 30); g <= lo + 30; g++) {
+                const d = Math.abs(computeBizTaxFromGross(g).net - n);
+                if (d < bestDiff) {
+                    bestDiff = d;
+                    best = g;
+                }
+            }
+            return best;
+        }
+
         function seedEstimateAggregates(e) {
             if (e.aggregateSalesGross == null) e.aggregateSalesGross = e.revenue || 0;
             if (e.aggregatePurchaseGross == null) e.aggregatePurchaseGross = e.purchase || 0;
@@ -789,6 +889,10 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
 
         async function deleteCurrentEstimate() {
+            if (isCurrentUserExternalContractor()) {
+                alert('도급사 계정은 프로젝트를 삭제할 수 없습니다.');
+                return;
+            }
             if (!currentEditItem || !currentEditItem.code) return;
             const code = String(currentEditItem.code).trim();
             const ok = confirm('견적 ' + code + ' 을(를) 삭제하시겠습니까?');
@@ -823,14 +927,36 @@ import { createProjectRegister } from './estimate-project-register.js';
             target.businessIncomeNetPay = comp.net;
         }
 
-        function syncBusinessIncomeDerived() {
-            const g = document.getElementById('biz_gross');
-            if (!g) return;
-            const comp = computeBizTaxFromGross(g.value);
+        function syncBusinessIncomeDerived(evt) {
+            const gEl = document.getElementById('biz_gross');
+            if (!gEl) return;
+            let srcId = 'biz_gross';
+            if (evt && evt.target && evt.target.id) srcId = evt.target.id;
+
+            function parseNonNeg(id) {
+                const el = document.getElementById(id);
+                if (!el || el.value === '' || el.value == null) return 0;
+                return Math.max(0, Math.round(Number(el.value) || 0));
+            }
+
+            let comp;
+            if (srcId === 'biz_tax3') {
+                comp = computeBizTaxFromGross(grossFromBizTax3(parseNonNeg('biz_tax3')));
+            } else if (srcId === 'biz_tax_local') {
+                comp = computeBizTaxFromGross(grossFromBizTaxLocal(parseNonNeg('biz_tax_local')));
+            } else if (srcId === 'biz_tax_total') {
+                comp = computeBizTaxFromGross(grossFromBizTaxTotal(parseNonNeg('biz_tax_total')));
+            } else if (srcId === 'biz_net') {
+                comp = computeBizTaxFromGross(grossFromBizNet(parseNonNeg('biz_net')));
+            } else {
+                comp = computeBizTaxFromGross(gEl.value);
+            }
+
             function setVal(id, v) {
                 const el = document.getElementById(id);
                 if (el) el.value = v;
             }
+            setVal('biz_gross', comp.gross);
             setVal('biz_tax3', comp.tax3);
             setVal('biz_tax_local', comp.taxLocal);
             setVal('biz_tax_total', comp.taxTotal);
@@ -1350,8 +1476,9 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             if (basis === 'purchase') {
                 const dates = derivePurchaseDatesFromPurchaseRows(item.purchaseRows || []);
-                if (!range) return true;
+                /* 매입일 기준: 매입 행에 유효한 일자가 하나도 없으면 기간·전체 여부와 관계없이 제외 */
                 if (!dates.length) return false;
+                if (!range) return true;
                 return dates.some(function (d) { return d >= range.from && d <= range.to; });
             }
             const d = item.date ? String(item.date).trim().slice(0, 10) : '';
@@ -8304,6 +8431,10 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         // 행 삭제
         function deleteRow(btn) {
+            if (isCurrentUserExternalContractor()) {
+                alert('도급사 계정은 테이블 행을 삭제할 수 없습니다.');
+                return;
+            }
             const row = btn.closest('tr');
             if (row && ((row.getAttribute('data-row-type') || '') === 'unpaid' || ((row.cells && row.cells[0] ? row.cells[0].textContent : '') || '').trim() === '미수금')) {
                 alert('미수금 행은 삭제할 수 없습니다.');
@@ -9084,6 +9215,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 startBusinessIncomeEdit,
                 cancelBusinessIncomeEdit,
                 saveBusinessIncomeEdit,
+                syncBusinessIncomeDerived,
                 deleteCurrentEstimate,
                 editRow,
                 saveEditedRow,

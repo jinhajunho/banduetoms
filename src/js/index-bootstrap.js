@@ -23,6 +23,54 @@ function mapDbRoleToUi(role) {
     return map[s] || s || '직원';
 }
 
+/** app.js getBaseAllowedPages / mergeAllowedPages 와 동기(부팅 시 메뉴 플래시 방지) */
+const BPS_PAGE_ACCESS_ORDER = ['dashboard', 'estimate', 'performance', 'weekly', 'unpaid', 'contractors', 'expenses', 'sga', 'users'];
+
+function bpsNormalizeAccountType(type) {
+    return type === 'external' ? 'external' : 'internal';
+}
+
+function bpsGetBaseAllowedPages(type, role) {
+    const normalizedType = bpsNormalizeAccountType(type);
+    const roleName = String(role || '');
+    if (normalizedType === 'external') return ['dashboard', 'estimate'];
+    if (roleName === '슈퍼관리자') {
+        return ['dashboard', 'estimate', 'performance', 'weekly', 'unpaid', 'contractors', 'expenses', 'sga', 'users'];
+    }
+    if (roleName === '관리자') {
+        return ['dashboard', 'estimate', 'performance', 'weekly', 'unpaid', 'contractors', 'expenses', 'sga'];
+    }
+    if (roleName === '회계팀') {
+        return ['dashboard', 'estimate', 'performance', 'unpaid', 'expenses', 'sga'];
+    }
+    if (roleName === '직원') return ['dashboard', 'estimate', 'weekly'];
+    return ['dashboard', 'estimate'];
+}
+
+function bpsMergeAllowedPages(basePages, extraPages) {
+    const set = new Set([
+        ...(basePages || []),
+        ...((extraPages || []).filter(function (p) {
+            return BPS_PAGE_ACCESS_ORDER.includes(p);
+        })),
+    ]);
+    return BPS_PAGE_ACCESS_ORDER.filter(function (p) {
+        return set.has(p);
+    });
+}
+
+/** 프로필 수신 직후(app.js 전): 네비 표시를 권한에 맞춤 후 메뉴 영역 표시 */
+function bpsApplyShellNavFromProfileBootstrap(bp) {
+    if (!bp) return;
+    const base = bpsGetBaseAllowedPages(bp.type, bp.role);
+    const allowed = bpsMergeAllowedPages(base, bp.extraAllowedPages || []);
+    document.querySelectorAll('.nav-item[data-page]').forEach(function (el) {
+        const p = el.getAttribute('data-page') || '';
+        el.style.display = allowed.includes(p) ? '' : 'none';
+    });
+    document.documentElement.classList.add('bps-shell-nav-ready');
+}
+
 async function loadAppWithShellPartials() {
     const [
         estimateMod,
@@ -94,6 +142,7 @@ async function main() {
             window.location.replace('login.html?next=' + encodeURIComponent(next));
             return;
         }
+        document.documentElement.classList.add('bps-shell-nav-ready');
         await loadAppWithShellPartials();
         window.dispatchEvent(new Event('DOMContentLoaded'));
         return;
@@ -124,6 +173,7 @@ async function main() {
             window.location.replace('login.html?next=' + encodeURIComponent(next));
             return;
         }
+        document.documentElement.classList.add('bps-shell-nav-ready');
         await loadAppWithShellPartials();
         window.dispatchEvent(new Event('DOMContentLoaded'));
         return;
@@ -141,13 +191,7 @@ async function main() {
             : [],
     };
 
-    if (profile.type === 'external' && mapDbRoleToUi(profile.role) === '도급사') {
-        document.documentElement.classList.add('bps-bootstrap-contractor-nav');
-        document.querySelectorAll('.nav-item[data-page]').forEach(function (el) {
-            const p = el.getAttribute('data-page') || '';
-            el.style.display = p === 'dashboard' || p === 'estimate' ? '' : 'none';
-        });
-    }
+    bpsApplyShellNavFromProfileBootstrap(window.__bpsProfileBootstrap);
 
     await loadAppWithShellPartials();
     window.dispatchEvent(new Event('DOMContentLoaded'));
