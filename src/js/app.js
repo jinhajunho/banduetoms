@@ -4638,8 +4638,22 @@ import { createProjectRegister } from './estimate-project-register.js';
             function step() {
                 if (i >= pending.length) {
                     syncEstimatesFromServer().then(function () {
-                        alert(pending.length + '건 반영했습니다.');
-                        closeEstimateImportModal();
+                        syncCategoryMastersFromEstimates();
+                        upsertCategoryMastersToServer().then(function (mRes) {
+                            refreshCategoryFilterOptionsAll();
+                            renderCategoryMasterTables();
+                            if (!mRes.ok) {
+                                alert(
+                                    pending.length +
+                                        '건 반영했습니다.\n(분류 마스터 자동 저장 실패: ' +
+                                        (mRes.error || '알 수 없는 오류') +
+                                        ')'
+                                );
+                            } else {
+                                alert(pending.length + '건 반영했습니다.\n(분류 마스터 자동 동기화 완료)');
+                            }
+                            closeEstimateImportModal();
+                        });
                     });
                     return;
                 }
