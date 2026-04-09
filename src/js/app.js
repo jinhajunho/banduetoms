@@ -3479,8 +3479,18 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         function getFilteredExpensesByMonth() {
             const month = getExpenseMonthFilter();
-            if (!month) return expenses;
-            return expenses.filter(e => e.date && e.date.slice(0, 7) === month);
+            const base = month
+                ? expenses.filter(function (e) { return e.date && e.date.slice(0, 7) === month; })
+                : expenses.slice();
+            // 사용일시 최신순(내림차순). 날짜가 같으면 id 큰 순서(최근 등록)로 정렬.
+            return base.sort(function (a, b) {
+                const aDate = Date.parse(String(a && a.date ? a.date : '')) || 0;
+                const bDate = Date.parse(String(b && b.date ? b.date : '')) || 0;
+                if (bDate !== aDate) return bDate - aDate;
+                const aId = Number(a && a.id != null ? a.id : 0) || 0;
+                const bId = Number(b && b.id != null ? b.id : 0) || 0;
+                return bId - aId;
+            });
         }
 
         // 월 선택 옵션 채우기 (사용일시 기준 존재하는 년월 + 현재 년월)
