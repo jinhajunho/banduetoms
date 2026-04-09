@@ -5370,7 +5370,7 @@ import { createProjectRegister } from './estimate-project-register.js';
         // ========================================
         
         /** 'all' | 'month' | 'range' — 표·KPI 필터 기준 */
-        let performancePeriodMode = 'month';
+        let performancePeriodMode = 'all';
         /** 'include' | 'exclude' — 판관비 포함 여부 */
         let performanceSgaMode = 'exclude';
         // 기간별 팝오버는 시작/종료 둘 다 선택되면 자동으로 닫히도록 제어
@@ -6793,9 +6793,31 @@ import { createProjectRegister } from './estimate-project-register.js';
                     basis.innerHTML =
                         '<option value="date">등록일</option>' +
                         '<option value="sales">매출일자</option>' +
-                        '<option value="start">진행일</option>' +
                         '<option value="end">완료일</option>';
-                    if (['date', 'sales', 'start', 'end'].indexOf(prev) !== -1) basis.value = prev;
+                    if (['date', 'sales', 'end'].indexOf(prev) !== -1) basis.value = prev;
+                }
+            }
+            // 내부 계정: 수금상태(미수금/수금완료)로 라벨/옵션 정리. 도급사 계정은 기존(입금상태) 유지.
+            const cashflowSel = document.getElementById('filterCashflow');
+            const cashflowLabel = document.getElementById('filterCashflowLabel');
+            if (cashflowSel) {
+                const prevV = cashflowSel.value || '';
+                if (!isCurrentUserExternalContractor()) {
+                    if (cashflowLabel) cashflowLabel.textContent = '수금상태';
+                    cashflowSel.innerHTML =
+                        '<option value="">전체</option>' +
+                        '<option value="미수금">미수금</option>' +
+                        '<option value="수금완료">수금완료</option>';
+                    if (prevV === '미수금' || prevV === '수금완료') cashflowSel.value = prevV;
+                    else cashflowSel.value = '';
+                } else {
+                    if (cashflowLabel) cashflowLabel.textContent = '입금상태';
+                    cashflowSel.innerHTML =
+                        '<option value="">전체</option>' +
+                        '<option value="미입금">미입금</option>' +
+                        '<option value="입금완료">입금완료</option>';
+                    if (prevV === '미입금' || prevV === '입금완료') cashflowSel.value = prevV;
+                    else cashflowSel.value = '';
                 }
             }
         }
@@ -8454,7 +8476,24 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return;
             }
             if (confirm('이 항목을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) {
+                const tbodyId = (row && row.closest('tbody') && row.closest('tbody').id) ? row.closest('tbody').id : '';
+                const code = tbodyId.replace('salesList-', '').replace('purchaseList-', '').replace('salesPayments-', '').replace('transferList-', '');
                 row.remove();
+                try {
+                    if (code) {
+                        recalcFinanceSummaries(code);
+                        persistEstimateToServerByCode(code);
+                    }
+                } catch (_e) {
+                    /* ignore */
+                }
+                try {
+                    renderTable({ preservePage: true });
+                    const perf = document.getElementById('page-performance');
+                    if (perf && perf.classList.contains('active')) renderPerformanceData();
+                } catch (_e2) {
+                    /* ignore */
+                }
                 alert('삭제되었습니다.');
             }
         }
@@ -9129,6 +9168,24 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (item) {
                 item.status = newStatus;
                 renderTable();
+                // 경영실적·대시보드 등 다른 탭도 즉시 반영
+                try {
+                    persistEstimateToServerByCode(c);
+                } catch (_e) {
+                    /* ignore */
+                }
+                try {
+                    const perf = document.getElementById('page-performance');
+                    if (perf && perf.classList.contains('active')) {
+                        renderPerformanceData();
+                    }
+                    const dash = document.getElementById('page-dashboard');
+                    if (dash && dash.classList.contains('active')) {
+                        renderDashboard();
+                    }
+                } catch (_e2) {
+                    /* ignore */
+                }
                 closeStatusPopover();
             }
         }

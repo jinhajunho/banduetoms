@@ -593,9 +593,19 @@ export function createDashboard(api) {
                 return sum + (isNaN(n) ? 0 : n);
             }, 0);
         }
-        const amountNum = contractorAmountView ? computePurchaseNetNow(resolved) : (resolved.amount || 0);
-        const bizLabel = '사업소득금액';
-        const bizNum = resolved.businessIncomeGross || 0;
+        function computeSalesGrossNow(est) {
+            const rows = est && Array.isArray(est.salesRows) ? est.salesRows : [];
+            if (rows.length === 0) return 0;
+            return rows.reduce(function (sum, r) {
+                // values[4] = vat포함(매출)
+                const n = parseFloat(String(r && r[4] != null ? r[4] : '').replace(/원/g, '').replace(/,/g, '').trim(), 10);
+                return sum + (isNaN(n) ? 0 : n);
+            }, 0);
+        }
+        const amountNum = contractorAmountView ? computePurchaseNetNow(resolved) : computeSalesGrossNow(resolved);
+        const bizLineHtml = contractorAmountView
+            ? ('<div class="modal-info"><div class="info-label">사업소득금액</div><div class="info-value">' + (resolved.businessIncomeGross || 0).toLocaleString() + '원</div></div>')
+            : '';
         body.innerHTML = '<div class="modal-info"><div class="info-label">코드</div><div class="info-value" style="font-family: ui-monospace, monospace; font-weight: 600;">' + codeDisplay + '</div></div>' +
             '<div class="modal-info"><div class="info-label">건물명</div><div class="info-value">' + (resolved.building || '-') + '</div></div>' +
             '<div class="modal-info"><div class="info-label">프로젝트명</div><div class="info-value">' + (resolved.project || '-') + '</div></div>' +
@@ -604,7 +614,7 @@ export function createDashboard(api) {
             (resolved.endDate ? '<div class="modal-info"><div class="info-label">완료일</div><div class="info-value">' + resolved.endDate + '</div></div>' : '') +
             '<div class="modal-info"><div class="info-label">상태</div><div class="info-value"><span class="status-badge ' + statusClass + '">' + (resolved.status || '-') + '</span></div></div>' +
             '<div class="modal-info"><div class="info-label">' + amountLabel + '</div><div class="info-value">' + amountNum.toLocaleString() + '원</div></div>' +
-            '<div class="modal-info"><div class="info-label">' + bizLabel + '</div><div class="info-value">' + bizNum.toLocaleString() + '원</div></div>' +
+            bizLineHtml +
             '<div class="dashboard-event-modal-actions">' +
                 '<button type="button" class="btn btn-primary dashboard-event-goto-project-btn"><i class="fas fa-external-link-alt"></i> 프로젝트 관리에서 보기</button>' +
             '</div>';

@@ -189,8 +189,24 @@ export function createEstimateFinanceModal(api) {
             if (type !== 'sales' && type !== 'purchase') {
                 return '<input id="fm_memo" type="text" value="' + String(values[5] || '').replace(/"/g, '&quot;') + '" placeholder="메모" class="form-input" style="grid-column:1 / -1;">';
             }
-            const cEsc = String(values[7] != null ? values[7] : '').replace(/"/g, '&quot;');
-            const iEsc = String(values[8] != null ? values[8] : '').replace(/"/g, '&quot;');
+            let cEsc = String(values[7] != null ? values[7] : '').replace(/"/g, '&quot;');
+            let iEsc = String(values[8] != null ? values[8] : '').replace(/"/g, '&quot;');
+            // 구 버전/데이터에서 memo가 1개만 있던 경우: 내부 계정은 내부메모 칸에 기본 표시
+            try {
+                const meta = values && values[9] && typeof values[9] === 'object' ? values[9] : null;
+                const hasInternal = meta && meta.internalBy;
+                const hasContractor = meta && meta.contractorBy;
+                if (!isExtContractor() && !iEsc.trim() && cEsc.trim() && (hasInternal && !hasContractor)) {
+                    iEsc = cEsc;
+                    cEsc = '';
+                }
+                if (!isExtContractor() && !iEsc.trim() && cEsc.trim() && !hasInternal && !hasContractor) {
+                    iEsc = cEsc;
+                    cEsc = '';
+                }
+            } catch (_e) {
+                /* ignore */
+            }
             if (isExtContractor()) {
                 return '<input id="fm_memo" type="text" value="' + cEsc + '" placeholder="메모(도급사)" class="form-input" style="grid-column:1 / -1;">';
             }

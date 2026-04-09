@@ -48,8 +48,10 @@ export function renderEstimateTable(api, options) {
             const contractorCashflowDone = xferDone && netDone;
             const cashflowDone = canSeeMonetary ? cashflowAllDone : contractorCashflowDone;
 
-            if (filterCashflow === '입금완료' && !cashflowDone) return false;
-            if (filterCashflow === '미입금' && cashflowDone) return false;
+            const wantDone = (filterCashflow === '입금완료' || filterCashflow === '수금완료');
+            const wantNotDone = (filterCashflow === '미입금' || filterCashflow === '미수금');
+            if (wantDone && !cashflowDone) return false;
+            if (wantNotDone && cashflowDone) return false;
         }
 
         if (filterSearch) {

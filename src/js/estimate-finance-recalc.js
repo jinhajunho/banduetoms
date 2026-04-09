@@ -96,7 +96,8 @@ export function createFinanceRecalc(api) {
             paymentRowCnt++;
             paymentDone += getRowGrossFromValues(r, 4);
         });
-        if (paymentRowCnt === 0 && estRow) {
+        // 표 DOM이 없는 경우(부분 로드)에는 저장된 집계값 fallback, 표 DOM이 있는데 행이 0이면 실제 0으로 취급
+        if (!payBody && estRow) {
             paymentDone = Number(estRow.aggregatePaymentGross) || 0;
         }
         if (purchaseBody) Array.from(purchaseBody.rows).forEach(function (r) {
@@ -110,8 +111,8 @@ export function createFinanceRecalc(api) {
             transferRowCnt++;
             transferDone += getRowGrossFromValues(r, 4);
         });
-        if (transferRowCnt === 0 && estRow) {
-            transferDone = purchaseTotal > 0 ? Math.round(purchaseTotal * 0.6) : 0;
+        if (!transferBody && estRow) {
+            transferDone = Number(estRow.aggregateTransferGross) || 0;
         }
 
         if (!salesTotal && !salesRowCnt && estRow && estRow.revenue) salesTotal = estRow.revenue;
