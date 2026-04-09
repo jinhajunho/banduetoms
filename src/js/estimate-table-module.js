@@ -72,7 +72,10 @@ export function renderEstimateTable(api, options) {
     filtered.sort(function (a, b) {
         const ka = api.getEstimateSortKey(a);
         const kb = api.getEstimateSortKey(b);
-        return kb.localeCompare(ka);
+        if (kb !== ka) return kb.localeCompare(ka);
+        const ac = String(a && a.code != null ? a.code : '');
+        const bc = String(b && b.code != null ? b.code : '');
+        return bc.localeCompare(ac, 'ko');
     });
 
     var totalItems = filtered.length;

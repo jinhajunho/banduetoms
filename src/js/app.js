@@ -3224,7 +3224,14 @@ import { createProjectRegister } from './estimate-project-register.js';
             const filtered = month ? sgaExpenses.filter(function(item) {
                 return item.date && item.date.slice(0, 7) === month;
             }) : sgaExpenses.slice();
-            filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+            filtered.sort(function (a, b) {
+                const aDate = Date.parse(String(a && a.date ? a.date : '')) || 0;
+                const bDate = Date.parse(String(b && b.date ? b.date : '')) || 0;
+                if (bDate !== aDate) return bDate - aDate;
+                const aId = Number(a && a.id != null ? a.id : 0) || 0;
+                const bId = Number(b && b.id != null ? b.id : 0) || 0;
+                return bId - aId;
+            });
 
             const totalItems = filtered.length;
             const totalPages = Math.max(1, Math.ceil(totalItems / ESTIMATE_PAGE_SIZE));
@@ -6173,10 +6180,26 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             const categoryOverallArr = Object.values(categoryOverallByKey).map(s => ({
                 ...s,
+                latestMonth: (function () {
+                    let latest = '';
+                    data.forEach(function (item) {
+                        const c1 = (item.category1 || '').trim() || '-';
+                        const c2 = (item.category2 || '').trim() || '-';
+                        if (c1 !== s.category1 || c2 !== s.category2) return;
+                        getPerformanceSalesDateList(item).forEach(function (d) {
+                            const m = String(d || '').slice(0, 7);
+                            if (/^\d{4}-\d{2}$/.test(m) && (!latest || m > latest)) latest = m;
+                        });
+                    });
+                    return latest;
+                })(),
                 profit: s.revenue - s.purchase - Math.round(s.revenue * sgaShareFactorOverall),
                 margin: s.revenue > 0 ? ((s.revenue - s.purchase - Math.round(s.revenue * sgaShareFactorOverall)) / s.revenue * 100) : 0,
                 avgUnitRounded: s.unitCount > 0 ? Math.round(s.unitRevSum / s.unitCount) : 0
             })).sort((a, b) => {
+                const aLatest = String(a && a.latestMonth ? a.latestMonth : '');
+                const bLatest = String(b && b.latestMonth ? b.latestMonth : '');
+                if (bLatest !== aLatest) return bLatest.localeCompare(aLatest);
                 if (a.category1 !== b.category1) return a.category1.localeCompare(b.category1);
                 return a.category2.localeCompare(b.category2);
             });
@@ -6531,8 +6554,13 @@ import { createProjectRegister } from './estimate-project-register.js';
             return estimates.filter(unpaidItemIsMismatch).sort(function (a, b) {
                 const aSales = getUnpaidSalesDisplayDate(a);
                 const bSales = getUnpaidSalesDisplayDate(b);
-                if (aSales === bSales) return 0;
-                return aSales < bSales ? 1 : -1;
+                if (aSales !== bSales) return aSales < bSales ? 1 : -1;
+                const aDate = String(a && a.date ? a.date : '').slice(0, 10);
+                const bDate = String(b && b.date ? b.date : '').slice(0, 10);
+                if (aDate !== bDate) return aDate < bDate ? 1 : -1;
+                const aCode = String(a && a.code != null ? a.code : '');
+                const bCode = String(b && b.code != null ? b.code : '');
+                return bCode.localeCompare(aCode, 'ko');
             });
         }
 
