@@ -183,9 +183,6 @@ import { createProjectRegister } from './estimate-project-register.js';
                 showPage('dashboard'); // 기본 페이지: 대시보드
             }
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
-                syncExpensesFromServer();
-                syncSgaFromServer();
-                syncContractorsFromServer();
                 Promise.all([syncEstimatesFromServer(), syncCategoryMastersFromServer()]).then(function () {
                     syncCategoryMastersFromEstimates();
                     renderCategoryMasterTables();
@@ -193,6 +190,17 @@ import { createProjectRegister } from './estimate-project-register.js';
                         refreshCategoryFilterOptionsAll();
                     }
                 });
+                // 대시보드·견적에 필요한 API와 경쟁하지 않도록 경비/판관/업체 목록은 유휴 시점에 로드
+                const runBgSync = function () {
+                    syncExpensesFromServer();
+                    syncSgaFromServer();
+                    syncContractorsFromServer();
+                };
+                if (typeof requestIdleCallback === 'function') {
+                    requestIdleCallback(runBgSync, { timeout: 2500 });
+                } else {
+                    setTimeout(runBgSync, 0);
+                }
             }
 
             // 경영실적관리 기간 UI(월 선택/기간 선택) 초기화

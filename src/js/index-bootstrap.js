@@ -24,24 +24,38 @@ function mapDbRoleToUi(role) {
 }
 
 async function loadAppWithShellPartials() {
-    const { ensureEstimatePartialMounted } = await import('./estimate-partial-loader.js');
-    await ensureEstimatePartialMounted();
-    const { ensurePerformancePartialMounted } = await import('./performance-partial-loader.js');
-    await ensurePerformancePartialMounted();
-    const { ensureWeeklyPartialMounted } = await import('./weekly-partial-loader.js');
-    await ensureWeeklyPartialMounted();
-    const { ensureUnpaidPartialMounted } = await import('./unpaid-partial-loader.js');
-    await ensureUnpaidPartialMounted();
-    const { ensureContractorPagePartialMounted } = await import('./contractor-partial-loader.js');
-    await ensureContractorPagePartialMounted();
-    const { ensureExpensePagePartialMounted } = await import('./expense-partial-loader.js');
-    await ensureExpensePagePartialMounted();
-    const { ensureSgaPagePartialMounted } = await import('./sga-partial-loader.js');
-    await ensureSgaPagePartialMounted();
-    const { ensureUsersPagePartialMounted } = await import('./users-partial-loader.js');
-    await ensureUsersPagePartialMounted();
-    const { ensureProjectDetailModalMounted } = await import('./project-detail-modal-loader.js');
-    await ensureProjectDetailModalMounted();
+    const [
+        estimateMod,
+        performanceMod,
+        weeklyMod,
+        unpaidMod,
+        contractorMod,
+        expenseMod,
+        sgaMod,
+        usersMod,
+        projectMod,
+    ] = await Promise.all([
+        import('./estimate-partial-loader.js'),
+        import('./performance-partial-loader.js'),
+        import('./weekly-partial-loader.js'),
+        import('./unpaid-partial-loader.js'),
+        import('./contractor-partial-loader.js'),
+        import('./expense-partial-loader.js'),
+        import('./sga-partial-loader.js'),
+        import('./users-partial-loader.js'),
+        import('./project-detail-modal-loader.js'),
+    ]);
+    await Promise.all([
+        estimateMod.ensureEstimatePartialMounted(),
+        performanceMod.ensurePerformancePartialMounted(),
+        weeklyMod.ensureWeeklyPartialMounted(),
+        unpaidMod.ensureUnpaidPartialMounted(),
+        contractorMod.ensureContractorPagePartialMounted(),
+        expenseMod.ensureExpensePagePartialMounted(),
+        sgaMod.ensureSgaPagePartialMounted(),
+        usersMod.ensureUsersPagePartialMounted(),
+        projectMod.ensureProjectDetailModalMounted(),
+    ]);
     await import('./app.js');
 }
 

@@ -171,7 +171,8 @@ async function run() {
     loginUserInput.addEventListener('input', function () {
         syncModeUI();
     });
-    await syncModeUI();
+    // 프로필 API 대기로 폼 표시가 늦어지지 않도록 비동기 실행(제출 시에는 submit 안에서 다시 확인)
+    syncModeUI();
 
     loginForm.addEventListener('submit', async function (e) {
         e.preventDefault();
