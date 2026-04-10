@@ -148,7 +148,7 @@
                     <div class="panel-form-row">
                         <label class="panel-form-label">사업자등록증</label>
                         <div class="file-upload file-upload-box">
-                            <input type="file" id="businessLicense" style="display: none;" accept="image/*,.pdf" onchange="updateContractorFileName('businessLicense')">
+                            <input type="file" id="businessLicense" style="display: none;" accept="image/*,.pdf" multiple onchange="updateContractorFileName('businessLicense')">
                             <button type="button" class="file-button" onclick="document.getElementById('businessLicense').click()">
                                 <i class="fas fa-file-alt"></i> 파일 선택
                             </button>
@@ -160,7 +160,7 @@
                     <div class="panel-form-row">
                         <label class="panel-form-label">통장사본</label>
                         <div class="file-upload file-upload-box">
-                            <input type="file" id="bankAccount" style="display: none;" accept="image/*,.pdf" onchange="updateContractorFileName('bankAccount')">
+                            <input type="file" id="bankAccount" style="display: none;" accept="image/*,.pdf" multiple onchange="updateContractorFileName('bankAccount')">
                             <button type="button" class="file-button" onclick="document.getElementById('bankAccount').click()">
                                 <i class="fas fa-university"></i> 파일 선택
                             </button>

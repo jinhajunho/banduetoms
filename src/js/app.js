@@ -986,6 +986,56 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        function uploadContractorFileToStorageWithToken(contractorId, slot, file, accessToken) {
+            if (!accessToken) return Promise.reject(new Error('로그인이 필요합니다.'));
+            var fd = new FormData();
+            fd.append('contractorId', String(contractorId));
+            fd.append('slot', slot === 'bank' ? 'bank' : 'license');
+            fd.append('file', file);
+            return fetch(window.location.origin + '/api/storage', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + accessToken },
+                body: fd,
+            })
+                .then(function (r) {
+                    return r.text().then(function (text) {
+                        var j = {};
+                        try {
+                            j = text && text.length ? JSON.parse(text) : {};
+                        } catch (_e) {
+                            j = { ok: false, error: '업로드 응답 파싱 실패' };
+                        }
+                        return { ok: r.ok, status: r.status, body: j };
+                    });
+                })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        var msg = (r.body && r.body.error) || '파일 업로드 실패';
+                        return Promise.reject(new Error(msg));
+                    }
+                    return {
+                        storagePath: r.body.path,
+                        name: r.body.name || (file && file.name) || '첨부',
+                        mimeType: r.body.mimeType || (file && file.type) || 'application/octet-stream',
+                    };
+                });
+        }
+
+        function uploadContractorFilesToStorage(contractorId, slot, files, accessToken) {
+            var list = Array.isArray(files) ? files : [];
+            if (!list.length) return Promise.resolve([]);
+            return Promise.all(
+                list.map(function (f) {
+                    return uploadContractorFileToStorageWithToken(
+                        contractorId,
+                        slot,
+                        f,
+                        accessToken
+                    );
+                })
+            );
+        }
+
         function uploadEstimateFinanceFileToStorage(estimateCode, rowKey, file) {
             return window.__bpsSupabase.auth.getSession().then(function (res) {
                 if (res.error || !res.data || !res.data.session) {
@@ -2655,12 +2705,12 @@ import { createProjectRegister } from './estimate-project-register.js';
         let contractors = [];
 
         let contractorEditingId = null;
-        /** 등록·수정 패널: 파일 선택 후 업로드 전(슬롯당 1개) */
-        let contractorLicensePendingFile = null;
-        let contractorBankPendingFile = null;
-        /** 수정 중 저장된 첨부를 목록에서 뺌 — 저장 성공 시 메타 삭제·Storage 정리 */
-        let contractorLicenseSavedRemoved = false;
-        let contractorBankSavedRemoved = false;
+        /** 등록·수정 패널: 파일 선택 후 업로드 전(슬롯별 다중 파일) */
+        let contractorLicensePendingFiles = [];
+        let contractorBankPendingFiles = [];
+        /** 수정 중 저장된 첨부를 목록에서 뺌(인덱스) — 저장 성공 시 Storage 정리 */
+        let contractorLicenseRemovedSavedIndexes = [];
+        let contractorBankRemovedSavedIndexes = [];
         /** 사용자가 뺀 Storage 경로 — 저장 성공 후 일괄 삭제 */
         let contractorRemovedStoragePathsPending = [];
 
@@ -2668,6 +2718,62 @@ import { createProjectRegister } from './estimate-project-register.js';
             var s = String(p || '').trim();
             if (!s || contractorRemovedStoragePathsPending.indexOf(s) !== -1) return;
             contractorRemovedStoragePathsPending.push(s);
+        }
+
+        function getContractorSavedFiles(contractor, slot) {
+            var key = slot === 'bank' ? 'bank' : 'license';
+            var listKey = key === 'license' ? 'licenseFiles' : 'bankFiles';
+            var arr = contractor && Array.isArray(contractor[listKey]) ? contractor[listKey] : [];
+            var normalized = arr
+                .map(function (x) {
+                    if (!x || typeof x !== 'object') return null;
+                    return {
+                        storagePath: x.storagePath ? String(x.storagePath).trim() : '',
+                        name: x.name || x.fileName || '',
+                        mimeType: x.mimeType || '',
+                        dataUrl: x.dataUrl || '',
+                    };
+                })
+                .filter(function (x) {
+                    return !!(x.storagePath || x.dataUrl);
+                });
+            if (normalized.length) return normalized;
+
+            // 하위 호환: 단일 필드만 있는 기존 데이터
+            var sp =
+                key === 'license'
+                    ? contractor && contractor.licenseStoragePath
+                    : contractor && contractor.bankStoragePath;
+            var du =
+                key === 'license'
+                    ? contractor && contractor.licenseDataUrl
+                    : contractor && contractor.bankDataUrl;
+            var fn =
+                key === 'license'
+                    ? contractor && contractor.licenseFileName
+                    : contractor && contractor.bankFileName;
+            var mt =
+                key === 'license'
+                    ? contractor && contractor.licenseMimeType
+                    : contractor && contractor.bankMimeType;
+            var p = String(sp || '').trim();
+            if (!p && !du) return [];
+            return [
+                {
+                    storagePath: p,
+                    name: fn || '',
+                    mimeType: mt || '',
+                    dataUrl: du || '',
+                },
+            ];
+        }
+
+        function getContractorSavedVisibleFiles(contractor, slot) {
+            var saved = getContractorSavedFiles(contractor, slot);
+            var removed = slot === 'bank' ? contractorBankRemovedSavedIndexes : contractorLicenseRemovedSavedIndexes;
+            return saved.filter(function (_x, i) {
+                return removed.indexOf(i) === -1;
+            });
         }
 
         function escapeHtml(value) {
@@ -2748,163 +2854,155 @@ import { createProjectRegister } from './estimate-project-register.js';
                       })
                     : null;
 
+            var licSavedFiles = base ? getContractorSavedVisibleFiles(base, 'license') : [];
             var licHtml = [];
-            if (contractorLicensePendingFile) {
-                var lfn =
-                    contractorLicensePendingFile && contractorLicensePendingFile.name
-                        ? String(contractorLicensePendingFile.name)
-                        : '파일';
-                licHtml.push(
-                    '<span class="expense-receipt-chip expense-receipt-chip--pending">' +
-                        '<span class="expense-receipt-chip-name">' +
-                        escapeHtmlAttr(lfn) +
-                        '</span>' +
-                        '<span class="expense-receipt-chip-badge">업로드 대기</span>' +
-                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorLicensePending()" title="선택 취소">&times;</button>' +
-                        '</span>'
-                );
-            }
-            if (
-                base &&
-                !contractorLicenseSavedRemoved &&
-                base.hasLicense &&
-                (base.licenseStoragePath || base.licenseDataUrl)
-            ) {
-                var llabel =
-                    base.licenseFileName && String(base.licenseFileName).trim()
-                        ? String(base.licenseFileName).trim()
-                        : '사업자등록증';
+            for (var lsi = 0; lsi < licSavedFiles.length; lsi++) {
+                var ls = licSavedFiles[lsi];
+                var llabel = ls && ls.name ? String(ls.name).trim() : '사업자등록증';
                 licHtml.push(
                     '<span class="expense-receipt-chip expense-receipt-chip--saved">' +
                         '<span class="expense-receipt-chip-name">' +
                         escapeHtmlAttr(llabel) +
                         '</span>' +
                         '<span class="expense-receipt-chip-badge">저장됨</span>' +
-                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorLicenseSaved()" title="목록에서 제거">&times;</button>' +
+                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorLicenseSaved(' +
+                        lsi +
+                        ')" title="목록에서 제거">&times;</button>' +
+                        '</span>'
+                );
+            }
+            for (var lpi = 0; lpi < contractorLicensePendingFiles.length; lpi++) {
+                var lpf = contractorLicensePendingFiles[lpi];
+                var lfn = lpf && lpf.name ? String(lpf.name) : '파일';
+                licHtml.push(
+                    '<span class="expense-receipt-chip expense-receipt-chip--pending">' +
+                        '<span class="expense-receipt-chip-name">' +
+                        escapeHtmlAttr(lfn) +
+                        '</span>' +
+                        '<span class="expense-receipt-chip-badge">업로드 대기</span>' +
+                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorLicensePending(' +
+                        lpi +
+                        ')" title="선택 취소">&times;</button>' +
                         '</span>'
                 );
             }
             if (licBox) licBox.innerHTML = licHtml.join('');
             if (licName) {
-                var licSaved =
-                    base &&
-                    !contractorLicenseSavedRemoved &&
-                    base.hasLicense &&
-                    (base.licenseStoragePath || base.licenseDataUrl)
-                        ? 1
-                        : 0;
-                var licPen = contractorLicensePendingFile ? 1 : 0;
+                var licSaved = licSavedFiles.length;
+                var licPen = contractorLicensePendingFiles.length;
                 if (licSaved + licPen === 0) {
                     licName.textContent = '선택한 파일 없음';
                 } else {
                     var lp = [];
-                    if (licSaved) lp.push('저장됨 1');
-                    if (licPen) lp.push('대기 1');
+                    if (licSaved) lp.push('저장됨 ' + licSaved);
+                    if (licPen) lp.push('대기 ' + licPen);
                     licName.textContent = lp.join(' · ');
                 }
             }
 
+            var bankSavedFiles = base ? getContractorSavedVisibleFiles(base, 'bank') : [];
             var bankHtml = [];
-            if (contractorBankPendingFile) {
-                var bfn =
-                    contractorBankPendingFile && contractorBankPendingFile.name
-                        ? String(contractorBankPendingFile.name)
-                        : '파일';
-                bankHtml.push(
-                    '<span class="expense-receipt-chip expense-receipt-chip--pending">' +
-                        '<span class="expense-receipt-chip-name">' +
-                        escapeHtmlAttr(bfn) +
-                        '</span>' +
-                        '<span class="expense-receipt-chip-badge">업로드 대기</span>' +
-                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorBankPending()" title="선택 취소">&times;</button>' +
-                        '</span>'
-                );
-            }
-            if (
-                base &&
-                !contractorBankSavedRemoved &&
-                base.hasBankAccount &&
-                (base.bankStoragePath || base.bankDataUrl)
-            ) {
-                var blabel =
-                    base.bankFileName && String(base.bankFileName).trim()
-                        ? String(base.bankFileName).trim()
-                        : '통장사본';
+            for (var bsi = 0; bsi < bankSavedFiles.length; bsi++) {
+                var bs = bankSavedFiles[bsi];
+                var blabel = bs && bs.name ? String(bs.name).trim() : '통장사본';
                 bankHtml.push(
                     '<span class="expense-receipt-chip expense-receipt-chip--saved">' +
                         '<span class="expense-receipt-chip-name">' +
                         escapeHtmlAttr(blabel) +
                         '</span>' +
                         '<span class="expense-receipt-chip-badge">저장됨</span>' +
-                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorBankSaved()" title="목록에서 제거">&times;</button>' +
+                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorBankSaved(' +
+                        bsi +
+                        ')" title="목록에서 제거">&times;</button>' +
+                        '</span>'
+                );
+            }
+            for (var bpi = 0; bpi < contractorBankPendingFiles.length; bpi++) {
+                var bpf = contractorBankPendingFiles[bpi];
+                var bfn = bpf && bpf.name ? String(bpf.name) : '파일';
+                bankHtml.push(
+                    '<span class="expense-receipt-chip expense-receipt-chip--pending">' +
+                        '<span class="expense-receipt-chip-name">' +
+                        escapeHtmlAttr(bfn) +
+                        '</span>' +
+                        '<span class="expense-receipt-chip-badge">업로드 대기</span>' +
+                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeContractorBankPending(' +
+                        bpi +
+                        ')" title="선택 취소">&times;</button>' +
                         '</span>'
                 );
             }
             if (bankBox) bankBox.innerHTML = bankHtml.join('');
             if (bankName) {
-                var bankSaved =
-                    base &&
-                    !contractorBankSavedRemoved &&
-                    base.hasBankAccount &&
-                    (base.bankStoragePath || base.bankDataUrl)
-                        ? 1
-                        : 0;
-                var bankPen = contractorBankPendingFile ? 1 : 0;
+                var bankSaved = bankSavedFiles.length;
+                var bankPen = contractorBankPendingFiles.length;
                 if (bankSaved + bankPen === 0) {
                     bankName.textContent = '선택한 파일 없음';
                 } else {
                     var bp = [];
-                    if (bankSaved) bp.push('저장됨 1');
-                    if (bankPen) bp.push('대기 1');
+                    if (bankSaved) bp.push('저장됨 ' + bankSaved);
+                    if (bankPen) bp.push('대기 ' + bankPen);
                     bankName.textContent = bp.join(' · ');
                 }
             }
         }
 
-        function removeContractorLicensePending() {
-            contractorLicensePendingFile = null;
+        function removeContractorLicensePending(index) {
+            var i = Number(index);
+            if (!Number.isFinite(i) || i < 0 || i >= contractorLicensePendingFiles.length) return;
+            contractorLicensePendingFiles.splice(i, 1);
             var input = document.getElementById('businessLicense');
             if (input) input.value = '';
             renderContractorAttachmentChips();
         }
 
-        function removeContractorLicenseSaved() {
+        function removeContractorLicenseSaved(index) {
             if (!contractorEditingId) return;
             var base = contractors.find(function (c) {
                 return c.id === contractorEditingId;
             });
             if (!base) return;
-            contractorLicenseSavedRemoved = true;
-            var sp = base.licenseStoragePath && String(base.licenseStoragePath).trim();
+            var saved = getContractorSavedFiles(base, 'license');
+            var i = Number(index);
+            if (!Number.isFinite(i) || i < 0 || i >= saved.length) return;
+            if (contractorLicenseRemovedSavedIndexes.indexOf(i) !== -1) return;
+            contractorLicenseRemovedSavedIndexes.push(i);
+            var sp = saved[i] && saved[i].storagePath ? String(saved[i].storagePath).trim() : '';
             if (sp) pushContractorRemovedPathOnce(sp);
             renderContractorAttachmentChips();
         }
 
-        function removeContractorBankPending() {
-            contractorBankPendingFile = null;
+        function removeContractorBankPending(index) {
+            var i = Number(index);
+            if (!Number.isFinite(i) || i < 0 || i >= contractorBankPendingFiles.length) return;
+            contractorBankPendingFiles.splice(i, 1);
             var input = document.getElementById('bankAccount');
             if (input) input.value = '';
             renderContractorAttachmentChips();
         }
 
-        function removeContractorBankSaved() {
+        function removeContractorBankSaved(index) {
             if (!contractorEditingId) return;
             var base = contractors.find(function (c) {
                 return c.id === contractorEditingId;
             });
             if (!base) return;
-            contractorBankSavedRemoved = true;
-            var sp = base.bankStoragePath && String(base.bankStoragePath).trim();
+            var saved = getContractorSavedFiles(base, 'bank');
+            var i = Number(index);
+            if (!Number.isFinite(i) || i < 0 || i >= saved.length) return;
+            if (contractorBankRemovedSavedIndexes.indexOf(i) !== -1) return;
+            contractorBankRemovedSavedIndexes.push(i);
+            var sp = saved[i] && saved[i].storagePath ? String(saved[i].storagePath).trim() : '';
             if (sp) pushContractorRemovedPathOnce(sp);
             renderContractorAttachmentChips();
         }
 
         function openContractorPanel() {
             if (!contractorEditingId) {
-                contractorLicensePendingFile = null;
-                contractorBankPendingFile = null;
-                contractorLicenseSavedRemoved = false;
-                contractorBankSavedRemoved = false;
+                contractorLicensePendingFiles = [];
+                contractorBankPendingFiles = [];
+                contractorLicenseRemovedSavedIndexes = [];
+                contractorBankRemovedSavedIndexes = [];
                 contractorRemovedStoragePathsPending = [];
             }
             document.getElementById('contractorPanelTitle').textContent = contractorEditingId ? '업체 수정' : '업체 등록';
@@ -2945,11 +3043,17 @@ import { createProjectRegister } from './estimate-project-register.js';
             const input = document.getElementById(inputId);
             if (!input) return;
             if (inputId === 'businessLicense') {
-                contractorLicensePendingFile =
-                    input.files && input.files.length > 0 ? input.files[0] : null;
+                var licFiles = input.files ? Array.from(input.files) : [];
+                if (licFiles.length) {
+                    contractorLicensePendingFiles =
+                        contractorLicensePendingFiles.concat(licFiles);
+                }
             } else if (inputId === 'bankAccount') {
-                contractorBankPendingFile =
-                    input.files && input.files.length > 0 ? input.files[0] : null;
+                var bankFiles = input.files ? Array.from(input.files) : [];
+                if (bankFiles.length) {
+                    contractorBankPendingFiles =
+                        contractorBankPendingFiles.concat(bankFiles);
+                }
             }
             input.value = '';
             renderContractorAttachmentChips();
@@ -2983,7 +3087,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (sorted.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                        <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">
                             등록된 업체가 없습니다
                         </td>
                     </tr>
@@ -3003,19 +3107,22 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             tbody.innerHTML = pageRows.map((item, index) => {
                 const rowNum = sliceStart + index + 1;
-                const attachCount =
-                    (item.hasLicense ? 1 : 0) + (item.hasBankAccount ? 1 : 0);
+                const licenseCount = getContractorSavedFiles(item, 'license').length;
+                const bankCount = getContractorSavedFiles(item, 'bank').length;
                 return `
                 <tr class="table-row-clickable" data-contractor-id="${item.id}" onclick="openContractorDetailPanel(${item.id})">
                     <td>${rowNum}</td>
                     <td style="font-weight: 600;">${item.name}</td>
                     <td>${item.phone || '-'}</td>
-                    <td>${item.hasLicense ? '<span style="color: var(--success);"><i class="fas fa-check-circle"></i> 있음</span>' : '<span style="color: var(--gray-400);">없음</span>'}</td>
-                    <td>${item.hasBankAccount ? '<span style="color: var(--success);"><i class="fas fa-check-circle"></i> 있음</span>' : '<span style="color: var(--gray-400);">없음</span>'}</td>
                     <td>${
-                        attachCount > 0
-                            ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorAllAttachments(${item.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${attachCount})</span>`
-                            : '<span style="color: var(--gray-400);">-</span>'
+                        licenseCount > 0
+                            ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('license', ${item.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${licenseCount})</span>`
+                            : '<span style="color: var(--gray-400);">없음</span>'
+                    }</td>
+                    <td>${
+                        bankCount > 0
+                            ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('bank', ${item.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${bankCount})</span>`
+                            : '<span style="color: var(--gray-400);">없음</span>'
                     }</td>
                 </tr>
             `;
@@ -3475,8 +3582,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 body.innerHTML = `
                 <div class="panel-form-row"><span class="detail-label">업체명</span><span class="detail-value">${(contractor.name || '').replace(/</g, '&lt;')}</span></div>
                 <div class="panel-form-row"><span class="detail-label">전화번호</span><span class="detail-value">${(contractor.phone || '-').replace(/</g, '&lt;')}</span></div>
-                <div class="panel-form-row"><span class="detail-label">사업자등록증</span><span class="detail-value">${contractor.hasLicense ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('license', ${contractor.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기</span>` : '없음'}</span></div>
-                <div class="panel-form-row"><span class="detail-label">통장사본</span><span class="detail-value">${contractor.hasBankAccount ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('bank', ${contractor.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기</span>` : '없음'}</span></div>
+                <div class="panel-form-row"><span class="detail-label">사업자등록증</span><span class="detail-value">${getContractorSavedFiles(contractor, 'license').length ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('license', ${contractor.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${getContractorSavedFiles(contractor, 'license').length})</span>` : '없음'}</span></div>
+                <div class="panel-form-row"><span class="detail-label">통장사본</span><span class="detail-value">${getContractorSavedFiles(contractor, 'bank').length ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('bank', ${contractor.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기 (${getContractorSavedFiles(contractor, 'bank').length})</span>` : '없음'}</span></div>
             `;
                 if (editBtn) editBtn.onclick = function() { closeContractorDetailPanel(); editContractor(id); };
             });
@@ -3491,8 +3598,8 @@ import { createProjectRegister } from './estimate-project-register.js';
         function saveContractor() {
             const name = document.getElementById('contractorName').value.trim();
             const phone = document.getElementById('contractorPhone').value.trim();
-            const licenseFile = contractorLicensePendingFile;
-            const bankFile = contractorBankPendingFile;
+            const licenseFiles = contractorLicensePendingFiles.slice();
+            const bankFiles = contractorBankPendingFiles.slice();
 
             if (!name) {
                 alert('업체명은 필수 입력 항목입니다.');
@@ -3501,6 +3608,15 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 alert('로그인(Supabase)이 필요합니다.');
                 return;
+            }
+
+            function getAccessTokenOnce() {
+                return window.__bpsSupabase.auth.getSession().then(function (res) {
+                    if (res.error || !res.data || !res.data.session) {
+                        return Promise.reject(new Error('로그인이 필요합니다.'));
+                    }
+                    return res.data.session.access_token;
+                });
             }
 
             function finish() {
@@ -3515,56 +3631,54 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (index === -1) return;
                 const prev = contractors[index];
                 const cid = prev.id;
-                const licP = licenseFile
-                    ? uploadContractorFileToStorage(cid, 'license', licenseFile)
-                    : Promise.resolve(null);
-                const bankP = bankFile ? uploadContractorFileToStorage(cid, 'bank', bankFile) : Promise.resolve(null);
-                Promise.all([licP, bankP])
+                getAccessTokenOnce()
+                    .then(function (tok) {
+                        return Promise.all([
+                            uploadContractorFilesToStorage(cid, 'license', licenseFiles, tok),
+                            uploadContractorFilesToStorage(cid, 'bank', bankFiles, tok),
+                        ]);
+                    })
                     .then(function (results) {
-                        const licMeta = results[0];
-                        const bankMeta = results[1];
+                        const licUploaded = Array.isArray(results[0]) ? results[0] : [];
+                        const bankUploaded = Array.isArray(results[1]) ? results[1] : [];
+                        const keptLicense = getContractorSavedVisibleFiles(prev, 'license');
+                        const keptBank = getContractorSavedVisibleFiles(prev, 'bank');
+                        const licenseFilesFinal = keptLicense.concat(
+                            licUploaded.map(function (m) {
+                                return {
+                                    storagePath: m.storagePath,
+                                    name: m.name,
+                                    mimeType: m.mimeType,
+                                };
+                            })
+                        );
+                        const bankFilesFinal = keptBank.concat(
+                            bankUploaded.map(function (m) {
+                                return {
+                                    storagePath: m.storagePath,
+                                    name: m.name,
+                                    mimeType: m.mimeType,
+                                };
+                            })
+                        );
                         const next = {
                             id: prev.id,
                             name: name,
                             phone: phone,
                             date: prev.date,
-                            hasLicense: prev.hasLicense,
-                            hasBankAccount: prev.hasBankAccount,
-                            licenseStoragePath: prev.licenseStoragePath,
-                            licenseFileName: prev.licenseFileName,
-                            licenseMimeType: prev.licenseMimeType,
-                            licenseDataUrl: prev.licenseDataUrl,
-                            bankStoragePath: prev.bankStoragePath,
-                            bankFileName: prev.bankFileName,
-                            bankMimeType: prev.bankMimeType,
-                            bankDataUrl: prev.bankDataUrl,
+                            hasLicense: licenseFilesFinal.length > 0,
+                            hasBankAccount: bankFilesFinal.length > 0,
+                            licenseFiles: licenseFilesFinal,
+                            bankFiles: bankFilesFinal,
                         };
-                        if (licMeta) {
-                            next.hasLicense = true;
-                            next.licenseStoragePath = licMeta.storagePath;
-                            next.licenseFileName = licMeta.name;
-                            next.licenseMimeType = licMeta.mimeType;
-                            delete next.licenseDataUrl;
-                        } else if (contractorLicenseSavedRemoved) {
-                            next.hasLicense = false;
-                            delete next.licenseStoragePath;
-                            delete next.licenseFileName;
-                            delete next.licenseMimeType;
-                            delete next.licenseDataUrl;
-                        }
-                        if (bankMeta) {
-                            next.hasBankAccount = true;
-                            next.bankStoragePath = bankMeta.storagePath;
-                            next.bankFileName = bankMeta.name;
-                            next.bankMimeType = bankMeta.mimeType;
-                            delete next.bankDataUrl;
-                        } else if (contractorBankSavedRemoved) {
-                            next.hasBankAccount = false;
-                            delete next.bankStoragePath;
-                            delete next.bankFileName;
-                            delete next.bankMimeType;
-                            delete next.bankDataUrl;
-                        }
+                        delete next.licenseStoragePath;
+                        delete next.licenseFileName;
+                        delete next.licenseMimeType;
+                        delete next.licenseDataUrl;
+                        delete next.bankStoragePath;
+                        delete next.bankFileName;
+                        delete next.bankMimeType;
+                        delete next.bankDataUrl;
                         return upsertContractorToServer(next).then(function (remote) {
                             if (!remote.ok) {
                                 alert(remote.error || '업체 서버 저장 실패');
@@ -3572,20 +3686,6 @@ import { createProjectRegister } from './estimate-project-register.js';
                             }
                             var toDelete = new Set(contractorRemovedStoragePathsPending);
                             contractorRemovedStoragePathsPending = [];
-                            if (
-                                licMeta &&
-                                prev.licenseStoragePath &&
-                                prev.licenseStoragePath !== licMeta.storagePath
-                            ) {
-                                toDelete.add(prev.licenseStoragePath);
-                            }
-                            if (
-                                bankMeta &&
-                                prev.bankStoragePath &&
-                                prev.bankStoragePath !== bankMeta.storagePath
-                            ) {
-                                toDelete.add(prev.bankStoragePath);
-                            }
                             toDelete.forEach(function (p) {
                                 if (p) {
                                     bpsStorageDeletePath(p).catch(function () {});
@@ -3612,32 +3712,38 @@ import { createProjectRegister } from './estimate-project-register.js';
                           })
                       ) + 1
                     : 1;
-            const licP = licenseFile
-                ? uploadContractorFileToStorage(newId, 'license', licenseFile)
-                : Promise.resolve(null);
-            const bankP = bankFile ? uploadContractorFileToStorage(newId, 'bank', bankFile) : Promise.resolve(null);
-            Promise.all([licP, bankP])
+            getAccessTokenOnce()
+                .then(function (tok) {
+                    return Promise.all([
+                        uploadContractorFilesToStorage(newId, 'license', licenseFiles, tok),
+                        uploadContractorFilesToStorage(newId, 'bank', bankFiles, tok),
+                    ]);
+                })
                 .then(function (results) {
-                    const licMeta = results[0];
-                    const bankMeta = results[1];
+                    const licMeta = Array.isArray(results[0]) ? results[0] : [];
+                    const bankMeta = Array.isArray(results[1]) ? results[1] : [];
                     const newContractor = {
                         id: newId,
                         name: name,
                         phone: phone,
                         date: new Date().toISOString().slice(0, 10),
-                        hasLicense: !!licMeta,
-                        hasBankAccount: !!bankMeta,
+                        hasLicense: licMeta.length > 0,
+                        hasBankAccount: bankMeta.length > 0,
+                        licenseFiles: licMeta.map(function (m) {
+                            return {
+                                storagePath: m.storagePath,
+                                name: m.name,
+                                mimeType: m.mimeType,
+                            };
+                        }),
+                        bankFiles: bankMeta.map(function (m) {
+                            return {
+                                storagePath: m.storagePath,
+                                name: m.name,
+                                mimeType: m.mimeType,
+                            };
+                        }),
                     };
-                    if (licMeta) {
-                        newContractor.licenseStoragePath = licMeta.storagePath;
-                        newContractor.licenseFileName = licMeta.name;
-                        newContractor.licenseMimeType = licMeta.mimeType;
-                    }
-                    if (bankMeta) {
-                        newContractor.bankStoragePath = bankMeta.storagePath;
-                        newContractor.bankFileName = bankMeta.name;
-                        newContractor.bankMimeType = bankMeta.mimeType;
-                    }
                     return upsertContractorToServer(newContractor).then(function (remote) {
                         if (!remote.ok) {
                             alert(remote.error || '업체 서버 저장 실패');
@@ -3658,10 +3764,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const contractor = contractors.find(c => c.id === id);
             if (!contractor) return;
 
-            contractorLicensePendingFile = null;
-            contractorBankPendingFile = null;
-            contractorLicenseSavedRemoved = false;
-            contractorBankSavedRemoved = false;
+            contractorLicensePendingFiles = [];
+            contractorBankPendingFiles = [];
+            contractorLicenseRemovedSavedIndexes = [];
+            contractorBankRemovedSavedIndexes = [];
             contractorRemovedStoragePathsPending = [];
             contractorEditingId = id;
             document.getElementById('contractorName').value = contractor.name;
@@ -3692,10 +3798,10 @@ import { createProjectRegister } from './estimate-project-register.js';
         // 폼 초기화
         function resetContractorForm() {
             contractorEditingId = null;
-            contractorLicensePendingFile = null;
-            contractorBankPendingFile = null;
-            contractorLicenseSavedRemoved = false;
-            contractorBankSavedRemoved = false;
+            contractorLicensePendingFiles = [];
+            contractorBankPendingFiles = [];
+            contractorLicenseRemovedSavedIndexes = [];
+            contractorBankRemovedSavedIndexes = [];
             contractorRemovedStoragePathsPending = [];
             document.getElementById('contractorName').value = '';
             document.getElementById('contractorPhone').value = '';
@@ -3800,54 +3906,28 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!contractor) return;
 
             var items = [];
-            if (
-                contractor.hasLicense &&
-                (contractor.licenseStoragePath || contractor.licenseDataUrl)
-            ) {
-                var lp = contractor.licenseStoragePath && String(contractor.licenseStoragePath).trim();
-                if (lp) {
-                    items.push({
-                        kind: 'path',
-                        path: lp,
-                        name:
-                            contractor.licenseFileName ||
-                            (contractor.name || '업체') + '_사업자등록증',
-                        mime: contractor.licenseMimeType || 'image/png',
-                    });
-                } else if (contractor.licenseDataUrl) {
-                    items.push({
-                        kind: 'data',
-                        data: contractor.licenseDataUrl,
-                        name:
-                            contractor.licenseFileName ||
-                            (contractor.name || '업체') + '_사업자등록증',
-                        mime: contractor.licenseMimeType || 'image/png',
-                    });
-                }
-            }
-            if (
-                contractor.hasBankAccount &&
-                (contractor.bankStoragePath || contractor.bankDataUrl)
-            ) {
-                var bp = contractor.bankStoragePath && String(contractor.bankStoragePath).trim();
-                if (bp) {
-                    items.push({
-                        kind: 'path',
-                        path: bp,
-                        name:
-                            contractor.bankFileName || (contractor.name || '업체') + '_통장사본',
-                        mime: contractor.bankMimeType || 'image/png',
-                    });
-                } else if (contractor.bankDataUrl) {
-                    items.push({
-                        kind: 'data',
-                        data: contractor.bankDataUrl,
-                        name:
-                            contractor.bankFileName || (contractor.name || '업체') + '_통장사본',
-                        mime: contractor.bankMimeType || 'image/png',
-                    });
-                }
-            }
+            getContractorSavedFiles(contractor, 'license').forEach(function (f, i) {
+                items.push({
+                    kind: f.storagePath ? 'path' : 'data',
+                    path: f.storagePath || '',
+                    data: f.dataUrl || '',
+                    name:
+                        (f.name && String(f.name).trim()) ||
+                        (contractor.name || '업체') + '_사업자등록증_' + (i + 1),
+                    mime: f.mimeType || 'image/png',
+                });
+            });
+            getContractorSavedFiles(contractor, 'bank').forEach(function (f, i) {
+                items.push({
+                    kind: f.storagePath ? 'path' : 'data',
+                    path: f.storagePath || '',
+                    data: f.dataUrl || '',
+                    name:
+                        (f.name && String(f.name).trim()) ||
+                        (contractor.name || '업체') + '_통장사본_' + (i + 1),
+                    mime: f.mimeType || 'image/png',
+                });
+            });
 
             if (!items.length) {
                 alert('첨부가 없습니다.');
@@ -3908,80 +3988,57 @@ import { createProjectRegister } from './estimate-project-register.js';
         function viewContractorImage(type, id) {
             const contractor = contractors.find(c => c.id === id);
             if (!contractor) return;
-
-            const imageType = type === 'license' ? '사업자등록증' : '통장사본';
-            if (type === 'license') {
-                if (!contractor.hasLicense) return;
-                const sp =
-                    contractor.licenseStoragePath && String(contractor.licenseStoragePath).trim();
-                if (sp) {
-                    bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
-                        if (!r.ok || !r.body || !r.body.url) {
-                            alert('파일을 불러올 수 없습니다.');
-                            return;
-                        }
-                        openAttachmentListModal(
-                            [
-                                {
-                                    name:
-                                        contractor.licenseFileName ||
-                                        (contractor.name || '업체') + '_' + imageType,
-                                    type: contractor.licenseMimeType || 'image/png',
-                                    data: r.body.url,
-                                    date: contractor.date || new Date().toISOString().slice(0, 10),
-                                },
-                            ],
-                            '첨부파일'
-                        );
-                    });
-                    return;
-                }
-                if (contractor.licenseDataUrl) {
-                    openAttachmentListModal([{
-                        name: contractor.licenseFileName || ((contractor.name || '업체') + '_' + imageType),
-                        type: contractor.licenseMimeType || 'image/png',
-                        data: contractor.licenseDataUrl,
-                        date: contractor.date || new Date().toISOString().slice(0, 10)
-                    }], '첨부파일');
-                    return;
-                }
-                alert('저장된 사업자등록증 파일이 없습니다.');
+            var slot = type === 'bank' ? 'bank' : 'license';
+            var label = slot === 'license' ? '사업자등록증' : '통장사본';
+            var files = getContractorSavedFiles(contractor, slot);
+            if (!files.length) {
+                alert('저장된 ' + label + ' 파일이 없습니다.');
                 return;
             }
-            if (!contractor.hasBankAccount) return;
-            const bsp = contractor.bankStoragePath && String(contractor.bankStoragePath).trim();
-            if (bsp) {
-                bpsAuthedPost('/api/storage', { path: bsp }).then(function (r) {
-                    if (!r.ok || !r.body || !r.body.url) {
-                        alert('파일을 불러올 수 없습니다.');
-                        return;
-                    }
-                    openAttachmentListModal(
-                        [
-                            {
-                                name:
-                                    contractor.bankFileName ||
-                                    (contractor.name || '업체') + '_' + imageType,
-                                type: contractor.bankMimeType || 'image/png',
-                                data: r.body.url,
-                                date: contractor.date || new Date().toISOString().slice(0, 10),
-                            },
-                        ],
-                        '첨부파일'
-                    );
+            var items = files.map(function (f, i) {
+                return {
+                    kind: f.storagePath ? 'path' : 'data',
+                    path: f.storagePath || '',
+                    data: f.dataUrl || '',
+                    name:
+                        (f.name && String(f.name).trim()) ||
+                        (contractor.name || '업체') + '_' + label + '_' + (i + 1),
+                    type: f.mimeType || 'image/png',
+                    date: contractor.date || new Date().toISOString().slice(0, 10),
+                };
+            });
+            var dataRows = items.filter(function (x) {
+                return x.kind === 'data';
+            });
+            var paths = items.filter(function (x) {
+                return x.kind === 'path';
+            }).map(function (x) { return x.path; });
+            if (!paths.length) {
+                openAttachmentListModal(
+                    dataRows.map(function (x) {
+                        return { name: x.name, type: x.type, data: x.data, date: x.date };
+                    }),
+                    '첨부파일'
+                );
+                return;
+            }
+            bpsStorageSignMany(paths).then(function (urlByPath) {
+                if (!urlByPath) {
+                    alert('파일을 불러올 수 없습니다.');
+                    return;
+                }
+                var rows = dataRows.slice();
+                items.forEach(function (x) {
+                    if (x.kind !== 'path') return;
+                    var u = urlByPath[x.path];
+                    if (u) rows.push({ name: x.name, type: x.type, data: u, date: x.date });
                 });
-                return;
-            }
-            if (contractor.bankDataUrl) {
-                openAttachmentListModal([{
-                    name: contractor.bankFileName || ((contractor.name || '업체') + '_' + imageType),
-                    type: contractor.bankMimeType || 'image/png',
-                    data: contractor.bankDataUrl,
-                    date: contractor.date || new Date().toISOString().slice(0, 10)
-                }], '첨부파일');
-                return;
-            }
-            alert('저장된 통장사본 파일이 없습니다.');
+                if (!rows.length) {
+                    alert('파일을 불러올 수 없습니다.');
+                    return;
+                }
+                openAttachmentListModal(rows, '첨부파일');
+            });
         }
 
         function downloadContractorImage(type, id) {

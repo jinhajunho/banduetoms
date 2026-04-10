@@ -57,6 +57,13 @@ export function collectStoragePathsFromContractorPayload(payload) {
         const p = typeof payload[k] === 'string' ? payload[k].trim() : '';
         if (p && isAllowedStorageObjectPath(p)) paths.push(p);
     });
+    ['licenseFiles', 'bankFiles'].forEach(function (k) {
+        const arr = Array.isArray(payload[k]) ? payload[k] : [];
+        arr.forEach(function (row) {
+            const p = row && typeof row.storagePath === 'string' ? row.storagePath.trim() : '';
+            if (p && isAllowedStorageObjectPath(p)) paths.push(p);
+        });
+    });
     return paths;
 }
 
