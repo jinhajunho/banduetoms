@@ -3639,6 +3639,73 @@
             color: var(--gray-500);
         }
 
+        .expense-receipt-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+            min-height: 0;
+            flex-basis: 100%;
+            width: 100%;
+        }
+
+        .expense-panel-body .file-upload-box .expense-receipt-chip-list {
+            margin-top: 10px;
+        }
+
+        .expense-receipt-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            max-width: 100%;
+            padding: 6px 8px 6px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            border: 1px solid var(--gray-200);
+            background: var(--gray-50);
+        }
+
+        .expense-receipt-chip--pending {
+            border-color: rgba(59, 130, 246, 0.35);
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        .expense-receipt-chip-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 200px;
+            color: var(--gray-800);
+        }
+
+        .expense-receipt-chip-badge {
+            font-size: 11px;
+            color: var(--gray-500);
+            flex-shrink: 0;
+        }
+
+        .expense-receipt-chip-remove {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            margin: -2px -4px -2px 0;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--gray-500);
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .expense-receipt-chip-remove:hover {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--danger, #dc2626);
+        }
+
         .expense-panel-body .radio-group {
             display: flex;
             gap: 16px;
@@ -6946,6 +7013,28 @@
         body.dark-mode .contractor-panel-body .file-upload-box .file-name,
         body.dark-mode .expense-panel-body .file-upload-box .file-name {
             color: var(--gray-600) !important;
+        }
+
+        body.dark-mode .expense-receipt-chip {
+            border-color: var(--gray-200) !important;
+            background: var(--gray-100) !important;
+        }
+
+        body.dark-mode .expense-receipt-chip--pending {
+            border-color: rgba(59, 130, 246, 0.4) !important;
+            background: rgba(59, 130, 246, 0.1) !important;
+        }
+
+        body.dark-mode .expense-receipt-chip-name {
+            color: var(--gray-700) !important;
+        }
+
+        body.dark-mode .expense-receipt-chip-badge {
+            color: var(--gray-500) !important;
+        }
+
+        body.dark-mode .expense-receipt-chip-remove {
+            color: var(--gray-400) !important;
         }
 
         /* ---------- 다크: 프로젝트관리(패널 탭) 배경 ---------- */

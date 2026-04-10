@@ -707,6 +707,15 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        /** Storage 객체 삭제 (경비 영수증 제거 시 서명 만료 대기 없이 정리) */
+        function bpsStorageDeletePath(path) {
+            var p = String(path || '').trim();
+            if (!p) return Promise.resolve({ ok: true });
+            return bpsAuthedPost('/api/storage', { deletePath: p }).then(function (r) {
+                return { ok: r.ok && r.body && r.body.ok === true, error: r.body && r.body.error };
+            });
+        }
+
         function bpsEstimateApi(path, payload) {
             return bpsAuthedPost(path, payload);
         }
@@ -3678,7 +3687,82 @@ import { createProjectRegister } from './estimate-project-register.js';
         // ========================================
         
         let expenseEditingId = null;
+        /** 경비 수정: 서버에 이미 있는 영수증 메타(signedUrl 제외). 신규 등록 시 [] */
+        let expenseEditSavedReceipts = [];
+        /** 파일 선택으로 추가했으나 아직 업로드 전인 File 목록 */
+        let expenseReceiptPendingFiles = [];
+        /** 수정 중 사용자가 뺀 Storage 경로 — 저장 성공 후 일괄 삭제 */
+        let expenseRemovedReceiptPathsPending = [];
         let sgaEditingId = null;
+
+        function renderExpenseReceiptChipList() {
+            var box = document.getElementById('expenseReceiptChipList');
+            var nameSpan = document.getElementById('expenseReceiptName');
+            if (!box) return;
+            var html = [];
+            var si;
+            for (si = 0; si < expenseEditSavedReceipts.length; si++) {
+                var rec = expenseEditSavedReceipts[si];
+                var label = rec && rec.name ? String(rec.name) : '영수증_' + (si + 1);
+                html.push(
+                    '<span class="expense-receipt-chip expense-receipt-chip--saved">' +
+                        '<span class="expense-receipt-chip-name">' +
+                        escapeHtmlAttr(label) +
+                        '</span>' +
+                        '<span class="expense-receipt-chip-badge">저장됨</span>' +
+                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeExpenseReceiptSavedAt(' +
+                        si +
+                        ')" title="목록에서 제거">&times;</button>' +
+                        '</span>'
+                );
+            }
+            var pi;
+            for (pi = 0; pi < expenseReceiptPendingFiles.length; pi++) {
+                var f = expenseReceiptPendingFiles[pi];
+                var fn = f && f.name ? String(f.name) : '파일';
+                html.push(
+                    '<span class="expense-receipt-chip expense-receipt-chip--pending">' +
+                        '<span class="expense-receipt-chip-name">' +
+                        escapeHtmlAttr(fn) +
+                        '</span>' +
+                        '<span class="expense-receipt-chip-badge">업로드 대기</span>' +
+                        '<button type="button" class="expense-receipt-chip-remove" onclick="removeExpenseReceiptPendingAt(' +
+                        pi +
+                        ')" title="선택 취소">&times;</button>' +
+                        '</span>'
+                );
+            }
+            box.innerHTML = html.length ? html.join('') : '';
+            if (nameSpan) {
+                var total = expenseEditSavedReceipts.length + expenseReceiptPendingFiles.length;
+                if (total === 0) {
+                    nameSpan.textContent = '선택한 파일 없음';
+                } else {
+                    nameSpan.textContent =
+                        '저장됨 ' +
+                        expenseEditSavedReceipts.length +
+                        ' · 대기 ' +
+                        expenseReceiptPendingFiles.length;
+                }
+            }
+        }
+
+        function removeExpenseReceiptPendingAt(index) {
+            var i = Number(index);
+            if (!Number.isFinite(i) || i < 0 || i >= expenseReceiptPendingFiles.length) return;
+            expenseReceiptPendingFiles.splice(i, 1);
+            renderExpenseReceiptChipList();
+        }
+
+        function removeExpenseReceiptSavedAt(index) {
+            var i = Number(index);
+            if (!Number.isFinite(i) || i < 0 || i >= expenseEditSavedReceipts.length) return;
+            var r = expenseEditSavedReceipts[i];
+            var sp = r && typeof r.storagePath === 'string' ? r.storagePath.trim() : '';
+            expenseEditSavedReceipts.splice(i, 1);
+            if (sp) expenseRemovedReceiptPathsPending.push(sp);
+            renderExpenseReceiptChipList();
+        }
 
         function renderSgaTable(options) {
             const preservePage = options && options.preservePage === true;
@@ -4045,10 +4129,13 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         // 경비 등록·수정 중앙 모달 열기
         function openExpensePanel() {
-            document.getElementById('expensePanelTitle').textContent = expenseEditingId ? '경비 수정' : '경비 등록';
             if (!expenseEditingId) {
+                expenseEditSavedReceipts = [];
+                expenseReceiptPendingFiles = [];
+                expenseRemovedReceiptPathsPending = [];
                 setExpenseTodayDate();
             }
+            document.getElementById('expensePanelTitle').textContent = expenseEditingId ? '경비 수정' : '경비 등록';
             var delBtn = document.getElementById('expensePanelDeleteBtn');
             if (delBtn) {
                 if (expenseEditingId) {
@@ -4066,6 +4153,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             document.getElementById('expensePanelOverlay').classList.add('active');
             document.getElementById('expenseSlidePanel').classList.add('active');
+            renderExpenseReceiptChipList();
         }
 
         // 경비 등록·수정 중앙 모달 닫기
@@ -4081,19 +4169,13 @@ import { createProjectRegister } from './estimate-project-register.js';
             resetExpenseForm();
         }
 
-        // 파일명 업데이트 (복수 표시)
+        // 파일 선택 — 대기 목록에 추가 후 입력 초기화(같은 파일 재선택 가능)
         function updateExpenseFileName() {
             const input = document.getElementById('expenseReceipt');
-            const nameSpan = document.getElementById('expenseReceiptName');
-            if (!input || !nameSpan) return;
-            const n = input.files.length;
-            if (n === 0) {
-                nameSpan.textContent = '선택한 파일 없음';
-            } else if (n === 1) {
-                nameSpan.textContent = input.files[0].name;
-            } else {
-                nameSpan.textContent = '선택한 파일 ' + n + '개';
-            }
+            if (!input || !input.files || input.files.length === 0) return;
+            expenseReceiptPendingFiles = expenseReceiptPendingFiles.concat(Array.from(input.files));
+            input.value = '';
+            renderExpenseReceiptChipList();
         }
 
         // 테이블 렌더링 (월별 필터 적용, 사용일시 기준)
@@ -4157,15 +4239,14 @@ import { createProjectRegister } from './estimate-project-register.js';
             );
         }
 
-        // 저장 (영수증 복수: data URL 배열로 저장)
+        // 저장 — chips의 저장분 + 업로드 대기 File만 반영
         function saveExpense() {
             const type = document.querySelector('input[name="expensePaymentType"]:checked').value;
             const date = document.getElementById('expenseUsageDate').value;
             const building = document.getElementById('expenseBuilding').value.trim();
             const purpose = document.getElementById('expensePurpose').value.trim();
             const amount = parseInt(document.getElementById('expenseAmount').value) || 0;
-            const fileInput = document.getElementById('expenseReceipt');
-            const files = fileInput && fileInput.files ? Array.from(fileInput.files) : [];
+            const files = expenseReceiptPendingFiles.slice();
 
             if (!date) {
                 alert('사용일시는 필수 입력 항목입니다.');
@@ -4176,13 +4257,19 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return;
             }
 
-            function runAfterSave(receiptsArray) {
+            function runAfterSave(uploadedMeta) {
                 async function finishSave() {
+                    var up = uploadedMeta || [];
+                    var saved = expenseEditSavedReceipts.map(function (r) {
+                        var o = { ...r };
+                        delete o.signedUrl;
+                        return o;
+                    });
+                    var receipts = expenseEditingId ? saved.concat(up) : up.slice();
+
                     if (expenseEditingId) {
                         const index = expenses.findIndex(e => e.id === expenseEditingId);
                         if (index === -1) return;
-                        const existing = getExpenseReceipts(expenses[index]);
-                        const merged = receiptsArray.length ? [...existing, ...receiptsArray] : existing;
                         const updated = {
                             ...expenses[index],
                             type,
@@ -4190,7 +4277,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                             building,
                             purpose,
                             amount,
-                            receipts: merged,
+                            receipts: receipts,
                         };
                         const remote = await upsertExpenseToServer(updated);
                         if (!remote.ok) {
@@ -4198,6 +4285,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                             return;
                         }
                         expenses[index] = updated;
+                        var rm = expenseRemovedReceiptPathsPending.slice();
+                        expenseRemovedReceiptPathsPending = [];
+                        rm.forEach(function (p) {
+                            bpsStorageDeletePath(p).catch(function () {});
+                        });
                         alert('경비 내역이 수정되었습니다.');
                         expenseEditingId = null;
                     } else {
@@ -4213,7 +4305,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                             building,
                             purpose,
                             amount,
-                            receipts: receiptsArray || [],
+                            receipts: receipts,
                         };
                         const remote = await upsertExpenseToServer(newExpense);
                         if (!remote.ok) {
@@ -4221,6 +4313,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                             return;
                         }
                         expenses.unshift(newExpense);
+                        expenseRemovedReceiptPathsPending = [];
                         alert('경비가 등록되었습니다.');
                     }
                     closeExpensePanel();
@@ -4273,6 +4366,14 @@ import { createProjectRegister } from './estimate-project-register.js';
                 document.getElementById('expenseBuilding').value = expense.building;
                 document.getElementById('expensePurpose').value = expense.purpose;
                 document.getElementById('expenseAmount').value = expense.amount;
+                expenseEditSavedReceipts = getExpenseReceipts(expense).map(function (r) {
+                    if (!r || typeof r !== 'object') return r;
+                    var o = { ...r };
+                    delete o.signedUrl;
+                    return o;
+                });
+                expenseReceiptPendingFiles = [];
+                expenseRemovedReceiptPathsPending = [];
                 openExpensePanel();
             }
 
@@ -4303,12 +4404,17 @@ import { createProjectRegister } from './estimate-project-register.js';
         // 폼 초기화
         function resetExpenseForm() {
             expenseEditingId = null;
+            expenseEditSavedReceipts = [];
+            expenseReceiptPendingFiles = [];
+            expenseRemovedReceiptPathsPending = [];
             document.getElementById('expenseTypeCard').checked = true;
             document.getElementById('expenseBuilding').value = '';
             document.getElementById('expensePurpose').value = '';
             document.getElementById('expenseAmount').value = '';
             document.getElementById('expenseReceipt').value = '';
             document.getElementById('expenseReceiptName').textContent = '선택한 파일 없음';
+            var chipBox = document.getElementById('expenseReceiptChipList');
+            if (chipBox) chipBox.innerHTML = '';
         }
 
         // 경비 상세 슬라이드 패널 (목록에 이미 있는 필드로 즉시 표시 — 전건 get 대기 제거)
@@ -10254,6 +10360,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 editExpense,
                 deleteExpense,
                 updateExpenseFileName,
+                removeExpenseReceiptPendingAt,
+                removeExpenseReceiptSavedAt,
 
                 // 판관비
                 downloadSgaCSV,

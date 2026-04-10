@@ -1,7 +1,7 @@
 /**
  * Vercel Hobby: 함수 개수 한도(12) 대응 — Storage 서명·업로드를 단일 엔드포인트로 통합.
  *
- * POST + Content-Type: application/json  → { path } 단일 또는 { paths: string[] } 일괄 서명 URL
+ * POST + Content-Type: application/json  → { path } / { paths } 서명 URL, 또는 { deletePath } Storage 객체 삭제
  * POST + multipart/form-data:
  *   - expenseId + file          → 경비 영수증
  *   - contractorId + slot + file → 업체 첨부
@@ -55,6 +55,19 @@ const ALLOWED_MIME = new Set([
 async function handleSignJson(request, supabaseAdmin) {
     const body = await request.json().catch(() => ({}));
     const bucket = getExpenseReceiptsBucket();
+
+    const delPath = body && typeof body.deletePath === 'string' ? body.deletePath.trim() : '';
+    if (delPath) {
+        if (!isAllowedStorageObjectPath(delPath)) {
+            return jsonResponse(400, { ok: false, error: 'invalid path' });
+        }
+        const { error } = await supabaseAdmin.storage.from(bucket).remove([delPath]);
+        if (error) {
+            return jsonResponse(500, { ok: false, error: error.message || 'Storage 삭제 실패' });
+        }
+        return jsonResponse(200, { ok: true });
+    }
+
     const sec = parseSignedUrlSeconds();
 
     const pathsRaw = body && Array.isArray(body.paths) ? body.paths : null;
