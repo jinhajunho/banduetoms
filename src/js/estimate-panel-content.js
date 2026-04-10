@@ -3,7 +3,7 @@
  * app.js에서 api 주입 후 할당합니다.
  */
 export function createRenderPanelContent(api) {
-        return function renderPanelContent(item) {
+        return function renderPanelContent(item, options) {
         const isExternalContractorView = api.isCurrentUserExternalContractor();
         const profile = api.getCurrentUserAccessProfile();
         const lockedContractorName = isExternalContractorView
@@ -495,7 +495,11 @@ export function createRenderPanelContent(api) {
             api.resetPanelDirtyState();
         }
         if (item && item.code) {
-            api.renderFinanceTablesFromItem(item);
-            api.recalcFinanceSummaries(item.code);
-        }    };
+            if (options && options.deferFinanceHydration === true) {
+                api.schedulePanelFinanceHydrationForView();
+            } else {
+                api.ensurePanelFinanceTables(item);
+            }
+        }
+        };
 }

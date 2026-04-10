@@ -569,6 +569,25 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         var __bpsAuthFetchState = { token: null, validUntil: 0 };
         var __bpsAuthTokenTtlMs = 45000;
+        /** Storage 서명 URL 클라이언트 캐시 path → { url, expiresAt } */
+        var __bpsSignedUrlCache = Object.create(null);
+
+        function __bpsSignedUrlCacheGet(path) {
+            var p = String(path || '').trim();
+            if (!p) return null;
+            var ent = __bpsSignedUrlCache[p];
+            if (!ent || !(ent.expiresAt > Date.now())) return null;
+            return ent.url;
+        }
+
+        function __bpsSignedUrlCacheSet(path, url, expiresInSec) {
+            var p = String(path || '').trim();
+            if (!p || !url) return;
+            var sec = Number(expiresInSec);
+            if (!Number.isFinite(sec) || sec < 60) sec = 3600;
+            var ms = Math.max(60000, (sec - 120) * 1000);
+            __bpsSignedUrlCache[p] = { url: String(url), expiresAt: Date.now() + ms };
+        }
 
         function bpsAuthedPost(path, payload) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
@@ -642,7 +661,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             return run(false, false);
         }
 
-        /** Storage 서명 URL — 경로가 여러 개면 한 번의 /api/storage 호출로 묶음 */
+        /** Storage 서명 URL — 캐시 히트는 /api/storage 생략, 여러 개면 한 번에 요청 */
         function bpsStorageSignMany(paths) {
             var raw = Array.isArray(paths)
                 ? paths.map(function (p) {
@@ -657,22 +676,34 @@ import { createProjectRegister } from './estimate-project-register.js';
                 seen[p] = true;
                 list.push(p);
             }
-            if (list.length === 0) return Promise.resolve({});
-            if (list.length === 1) {
-                return bpsAuthedPost('/api/storage', { path: list[0] }).then(function (r) {
+            var result = Object.create(null);
+            var need = [];
+            for (var j = 0; j < list.length; j++) {
+                var pj = list[j];
+                var hit = __bpsSignedUrlCacheGet(pj);
+                if (hit) result[pj] = hit;
+                else need.push(pj);
+            }
+            if (need.length === 0) return Promise.resolve(result);
+            if (need.length === 1) {
+                return bpsAuthedPost('/api/storage', { path: need[0] }).then(function (r) {
                     if (!r.ok || !r.body || !r.body.url) return null;
-                    var m = {};
-                    m[list[0]] = r.body.url;
-                    return m;
+                    var exp = r.body && r.body.expiresIn != null ? Number(r.body.expiresIn) : 3600;
+                    __bpsSignedUrlCacheSet(need[0], r.body.url, exp);
+                    result[need[0]] = r.body.url;
+                    return result;
                 });
             }
-            return bpsAuthedPost('/api/storage', { paths: list }).then(function (r) {
+            return bpsAuthedPost('/api/storage', { paths: need }).then(function (r) {
                 if (!r.ok || !r.body || !Array.isArray(r.body.results)) return null;
-                var m = {};
+                var exp = r.body && r.body.expiresIn != null ? Number(r.body.expiresIn) : 3600;
                 r.body.results.forEach(function (row) {
-                    if (row && row.path && row.url) m[row.path] = row.url;
+                    if (row && row.path && row.url) {
+                        __bpsSignedUrlCacheSet(row.path, row.url, exp);
+                        result[row.path] = row.url;
+                    }
                 });
-                return m;
+                return result;
             });
         }
 
@@ -1009,6 +1040,20 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
         }
 
+        function copyExpenseItemForUpsert(item) {
+            if (!item || typeof item !== 'object') return item;
+            var o = { ...item };
+            if (Array.isArray(o.receipts)) {
+                o.receipts = o.receipts.map(function (r) {
+                    if (!r || typeof r !== 'object') return r;
+                    var x = { ...r };
+                    delete x.signedUrl;
+                    return x;
+                });
+            }
+            return o;
+        }
+
         function upsertExpenseToServer(item) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.resolve({
@@ -1021,7 +1066,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!item || !Number.isFinite(id)) {
                 return Promise.resolve({ ok: false, error: '저장할 경비 데이터가 올바르지 않습니다.' });
             }
-            var payloadWrapper = { action: 'upsert', item: item };
+            var payloadWrapper = { action: 'upsert', item: copyExpenseItemForUpsert(item) };
             var maxBytes = expenseItemHasHeavyDataUrls(item)
                 ? 4 * 1024 * 1024 - 80 * 1024
                 : 512 * 1024;
@@ -4302,12 +4347,53 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('expenseDetailSlidePanel').classList.remove('active');
         }
 
+        /** Storage 서명 API 호출이 필요한지 — get에 signedUrl 있거나 캐시 히트면 불필요 */
+        function expenseNeedsSignedUrls(expense) {
+            var recs = getExpenseReceipts(expense);
+            for (var i = 0; i < recs.length; i++) {
+                var r = recs[i];
+                var sp = r && typeof r.storagePath === 'string' ? r.storagePath.trim() : '';
+                if (!sp) continue;
+                if (r.signedUrl && String(r.signedUrl).trim()) continue;
+                if (__bpsSignedUrlCacheGet(sp)) continue;
+                return true;
+            }
+            return false;
+        }
+
+        function showExpenseReceiptLoadingModal() {
+            var el = document.createElement('div');
+            el.className = 'file-list-modal active';
+            el.setAttribute('data-bps-receipt-loading', '1');
+            el.innerHTML =
+                '<div class="file-list-modal-content" style="min-width:280px;min-height:140px;display:flex;align-items:center;justify-content:center;">' +
+                '<div style="text-align:center;color:var(--gray-600);padding:16px;">' +
+                '<i class="fas fa-spinner fa-spin" style="font-size:26px;margin-bottom:12px;display:block;color:var(--primary);"></i>' +
+                '<div style="font-size:15px;font-weight:500;">영수증을 불러오는 중…</div>' +
+                '</div></div>';
+            document.body.appendChild(el);
+            return el;
+        }
+
+        function removeExpenseReceiptLoadingModal(el) {
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+        }
+
         // 경비 첨부파일 보기 — Storage 경로·dataUrl이 메모리에 있으면 get 생략(지연 감소)
         function viewExpenseImage(id, index) {
             var existing = expenses.find(e => e.id === id);
             if (!existing) return;
             var receiptsCheck = getExpenseReceipts(existing);
             if (receiptsCheck.length === 0) return;
+
+            var loadingModalEl = null;
+            function hideLoading() {
+                removeExpenseReceiptLoadingModal(loadingModalEl);
+                loadingModalEl = null;
+            }
+            function showLoading() {
+                if (!loadingModalEl) loadingModalEl = showExpenseReceiptLoadingModal();
+            }
 
             function fileMetaFromDataUrl(item, idx, expense) {
                 const dataUrl = item && (item.dataUrl || item);
@@ -4325,13 +4411,31 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             function runReceiptPreview(expense) {
                 const receipts = getExpenseReceipts(expense);
-                if (receipts.length === 0) return Promise.resolve();
+                if (receipts.length === 0) {
+                    hideLoading();
+                    return Promise.resolve();
+                }
 
-                const storagePaths = [];
+                const urlByPathAgg = Object.create(null);
+                const needSign = [];
+                const seenNeed = Object.create(null);
                 for (let i = 0; i < receipts.length; i++) {
                     const item = receipts[i];
                     const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
-                    if (sp) storagePaths.push(sp);
+                    if (!sp) continue;
+                    if (item.signedUrl && String(item.signedUrl).trim()) {
+                        urlByPathAgg[sp] = String(item.signedUrl).trim();
+                        continue;
+                    }
+                    const cached = __bpsSignedUrlCacheGet(sp);
+                    if (cached) {
+                        urlByPathAgg[sp] = cached;
+                        continue;
+                    }
+                    if (!seenNeed[sp]) {
+                        seenNeed[sp] = true;
+                        needSign.push(sp);
+                    }
                 }
 
                 function buildList(urlByPath) {
@@ -4340,7 +4444,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                         const item = receipts[idx];
                         const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
                         if (sp) {
-                            const url = urlByPath && urlByPath[sp];
+                            const url =
+                                (item.signedUrl && String(item.signedUrl).trim()) ||
+                                (urlByPath && urlByPath[sp]) ||
+                                '';
                             if (!url) continue;
                             const mime = item.mimeType ? String(item.mimeType) : '';
                             const defaultName = '영수증_' + (idx + 1);
@@ -4367,8 +4474,18 @@ import { createProjectRegister } from './estimate-project-register.js';
                     return list;
                 }
 
-                if (storagePaths.length === 0) {
+                var hasStoragePath = false;
+                for (let h = 0; h < receipts.length; h++) {
+                    var rh = receipts[h];
+                    if (rh && typeof rh.storagePath === 'string' && rh.storagePath.trim()) {
+                        hasStoragePath = true;
+                        break;
+                    }
+                }
+
+                if (!hasStoragePath) {
                     const list = buildList({});
+                    hideLoading();
                     if (list.length === 0) {
                         alert('저장된 영수증 파일이 없습니다.');
                         return Promise.resolve();
@@ -4377,36 +4494,69 @@ import { createProjectRegister } from './estimate-project-register.js';
                     return Promise.resolve();
                 }
 
-                return bpsStorageSignMany(storagePaths).then(function (urlByPath) {
-                    if (!urlByPath) {
-                        alert('영수증 URL을 불러오지 못했습니다.');
-                        return;
-                    }
-                    const list = buildList(urlByPath);
+                if (needSign.length === 0) {
+                    hideLoading();
+                    const list = buildList(urlByPathAgg);
                     if (list.length === 0) {
                         alert('저장된 영수증 파일이 없습니다.');
-                        return;
+                        return Promise.resolve();
                     }
                     openAttachmentListModal(list, '첨부파일');
-                });
+                    return Promise.resolve();
+                }
+
+                return bpsStorageSignMany(needSign)
+                    .then(function (fetched) {
+                        hideLoading();
+                        if (!fetched) {
+                            alert('영수증 URL을 불러오지 못했습니다.');
+                            return;
+                        }
+                        Object.assign(urlByPathAgg, fetched);
+                        const list = buildList(urlByPathAgg);
+                        if (list.length === 0) {
+                            alert('저장된 영수증 파일이 없습니다.');
+                            return;
+                        }
+                        openAttachmentListModal(list, '첨부파일');
+                    })
+                    .catch(function (e) {
+                        hideLoading();
+                        alert((e && e.message) || '영수증 URL 요청에 실패했습니다.');
+                    });
             }
 
             function runWithExpense(expense) {
                 return runReceiptPreview(expense).catch(function (e) {
+                    hideLoading();
                     alert((e && e.message) || '영수증을 불러오지 못했습니다.');
                 });
             }
 
             if (expenseReceiptsResolvableFromMemory(existing)) {
+                if (expenseNeedsSignedUrls(existing)) {
+                    showLoading();
+                }
                 runWithExpense(existing);
                 return;
             }
-            fetchExpenseFullFromServer(id).then(function (full) {
-                if (full) mergeExpenseIntoList(full);
-                var expense = expenses.find(e => e.id === id);
-                if (!expense) return;
-                return runWithExpense(expense);
-            });
+
+            showLoading();
+            fetchExpenseFullFromServer(id)
+                .then(function (full) {
+                    if (full) mergeExpenseIntoList(full);
+                    var expense = expenses.find(e => e.id === id);
+                    if (!expense) {
+                        hideLoading();
+                        alert('경비 정보를 불러오지 못했습니다.');
+                        return;
+                    }
+                    return runWithExpense(expense);
+                })
+                .catch(function (e) {
+                    hideLoading();
+                    alert((e && e.message) || '경비 정보를 불러오지 못했습니다.');
+                });
         }
 
         // CSV 다운로드
@@ -8079,6 +8229,8 @@ import { createProjectRegister } from './estimate-project-register.js';
         let getProfitNetTotalsByCode = function () {
             return { salesNet: 0, purchaseNet: 0, businessGross: 0, profitNet: 0 };
         };
+        /** 프로젝트 보기 모달: 재무 표 idle 보충용 (openPanel·closePanel과 공유) */
+        let pendingFinanceHydrationCode = null;
 
         function getPanelSnapshot() {
             const panelBody = document.getElementById('sharedPanelBody');
@@ -8148,6 +8300,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             const item = findEstimateByCode(code);
             if (!item) return;
 
+            pendingFinanceHydrationCode = null;
             currentEditItem = {...item};
             isEditMode = false;
             basicInfoEditMode = false;
@@ -8158,7 +8311,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('sharedPanelOverlay').classList.add('active');
             document.getElementById('sharedCenterPanel').classList.add('active');
             requestAnimationFrame(function () {
-                renderPanelContent(item);
+                renderPanelContent(item, { deferFinanceHydration: true });
             });
         }
 
@@ -8216,6 +8369,15 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.querySelectorAll('.new-estimate-tab-pane').forEach(c => c.classList.remove('active'));
             const target = document.getElementById('tab-' + tabId);
             if (target) target.classList.add('active');
+
+            if (
+                pendingFinanceHydrationCode &&
+                currentEditItem &&
+                String(currentEditItem.code) === pendingFinanceHydrationCode &&
+                (tabId === 'sales' || tabId === 'purchase' || tabId === 'profit' || tabId === 'business')
+            ) {
+                ensurePanelFinanceTables(currentEditItem);
+            }
         }
 
         /** vat별도 입력 시 부가세(10%)·vat포함 자동 (부가세 = 별도×0.1, 포함 = 별도×1.1) */
@@ -9752,6 +9914,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             basicInfoEditMode = false;
             currentEditItem = null;
             isCreatingAccount = false;
+            pendingFinanceHydrationCode = null;
         }
 
         // 뱃지 클래스 가져오기
@@ -9779,6 +9942,32 @@ import { createProjectRegister } from './estimate-project-register.js';
         recalcFinanceSummaries = financeRecalc.recalcFinanceSummaries;
         getProfitNetTotalsByCode = financeRecalc.getProfitNetTotalsByCode;
 
+        /** 보기 모달: 매출·수금·매입·이체 표는 idle에 채워 첫 페인트를 앞당김. 탭 전환 시 즉시 채움. */
+        function ensurePanelFinanceTables(item) {
+            if (!item || item.code == null) return;
+            pendingFinanceHydrationCode = null;
+            renderFinanceTablesFromItem(item);
+            recalcFinanceSummaries(item.code);
+        }
+
+        function schedulePanelFinanceHydrationForView() {
+            const it = currentEditItem;
+            if (!it || it.code == null) return;
+            const code = String(it.code);
+            pendingFinanceHydrationCode = code;
+            const run = function () {
+                if (pendingFinanceHydrationCode !== code) return;
+                const cur = currentEditItem;
+                if (!cur || String(cur.code) !== code) return;
+                ensurePanelFinanceTables(cur);
+            };
+            if (typeof requestIdleCallback !== 'undefined') {
+                requestIdleCallback(run, { timeout: 450 });
+            } else {
+                setTimeout(run, 0);
+            }
+        }
+
         renderPanelContent = createRenderPanelContent({
             isCurrentUserExternalContractor: isCurrentUserExternalContractor,
             getCurrentUserAccessProfile: function () { return currentUserAccessProfile; },
@@ -9800,6 +9989,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             resetPanelDirtyState: resetPanelDirtyState,
             renderFinanceTablesFromItem: renderFinanceTablesFromItem,
             recalcFinanceSummaries: recalcFinanceSummaries,
+            ensurePanelFinanceTables: ensurePanelFinanceTables,
+            schedulePanelFinanceHydrationForView: schedulePanelFinanceHydrationForView,
         });
 
         // 상태 팝오버

@@ -1,7 +1,47 @@
 export const runtime = 'nodejs';
 
 import { requireActiveUser } from './_lib/activeAuth.js';
-import { removeExpenseReceiptObjectsFromPayload } from './_lib/expenseReceiptsStorage.js';
+import {
+    getExpenseReceiptsBucket,
+    isAllowedStorageObjectPath,
+    removeExpenseReceiptObjectsFromPayload,
+} from './_lib/expenseReceiptsStorage.js';
+
+function parseSignedUrlSeconds() {
+    const raw = process.env.EXPENSE_RECEIPT_SIGNED_URL_SECONDS;
+    if (raw && /^\d+$/.test(String(raw).trim())) {
+        const n = parseInt(String(raw).trim(), 10);
+        if (n >= 60 && n <= 86400) return n;
+    }
+    return 3600;
+}
+
+/** action:get 전용 — DB에는 넣지 않고 응답에만 ephemeral signedUrl 부착 (클라이언트가 /api/storage 왕복 생략) */
+async function attachSignedUrlsToExpensePayload(supabaseAdmin, payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    const receipts = Array.isArray(payload.receipts) ? payload.receipts : [];
+    if (receipts.length === 0) return payload;
+    const bucket = getExpenseReceiptsBucket();
+    const sec = parseSignedUrlSeconds();
+    const nextReceipts = [];
+    for (let i = 0; i < receipts.length; i++) {
+        const r = receipts[i];
+        if (!r || typeof r !== 'object') {
+            nextReceipts.push(r);
+            continue;
+        }
+        const o = { ...r };
+        const p = typeof o.storagePath === 'string' ? o.storagePath.trim() : '';
+        if (p && isAllowedStorageObjectPath(p)) {
+            const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(p, sec);
+            if (!error && data && data.signedUrl) {
+                o.signedUrl = data.signedUrl;
+            }
+        }
+        nextReceipts.push(o);
+    }
+    return { ...payload, receipts: nextReceipts };
+}
 
 function jsonResponse(status, body) {
     return new Response(JSON.stringify(body), {
@@ -73,8 +113,9 @@ export default {
                 if (!row || typeof row.payload !== 'object' || row.payload === null) {
                     return jsonResponse(404, { ok: false, error: 'not found' });
                 }
-                const p = { ...row.payload };
+                let p = { ...row.payload };
                 if (p.id === undefined || p.id === null) p.id = Number(row.id);
+                p = await attachSignedUrlsToExpensePayload(supabaseAdmin, p);
                 return jsonResponse(200, { ok: true, item: p });
             }
 
@@ -85,7 +126,15 @@ export default {
                     return jsonResponse(400, { ok: false, error: 'item.id is required' });
                 }
 
-                const payload = { ...item, id };
+                let payload = { ...item, id };
+                if (payload.receipts && Array.isArray(payload.receipts)) {
+                    payload.receipts = payload.receipts.map(function (r) {
+                        if (!r || typeof r !== 'object') return r;
+                        const x = { ...r };
+                        delete x.signedUrl;
+                        return x;
+                    });
+                }
 
                 const { error } = await supabaseAdmin.from('expense_records').upsert(
                     {
