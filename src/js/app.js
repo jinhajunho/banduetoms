@@ -715,7 +715,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 var fd = new FormData();
                 fd.append('expenseId', String(expenseId));
                 fd.append('file', file);
-                return fetch(window.location.origin + '/api/expense-receipt-upload', {
+                return fetch(window.location.origin + '/api/storage', {
                     method: 'POST',
                     headers: { Authorization: 'Bearer ' + res.data.session.access_token },
                     body: fd,
@@ -769,7 +769,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 fd.append('contractorId', String(contractorId));
                 fd.append('slot', slot === 'bank' ? 'bank' : 'license');
                 fd.append('file', file);
-                return fetch(window.location.origin + '/api/contractor-file-upload', {
+                return fetch(window.location.origin + '/api/storage', {
                     method: 'POST',
                     headers: { Authorization: 'Bearer ' + res.data.session.access_token },
                     body: fd,
@@ -806,7 +806,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 fd.append('estimateCode', String(estimateCode || '').trim());
                 fd.append('rowKey', String(rowKey || '').trim());
                 fd.append('file', file);
-                return fetch(window.location.origin + '/api/estimate-finance-file-upload', {
+                return fetch(window.location.origin + '/api/storage', {
                     method: 'POST',
                     headers: { Authorization: 'Bearer ' + res.data.session.access_token },
                     body: fd,
@@ -3074,7 +3074,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('contractorDetailSlidePanel').classList.remove('active');
         }
 
-        // 저장 (첨부는 Supabase Storage — contractor-file-upload)
+        // 저장 (첨부는 Supabase Storage — /api/storage 업로드)
         function saveContractor() {
             const name = document.getElementById('contractorName').value.trim();
             const phone = document.getElementById('contractorPhone').value.trim();
@@ -3359,7 +3359,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 const sp =
                     contractor.licenseStoragePath && String(contractor.licenseStoragePath).trim();
                 if (sp) {
-                    bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
+                    bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
                         if (!r.ok || !r.body || !r.body.url) {
                             alert('파일을 불러올 수 없습니다.');
                             return;
@@ -3395,7 +3395,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!contractor.hasBankAccount) return;
             const bsp = contractor.bankStoragePath && String(contractor.bankStoragePath).trim();
             if (bsp) {
-                bpsAuthedPost('/api/storage-sign', { path: bsp }).then(function (r) {
+                bpsAuthedPost('/api/storage', { path: bsp }).then(function (r) {
                     if (!r.ok || !r.body || !r.body.url) {
                         alert('파일을 불러올 수 없습니다.');
                         return;
@@ -4175,7 +4175,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             const tasks = receipts.map(function (item, idx) {
                 const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
                 if (sp) {
-                    return bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
+                    return bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
                         if (!r.ok || !r.body || !r.body.url) return null;
                         const url = r.body.url;
                         const mime = item.mimeType ? String(item.mimeType) : '';
@@ -9069,7 +9069,7 @@ import { createProjectRegister } from './estimate-project-register.js';
         function resolveFinanceAttachmentPreviewUrl(file, done) {
             var sp = file && typeof file.storagePath === 'string' ? file.storagePath.trim() : '';
             if (sp) {
-                bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
+                bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
                     if (!r.ok || !r.body || !r.body.url) {
                         alert('파일을 불러올 수 없습니다.');
                         return;
@@ -9089,7 +9089,7 @@ import { createProjectRegister } from './estimate-project-register.js';
         function downloadFinanceAttachmentBlob(file) {
             var sp = file && typeof file.storagePath === 'string' ? file.storagePath.trim() : '';
             if (sp) {
-                bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
+                bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
                     if (!r.ok || !r.body || !r.body.url) {
                         alert('다운로드 링크를 만들 수 없습니다.');
                         return;
