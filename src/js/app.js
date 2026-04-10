@@ -336,6 +336,9 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         // 경비 (`POST /api/expense` + body.action → `expense_records`).
         let expenses = [];
+        let expenseSyncInFlight = null;
+        let expenseSyncLastSuccessAt = 0;
+        const EXPENSE_SYNC_MIN_INTERVAL_MS = 30000;
 
         // 판관비 (`POST /api/sga` + body.action → `sga_records`)
         let sgaExpenses = [];
@@ -678,22 +681,64 @@ import { createProjectRegister } from './estimate-project-register.js';
                 });
         }
 
-        function syncExpensesFromServer() {
+        function syncExpensesFromServer(options) {
+            options = options || {};
+            const force = !!options.force;
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) return Promise.resolve(false);
-            return bpsAuthedPost('/api/expense', { action: 'list' }).then(function (r) {
-                if (!r.ok || !r.body || r.body.ok !== true || !Array.isArray(r.body.items)) {
+            if (expenseSyncInFlight) {
+                return expenseSyncInFlight;
+            }
+            if (
+                !force &&
+                expenseSyncLastSuccessAt > 0 &&
+                Date.now() - expenseSyncLastSuccessAt < EXPENSE_SYNC_MIN_INTERVAL_MS
+            ) {
+                return Promise.resolve(true);
+            }
+            expenseSyncInFlight = bpsAuthedPost('/api/expense', { action: 'list' })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true || !Array.isArray(r.body.items)) {
+                        return false;
+                    }
+                    const list = r.body.items.map(function (x) {
+                        return { ...x };
+                    });
+                    expenses.splice(0, expenses.length, ...list);
+                    expenseSyncLastSuccessAt = Date.now();
+                    fillExpenseMonthFilter();
+                    renderExpenseTable();
+                    return true;
+                })
+                .catch(function () {
                     return false;
-                }
-                const list = r.body.items.map(function (x) {
-                    return { ...x };
+                })
+                .finally(function () {
+                    expenseSyncInFlight = null;
                 });
-                expenses.splice(0, expenses.length, ...list);
-                fillExpenseMonthFilter();
-                renderExpenseTable();
-                return true;
-            }).catch(function () {
-                return false;
+            return expenseSyncInFlight;
+        }
+
+        /** 상세·수정·영수증 보기용 전체 payload (목록은 data URL 생략될 수 있음) */
+        function fetchExpenseFullFromServer(id) {
+            var nid = Number(id);
+            if (!Number.isFinite(nid)) return Promise.resolve(null);
+            return bpsAuthedPost('/api/expense', { action: 'get', id: nid })
+                .then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true || !r.body.item) return null;
+                    return r.body.item;
+                })
+                .catch(function () {
+                    return null;
+                });
+        }
+
+        function mergeExpenseIntoList(item) {
+            if (!item || item.id == null) return;
+            var ix = expenses.findIndex(function (e) {
+                return e.id === item.id;
             });
+            if (ix !== -1) expenses[ix] = item;
+            else expenses.push(item);
         }
 
         function expenseItemHasHeavyDataUrls(item) {
@@ -4060,24 +4105,27 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         // 수정
         function editExpense(id) {
-            const expense = expenses.find(e => e.id === id);
-            if (!expense) return;
+            const existing = expenses.find(e => e.id === id);
+            if (!existing) return;
 
-            expenseEditingId = id;
-            
-            // 라디오 버튼 설정
-            if (expense.type === '계좌이체') {
-                document.getElementById('expenseTypeTransfer').checked = true;
-            } else {
-                document.getElementById('expenseTypeCard').checked = true;
+            function fillFromExpense(expense) {
+                mergeExpenseIntoList(expense);
+                expenseEditingId = id;
+                if (expense.type === '계좌이체') {
+                    document.getElementById('expenseTypeTransfer').checked = true;
+                } else {
+                    document.getElementById('expenseTypeCard').checked = true;
+                }
+                document.getElementById('expenseUsageDate').value = expense.date;
+                document.getElementById('expenseBuilding').value = expense.building;
+                document.getElementById('expensePurpose').value = expense.purpose;
+                document.getElementById('expenseAmount').value = expense.amount;
+                openExpensePanel();
             }
-            
-            document.getElementById('expenseUsageDate').value = expense.date;
-            document.getElementById('expenseBuilding').value = expense.building;
-            document.getElementById('expensePurpose').value = expense.purpose;
-            document.getElementById('expenseAmount').value = expense.amount;
-            
-            openExpensePanel();
+
+            fetchExpenseFullFromServer(id).then(function (full) {
+                fillFromExpense(full || existing);
+            });
         }
 
         // 삭제
@@ -4108,12 +4156,13 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         // 경비 상세 슬라이드 패널
         function openExpenseDetailPanel(id) {
-            const expense = expenses.find(e => e.id === id);
-            if (!expense) return;
             const body = document.getElementById('expenseDetailBody');
             const editBtn = document.getElementById('expenseDetailEditBtn');
             if (!body) return;
-            body.innerHTML = `
+
+            function renderDetail(expense) {
+                if (!expense) return;
+                body.innerHTML = `
                 <div class="panel-form-row"><span class="detail-label">구분</span><span class="detail-value">${expense.type}</span></div>
                 <div class="panel-form-row"><span class="detail-label">사용일시</span><span class="detail-value">${expense.date}</span></div>
                 <div class="panel-form-row"><span class="detail-label">사용건물</span><span class="detail-value">${expense.building || '-'}</span></div>
@@ -4124,26 +4173,39 @@ import { createProjectRegister } from './estimate-project-register.js';
                     <span class="detail-value expense-detail-photo-cell"></span>
                 </div>
             `;
-            (function () {
-                const photoCell = body.querySelector('.expense-detail-photo-cell');
-                if (!photoCell) return;
-                const n = getExpenseReceipts(expense).length;
-                if (!n) {
-                    photoCell.textContent = '보기 (0)';
-                    return;
+                (function () {
+                    const photoCell = body.querySelector('.expense-detail-photo-cell');
+                    if (!photoCell) return;
+                    const n = getExpenseReceipts(expense).length;
+                    if (!n) {
+                        photoCell.textContent = '보기 (0)';
+                        return;
+                    }
+                    const span = document.createElement('span');
+                    span.className = 'file-link';
+                    span.style.cssText = 'color: var(--primary); cursor: pointer;';
+                    span.innerHTML = '<i class="fas fa-image"></i> 보기 (' + n + ')';
+                    span.addEventListener('click', function () {
+                        viewExpenseImage(id, 0);
+                    });
+                    photoCell.appendChild(span);
+                })();
+                if (editBtn) {
+                    editBtn.onclick = function () {
+                        closeExpenseDetailPanel();
+                        editExpense(id);
+                    };
                 }
-                const span = document.createElement('span');
-                span.className = 'file-link';
-                span.style.cssText = 'color: var(--primary); cursor: pointer;';
-                span.innerHTML = '<i class="fas fa-image"></i> 보기 (' + n + ')';
-                span.addEventListener('click', function () {
-                    viewExpenseImage(id, 0);
-                });
-                photoCell.appendChild(span);
-            })();
-            if (editBtn) { editBtn.onclick = function() { closeExpenseDetailPanel(); editExpense(id); }; }
-            document.getElementById('expenseDetailOverlay').classList.add('active');
-            document.getElementById('expenseDetailSlidePanel').classList.add('active');
+                document.getElementById('expenseDetailOverlay').classList.add('active');
+                document.getElementById('expenseDetailSlidePanel').classList.add('active');
+            }
+
+            fetchExpenseFullFromServer(id).then(function (full) {
+                var expense = full || expenses.find(e => e.id === id);
+                if (!expense) return;
+                if (full) mergeExpenseIntoList(full);
+                renderDetail(expense);
+            });
         }
 
         function closeExpenseDetailPanel() {
@@ -4151,57 +4213,61 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('expenseDetailSlidePanel').classList.remove('active');
         }
 
-        // 경비 첨부파일 보기 (프로젝트관리 첨부파일 목록 모달과 동일 패턴)
+        // 경비 첨부파일 보기 (목록이 경량 payload일 수 있어 전건 조회 후 표시)
         function viewExpenseImage(id, index) {
-            const expense = expenses.find(e => e.id === id);
-            if (!expense) return;
-            const receipts = getExpenseReceipts(expense);
-            if (receipts.length === 0) return;
+            fetchExpenseFullFromServer(id).then(function (full) {
+                if (full) mergeExpenseIntoList(full);
+                const expense = expenses.find(e => e.id === id);
+                if (!expense) return;
+                const receipts = getExpenseReceipts(expense);
+                if (receipts.length === 0) return;
 
-            function fileMetaFromDataUrl(item, idx) {
-                const dataUrl = item && (item.dataUrl || item);
-                const src = typeof dataUrl === 'string' ? dataUrl : (dataUrl && dataUrl.dataUrl);
-                if (!src) return null;
-                const isPdf = src.indexOf('data:application/pdf') === 0;
-                const defaultName = '영수증_' + (idx + 1) + (isPdf ? '.pdf' : '.png');
-                return {
-                    name: ((item && item.name) ? String(item.name) : defaultName).replace(/[\\/:*?"<>|]/g, '_'),
-                    type: isPdf ? 'application/pdf' : 'image/png',
-                    data: src,
-                    date: expense.date || new Date().toISOString().slice(0, 10)
-                };
-            }
-
-            const tasks = receipts.map(function (item, idx) {
-                const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
-                if (sp) {
-                    return bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
-                        if (!r.ok || !r.body || !r.body.url) return null;
-                        const url = r.body.url;
-                        const mime = item.mimeType ? String(item.mimeType) : '';
-                        const defaultName = '영수증_' + (idx + 1);
-                        const nm = ((item && item.name) ? String(item.name) : defaultName).replace(
-                            /[\\/:*?"<>|]/g,
-                            '_'
-                        );
-                        const isPdf =
-                            mime === 'application/pdf' ||
-                            /\.pdf(\?|#|$)/i.test(url) ||
-                            /\.pdf$/i.test(nm);
-                        const type = isPdf ? 'application/pdf' : mime.indexOf('image/') === 0 ? mime : 'image/jpeg';
-                        return {
-                            name: nm,
-                            type: type,
-                            data: url,
-                            date: expense.date || new Date().toISOString().slice(0, 10),
-                        };
-                    });
+                function fileMetaFromDataUrl(item, idx) {
+                    const dataUrl = item && (item.dataUrl || item);
+                    const src = typeof dataUrl === 'string' ? dataUrl : (dataUrl && dataUrl.dataUrl);
+                    if (!src) return null;
+                    const isPdf = src.indexOf('data:application/pdf') === 0;
+                    const defaultName = '영수증_' + (idx + 1) + (isPdf ? '.pdf' : '.png');
+                    return {
+                        name: ((item && item.name) ? String(item.name) : defaultName).replace(/[\\/:*?"<>|]/g, '_'),
+                        type: isPdf ? 'application/pdf' : 'image/png',
+                        data: src,
+                        date: expense.date || new Date().toISOString().slice(0, 10)
+                    };
                 }
-                return Promise.resolve(fileMetaFromDataUrl(item, idx));
-            });
 
-            Promise.all(tasks)
+                const tasks = receipts.map(function (item, idx) {
+                    const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
+                    if (sp) {
+                        return bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
+                            if (!r.ok || !r.body || !r.body.url) return null;
+                            const url = r.body.url;
+                            const mime = item.mimeType ? String(item.mimeType) : '';
+                            const defaultName = '영수증_' + (idx + 1);
+                            const nm = ((item && item.name) ? String(item.name) : defaultName).replace(
+                                /[\\/:*?"<>|]/g,
+                                '_'
+                            );
+                            const isPdf =
+                                mime === 'application/pdf' ||
+                                /\.pdf(\?|#|$)/i.test(url) ||
+                                /\.pdf$/i.test(nm);
+                            const type = isPdf ? 'application/pdf' : mime.indexOf('image/') === 0 ? mime : 'image/jpeg';
+                            return {
+                                name: nm,
+                                type: type,
+                                data: url,
+                                date: expense.date || new Date().toISOString().slice(0, 10),
+                            };
+                        });
+                    }
+                    return Promise.resolve(fileMetaFromDataUrl(item, idx));
+                });
+
+                return Promise.all(tasks);
+            })
                 .then(function (files) {
+                    if (!files) return;
                     const list = files.filter(Boolean);
                     if (list.length === 0) {
                         alert('저장된 영수증 파일이 없습니다.');
@@ -5359,7 +5425,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (i >= pending.length) {
                     var selMonth = document.getElementById('expenseMonthFilter');
                     if (selMonth) selMonth.value = '';
-                    syncExpensesFromServer().then(function () {
+                    syncExpensesFromServer({ force: true }).then(function () {
                         alert(pending.length + '건 반영했습니다. 월 필터는 「전체」로 바꿔 두었습니다.');
                         closeExpenseImportModal();
                     });
@@ -5376,7 +5442,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                                 '): ' +
                                 (r.error || '')
                         );
-                        syncExpensesFromServer();
+                        syncExpensesFromServer({ force: true });
                         closeExpenseImportModal();
                         return;
                     }

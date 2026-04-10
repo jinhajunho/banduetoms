@@ -10,6 +10,24 @@ function jsonResponse(status, body) {
     });
 }
 
+/** 목록 응답 크기 축소: 긴 data URL은 제거(상세/수정 시 action:get으로 전체 로드) */
+function liteExpensePayloadForList(p) {
+    if (!p || typeof p !== 'object') return p;
+    const o = { ...p };
+    if (o.receipts && Array.isArray(o.receipts)) {
+        o.receipts = o.receipts.map(function (r) {
+            if (!r || typeof r !== 'object') return r;
+            const next = { ...r };
+            const du = next.dataUrl != null ? String(next.dataUrl) : '';
+            if (du.length > 500) {
+                delete next.dataUrl;
+            }
+            return next;
+        });
+    }
+    return o;
+}
+
 export default {
     async fetch(request) {
         try {
@@ -35,10 +53,29 @@ export default {
                     if (!r || typeof r.payload !== 'object' || r.payload === null) return null;
                     const p = { ...r.payload };
                     if (p.id === undefined || p.id === null) p.id = Number(r.id);
-                    return p;
+                    return liteExpensePayloadForList(p);
                 }).filter(Boolean);
 
                 return jsonResponse(200, { ok: true, items });
+            }
+
+            if (action === 'get') {
+                const id = body && body.id != null ? Number(body.id) : NaN;
+                if (!Number.isFinite(id)) {
+                    return jsonResponse(400, { ok: false, error: 'id is required' });
+                }
+                const { data: row, error } = await supabaseAdmin
+                    .from('expense_records')
+                    .select('id, payload')
+                    .eq('id', id)
+                    .maybeSingle();
+                if (error) return jsonResponse(500, { ok: false, error: error.message });
+                if (!row || typeof row.payload !== 'object' || row.payload === null) {
+                    return jsonResponse(404, { ok: false, error: 'not found' });
+                }
+                const p = { ...row.payload };
+                if (p.id === undefined || p.id === null) p.id = Number(row.id);
+                return jsonResponse(200, { ok: true, item: p });
             }
 
             if (action === 'upsert') {
@@ -89,7 +126,7 @@ export default {
                 return jsonResponse(200, { ok: true });
             }
 
-            return jsonResponse(400, { ok: false, error: 'action must be list, upsert, or delete' });
+            return jsonResponse(400, { ok: false, error: 'action must be list, get, upsert, or delete' });
         } catch (e) {
             return jsonResponse(500, { ok: false, error: e?.message || String(e) });
         }
