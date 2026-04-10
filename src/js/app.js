@@ -567,42 +567,112 @@ import { createProjectRegister } from './estimate-project-register.js';
             return unescape(encodeURIComponent(str)).length;
         }
 
+        var __bpsAuthFetchState = { token: null, validUntil: 0 };
+        var __bpsAuthTokenTtlMs = 45000;
+
         function bpsAuthedPost(path, payload) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.reject(new Error('NO_SUPABASE'));
             }
-            return window.__bpsSupabase.auth.getSession().then(function (res) {
-                if (res.error || !res.data || !res.data.session) {
-                    return Promise.reject(new Error('로그인이 필요합니다.'));
+
+            function parseResponse(r, text) {
+                var j = null;
+                try {
+                    j = text && text.length ? JSON.parse(text) : {};
+                } catch (e) {
+                    j = {
+                        ok: false,
+                        error:
+                            '서버 응답이 JSON이 아닙니다 (HTTP ' +
+                            r.status +
+                            '). /api 경로·최신 배포·로그인 세션을 확인해 주세요.',
+                        _rawSnippet: text ? String(text).replace(/\s+/g, ' ').slice(0, 180) : '',
+                    };
                 }
+                if (!r.ok && j && !j.error && typeof j.message === 'string') {
+                    j = { ...j, error: j.message };
+                }
+                return { ok: r.ok, status: r.status, body: j };
+            }
+
+            function doFetch(token) {
                 return fetch(window.location.origin + path, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        Authorization: 'Bearer ' + res.data.session.access_token,
+                        Authorization: 'Bearer ' + token,
                     },
                     body: JSON.stringify(payload || {}),
                 }).then(function (r) {
                     return r.text().then(function (text) {
-                        var j = null;
-                        try {
-                            j = text && text.length ? JSON.parse(text) : {};
-                        } catch (e) {
-                            j = {
-                                ok: false,
-                                error:
-                                    '서버 응답이 JSON이 아닙니다 (HTTP ' +
-                                    r.status +
-                                    '). /api 경로·최신 배포·로그인 세션을 확인해 주세요.',
-                                _rawSnippet: text ? String(text).replace(/\s+/g, ' ').slice(0, 180) : '',
-                            };
+                        if (r.status === 401) {
+                            __bpsAuthFetchState = { token: null, validUntil: 0 };
                         }
-                        if (!r.ok && j && !j.error && typeof j.message === 'string') {
-                            j = { ...j, error: j.message };
-                        }
-                        return { ok: r.ok, status: r.status, body: j };
+                        return parseResponse(r, text);
                     });
                 });
+            }
+
+            function run(forceRefresh, alreadyRetried401) {
+                var now = Date.now();
+                if (!forceRefresh && __bpsAuthFetchState.token && now < __bpsAuthFetchState.validUntil) {
+                    return doFetch(__bpsAuthFetchState.token).then(function (res) {
+                        if (res.status === 401 && !alreadyRetried401) {
+                            return run(true, true);
+                        }
+                        return res;
+                    });
+                }
+                return window.__bpsSupabase.auth.getSession().then(function (res) {
+                    if (res.error || !res.data || !res.data.session) {
+                        return Promise.reject(new Error('로그인이 필요합니다.'));
+                    }
+                    var tok = res.data.session.access_token;
+                    __bpsAuthFetchState = { token: tok, validUntil: Date.now() + __bpsAuthTokenTtlMs };
+                    return doFetch(tok).then(function (out) {
+                        if (out.status === 401 && !alreadyRetried401) {
+                            __bpsAuthFetchState = { token: null, validUntil: 0 };
+                            return run(true, true);
+                        }
+                        return out;
+                    });
+                });
+            }
+
+            return run(false, false);
+        }
+
+        /** Storage 서명 URL — 경로가 여러 개면 한 번의 /api/storage 호출로 묶음 */
+        function bpsStorageSignMany(paths) {
+            var raw = Array.isArray(paths)
+                ? paths.map(function (p) {
+                      return String(p || '').trim();
+                  })
+                : [];
+            var seen = {};
+            var list = [];
+            for (var i = 0; i < raw.length; i++) {
+                var p = raw[i];
+                if (!p || seen[p]) continue;
+                seen[p] = true;
+                list.push(p);
+            }
+            if (list.length === 0) return Promise.resolve({});
+            if (list.length === 1) {
+                return bpsAuthedPost('/api/storage', { path: list[0] }).then(function (r) {
+                    if (!r.ok || !r.body || !r.body.url) return null;
+                    var m = {};
+                    m[list[0]] = r.body.url;
+                    return m;
+                });
+            }
+            return bpsAuthedPost('/api/storage', { paths: list }).then(function (r) {
+                if (!r.ok || !r.body || !Array.isArray(r.body.results)) return null;
+                var m = {};
+                r.body.results.forEach(function (row) {
+                    if (row && row.path && row.url) m[row.path] = row.url;
+                });
+                return m;
             });
         }
 
@@ -3120,15 +3190,17 @@ import { createProjectRegister } from './estimate-project-register.js';
             const body = document.getElementById('contractorDetailBody');
             const editBtn = document.getElementById('contractorDetailEditBtn');
             if (!body) return;
-            body.innerHTML = `
+            document.getElementById('contractorDetailOverlay').classList.add('active');
+            document.getElementById('contractorDetailSlidePanel').classList.add('active');
+            requestAnimationFrame(function () {
+                body.innerHTML = `
                 <div class="panel-form-row"><span class="detail-label">업체명</span><span class="detail-value">${(contractor.name || '').replace(/</g, '&lt;')}</span></div>
                 <div class="panel-form-row"><span class="detail-label">전화번호</span><span class="detail-value">${(contractor.phone || '-').replace(/</g, '&lt;')}</span></div>
                 <div class="panel-form-row"><span class="detail-label">사업자등록증</span><span class="detail-value">${contractor.hasLicense ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('license', ${contractor.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기</span>` : '없음'}</span></div>
                 <div class="panel-form-row"><span class="detail-label">통장사본</span><span class="detail-value">${contractor.hasBankAccount ? `<span class="file-link" onclick="event.stopPropagation(); viewContractorImage('bank', ${contractor.id})" style="color: var(--primary); cursor: pointer;"><i class="fas fa-image"></i> 보기</span>` : '없음'}</span></div>
             `;
-            if (editBtn) editBtn.onclick = function() { closeContractorDetailPanel(); editContractor(id); };
-            document.getElementById('contractorDetailOverlay').classList.add('active');
-            document.getElementById('contractorDetailSlidePanel').classList.add('active');
+                if (editBtn) editBtn.onclick = function() { closeContractorDetailPanel(); editContractor(id); };
+            });
         }
 
         function closeContractorDetailPanel() {
@@ -3615,21 +3687,23 @@ import { createProjectRegister } from './estimate-project-register.js';
             const body = document.getElementById('sgaDetailBody');
             const editBtn = document.getElementById('sgaDetailEditBtn');
             if (!body) return;
-            body.innerHTML =
-                '<div class="panel-form-row"><span class="detail-label">지출일자</span><span class="detail-value">' + (item.date || '-') + '</span></div>' +
-                '<div class="panel-form-row"><span class="detail-label">계정과목</span><span class="detail-value">' + (item.category || '-') + '</span></div>' +
-                '<div class="panel-form-row"><span class="detail-label">금액(vat별도)</span><span class="detail-value">' + (item.amount || 0).toLocaleString() + '원</span></div>' +
-                '<div class="panel-form-row"><span class="detail-label">메모</span><span class="detail-value">' + (item.memo || '-') + '</span></div>';
-            if (editBtn) {
-                editBtn.onclick = function() {
-                    closeSgaDetailPanel();
-                    editSgaExpense(id);
-                };
-            }
             const overlay = document.getElementById('sgaDetailOverlay');
             const panel = document.getElementById('sgaDetailSlidePanel');
             if (overlay) overlay.classList.add('active');
             if (panel) panel.classList.add('active');
+            requestAnimationFrame(function () {
+                body.innerHTML =
+                    '<div class="panel-form-row"><span class="detail-label">지출일자</span><span class="detail-value">' + (item.date || '-') + '</span></div>' +
+                    '<div class="panel-form-row"><span class="detail-label">계정과목</span><span class="detail-value">' + (item.category || '-') + '</span></div>' +
+                    '<div class="panel-form-row"><span class="detail-label">금액(vat별도)</span><span class="detail-value">' + (item.amount || 0).toLocaleString() + '원</span></div>' +
+                    '<div class="panel-form-row"><span class="detail-label">메모</span><span class="detail-value">' + (item.memo || '-') + '</span></div>';
+                if (editBtn) {
+                    editBtn.onclick = function() {
+                        closeSgaDetailPanel();
+                        editSgaExpense(id);
+                    };
+                }
+            });
         }
 
         function closeSgaDetailPanel() {
@@ -4183,7 +4257,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const editBtn = document.getElementById('expenseDetailEditBtn');
             if (!body) return;
 
-            body.innerHTML = `
+            document.getElementById('expenseDetailOverlay').classList.add('active');
+            document.getElementById('expenseDetailSlidePanel').classList.add('active');
+            requestAnimationFrame(function () {
+                body.innerHTML = `
                 <div class="panel-form-row"><span class="detail-label">구분</span><span class="detail-value">${expense.type}</span></div>
                 <div class="panel-form-row"><span class="detail-label">사용일시</span><span class="detail-value">${expense.date}</span></div>
                 <div class="panel-form-row"><span class="detail-label">사용건물</span><span class="detail-value">${expense.building || '-'}</span></div>
@@ -4194,31 +4271,30 @@ import { createProjectRegister } from './estimate-project-register.js';
                     <span class="detail-value expense-detail-photo-cell"></span>
                 </div>
             `;
-            (function () {
-                const photoCell = body.querySelector('.expense-detail-photo-cell');
-                if (!photoCell) return;
-                const n = getExpenseReceipts(expense).length;
-                if (!n) {
-                    photoCell.textContent = '보기 (0)';
-                    return;
+                (function () {
+                    const photoCell = body.querySelector('.expense-detail-photo-cell');
+                    if (!photoCell) return;
+                    const n = getExpenseReceipts(expense).length;
+                    if (!n) {
+                        photoCell.textContent = '보기 (0)';
+                        return;
+                    }
+                    const span = document.createElement('span');
+                    span.className = 'file-link';
+                    span.style.cssText = 'color: var(--primary); cursor: pointer;';
+                    span.innerHTML = '<i class="fas fa-image"></i> 보기 (' + n + ')';
+                    span.addEventListener('click', function () {
+                        viewExpenseImage(id, 0);
+                    });
+                    photoCell.appendChild(span);
+                })();
+                if (editBtn) {
+                    editBtn.onclick = function () {
+                        closeExpenseDetailPanel();
+                        editExpense(id);
+                    };
                 }
-                const span = document.createElement('span');
-                span.className = 'file-link';
-                span.style.cssText = 'color: var(--primary); cursor: pointer;';
-                span.innerHTML = '<i class="fas fa-image"></i> 보기 (' + n + ')';
-                span.addEventListener('click', function () {
-                    viewExpenseImage(id, 0);
-                });
-                photoCell.appendChild(span);
-            })();
-            if (editBtn) {
-                editBtn.onclick = function () {
-                    closeExpenseDetailPanel();
-                    editExpense(id);
-                };
-            }
-            document.getElementById('expenseDetailOverlay').classList.add('active');
-            document.getElementById('expenseDetailSlidePanel').classList.add('active');
+            });
         }
 
         function closeExpenseDetailPanel() {
@@ -4251,12 +4327,21 @@ import { createProjectRegister } from './estimate-project-register.js';
                 const receipts = getExpenseReceipts(expense);
                 if (receipts.length === 0) return Promise.resolve();
 
-                const tasks = receipts.map(function (item, idx) {
+                const storagePaths = [];
+                for (let i = 0; i < receipts.length; i++) {
+                    const item = receipts[i];
                     const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
-                    if (sp) {
-                        return bpsAuthedPost('/api/storage', { path: sp }).then(function (r) {
-                            if (!r.ok || !r.body || !r.body.url) return null;
-                            const url = r.body.url;
+                    if (sp) storagePaths.push(sp);
+                }
+
+                function buildList(urlByPath) {
+                    const list = [];
+                    for (let idx = 0; idx < receipts.length; idx++) {
+                        const item = receipts[idx];
+                        const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
+                        if (sp) {
+                            const url = urlByPath && urlByPath[sp];
+                            if (!url) continue;
                             const mime = item.mimeType ? String(item.mimeType) : '';
                             const defaultName = '영수증_' + (idx + 1);
                             const nm = ((item && item.name) ? String(item.name) : defaultName).replace(
@@ -4268,19 +4353,36 @@ import { createProjectRegister } from './estimate-project-register.js';
                                 /\.pdf(\?|#|$)/i.test(url) ||
                                 /\.pdf$/i.test(nm);
                             const type = isPdf ? 'application/pdf' : mime.indexOf('image/') === 0 ? mime : 'image/jpeg';
-                            return {
+                            list.push({
                                 name: nm,
                                 type: type,
                                 data: url,
                                 date: expense.date || new Date().toISOString().slice(0, 10),
-                            };
-                        });
+                            });
+                        } else {
+                            const fm = fileMetaFromDataUrl(item, idx, expense);
+                            if (fm) list.push(fm);
+                        }
                     }
-                    return Promise.resolve(fileMetaFromDataUrl(item, idx, expense));
-                });
+                    return list;
+                }
 
-                return Promise.all(tasks).then(function (files) {
-                    const list = files.filter(Boolean);
+                if (storagePaths.length === 0) {
+                    const list = buildList({});
+                    if (list.length === 0) {
+                        alert('저장된 영수증 파일이 없습니다.');
+                        return Promise.resolve();
+                    }
+                    openAttachmentListModal(list, '첨부파일');
+                    return Promise.resolve();
+                }
+
+                return bpsStorageSignMany(storagePaths).then(function (urlByPath) {
+                    if (!urlByPath) {
+                        alert('영수증 URL을 불러오지 못했습니다.');
+                        return;
+                    }
+                    const list = buildList(urlByPath);
                     if (list.length === 0) {
                         alert('저장된 영수증 파일이 없습니다.');
                         return;
@@ -8052,11 +8154,12 @@ import { createProjectRegister } from './estimate-project-register.js';
             businessInfoEditMode = false;
             activePanelTabId = 'basic';
 
-            renderPanelContent(item);
-
             document.getElementById('sharedCenterPanel').classList.add('project-detail-modal');
             document.getElementById('sharedPanelOverlay').classList.add('active');
             document.getElementById('sharedCenterPanel').classList.add('active');
+            requestAnimationFrame(function () {
+                renderPanelContent(item);
+            });
         }
 
         (function initDashboardModule() {

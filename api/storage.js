@@ -1,7 +1,7 @@
 /**
  * Vercel Hobby: 함수 개수 한도(12) 대응 — Storage 서명·업로드를 단일 엔드포인트로 통합.
  *
- * POST + Content-Type: application/json  → { path } 서명 URL
+ * POST + Content-Type: application/json  → { path } 단일 또는 { paths: string[] } 일괄 서명 URL
  * POST + multipart/form-data:
  *   - expenseId + file          → 경비 영수증
  *   - contractorId + slot + file → 업체 첨부
@@ -54,13 +54,44 @@ const ALLOWED_MIME = new Set([
 
 async function handleSignJson(request, supabaseAdmin) {
     const body = await request.json().catch(() => ({}));
+    const bucket = getExpenseReceiptsBucket();
+    const sec = parseSignedUrlSeconds();
+
+    const pathsRaw = body && Array.isArray(body.paths) ? body.paths : null;
+    if (pathsRaw && pathsRaw.length > 0) {
+        const MAX = 40;
+        const normalized = pathsRaw
+            .slice(0, MAX)
+            .map((p) => (typeof p === 'string' ? p.trim() : ''))
+            .filter(Boolean);
+        if (normalized.length === 0) {
+            return jsonResponse(400, { ok: false, error: 'invalid paths' });
+        }
+        for (const p of normalized) {
+            if (!isAllowedStorageObjectPath(p)) {
+                return jsonResponse(400, { ok: false, error: 'invalid path in paths' });
+            }
+        }
+        const results = [];
+        for (const path of normalized) {
+            const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(path, sec);
+            if (error || !data || !data.signedUrl) {
+                return jsonResponse(500, {
+                    ok: false,
+                    error: error?.message || 'signed URL 생성 실패',
+                    path,
+                });
+            }
+            results.push({ path, url: data.signedUrl });
+        }
+        return jsonResponse(200, { ok: true, results, expiresIn: sec });
+    }
+
     const path = body && typeof body.path === 'string' ? body.path.trim() : '';
     if (!path || !isAllowedStorageObjectPath(path)) {
         return jsonResponse(400, { ok: false, error: 'invalid path' });
     }
 
-    const bucket = getExpenseReceiptsBucket();
-    const sec = parseSignedUrlSeconds();
     const { data, error } = await supabaseAdmin.storage.from(bucket).createSignedUrl(path, sec);
 
     if (error || !data || !data.signedUrl) {
