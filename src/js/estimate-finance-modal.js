@@ -17,6 +17,10 @@ export function createEstimateFinanceModal(api) {
     const stampMeta = typeof api.stampFinanceRowMemoMetaAfterEdit === 'function'
         ? api.stampFinanceRowMemoMetaAfterEdit.bind(api)
         : function () {};
+    const mergeRowAttachments =
+        typeof api.mergeFinanceAttachmentsIntoValues9 === 'function'
+            ? api.mergeFinanceAttachmentsIntoValues9.bind(api)
+            : function () {};
     const isExtContractor = typeof api.isCurrentUserExternalContractor === 'function'
         ? api.isCurrentUserExternalContractor.bind(api)
         : function () { return false; };
@@ -167,7 +171,31 @@ export function createEstimateFinanceModal(api) {
             (rows || []).forEach(function (values) {
                 ensureMeta(values, type);
                 const tr = document.createElement('tr');
-                renderFinanceRow(tr, type, values, '');
+                let rowFileIdForRender = '';
+                if (
+                    (type === 'sales' || type === 'purchase') &&
+                    values[9] &&
+                    typeof values[9] === 'object' &&
+                    Array.isArray(values[9].attachments) &&
+                    values[9].attachments.length
+                ) {
+                    if (!window.savedRowFiles) window.savedRowFiles = {};
+                    const rk =
+                        values[9].rowFileKey ||
+                        'rowfile-' + code + '-' + type + '-' + Math.random().toString(36).slice(2);
+                    values[9].rowFileKey = rk;
+                    window.savedRowFiles[rk] = values[9].attachments.map(function (a) {
+                        return {
+                            name: (a && a.name) ? String(a.name) : '파일',
+                            type: (a && (a.mimeType || a.type)) ? String(a.mimeType || a.type) : 'application/octet-stream',
+                            data: a && a.legacyDataUrl ? String(a.legacyDataUrl) : '',
+                            storagePath: a && typeof a.storagePath === 'string' ? a.storagePath.trim() : '',
+                            date: item.date || new Date().toISOString().slice(0, 10),
+                        };
+                    });
+                    rowFileIdForRender = rk;
+                }
+                renderFinanceRow(tr, type, values, rowFileIdForRender);
                 body.appendChild(tr);
             });
         }
@@ -180,6 +208,7 @@ export function createEstimateFinanceModal(api) {
     function openFinanceRowModal(type, code, row) {
         const values = getRowValuesForModal(type, row);
         const root = getFinanceModalRoot();
+        root.dataset.financeUploadCode = String(code || '').trim();
         const isEdit = !!row;
         const fileCount = (row && row.dataset.rowFileId && window.savedRowFiles && window.savedRowFiles[row.dataset.rowFileId]) ? window.savedRowFiles[row.dataset.rowFileId].length : 0;
         const modalFileId = 'modal-file-' + Date.now();
@@ -276,7 +305,10 @@ export function createEstimateFinanceModal(api) {
 
     function closeFinanceRowModal() {
         const root = document.getElementById('financeRowModalRoot');
-        if (root) root.innerHTML = '';
+        if (root) {
+            root.removeAttribute('data-finance-upload-code');
+            root.innerHTML = '';
+        }
         financeModalState = null;
     }
 
@@ -334,6 +366,7 @@ export function createEstimateFinanceModal(api) {
                 if (!window.savedRowFiles) window.savedRowFiles = {};
                 window.savedRowFiles[rowFileId] = JSON.parse(JSON.stringify(window.uploadedFiles[fid]));
             }
+            mergeRowAttachments(values, type, rowFileId);
         }
         renderFinanceRow(targetRow, type, values, rowFileId);
         api.recalcFinanceSummaries(code);

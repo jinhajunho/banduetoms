@@ -760,6 +760,123 @@ import { createProjectRegister } from './estimate-project-register.js';
             }, Promise.resolve([]));
         }
 
+        function uploadContractorFileToStorage(contractorId, slot, file) {
+            return window.__bpsSupabase.auth.getSession().then(function (res) {
+                if (res.error || !res.data || !res.data.session) {
+                    return Promise.reject(new Error('로그인이 필요합니다.'));
+                }
+                var fd = new FormData();
+                fd.append('contractorId', String(contractorId));
+                fd.append('slot', slot === 'bank' ? 'bank' : 'license');
+                fd.append('file', file);
+                return fetch(window.location.origin + '/api/contractor-file-upload', {
+                    method: 'POST',
+                    headers: { Authorization: 'Bearer ' + res.data.session.access_token },
+                    body: fd,
+                }).then(function (r) {
+                    return r.text().then(function (text) {
+                        var j = {};
+                        try {
+                            j = text && text.length ? JSON.parse(text) : {};
+                        } catch (_e) {
+                            j = { ok: false, error: '업로드 응답 파싱 실패' };
+                        }
+                        return { ok: r.ok, status: r.status, body: j };
+                    });
+                });
+            }).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true) {
+                    var msg = (r.body && r.body.error) || '파일 업로드 실패';
+                    return Promise.reject(new Error(msg));
+                }
+                return {
+                    storagePath: r.body.path,
+                    name: r.body.name || (file && file.name) || '첨부',
+                    mimeType: r.body.mimeType || (file && file.type) || 'application/octet-stream',
+                };
+            });
+        }
+
+        function uploadEstimateFinanceFileToStorage(estimateCode, rowKey, file) {
+            return window.__bpsSupabase.auth.getSession().then(function (res) {
+                if (res.error || !res.data || !res.data.session) {
+                    return Promise.reject(new Error('로그인이 필요합니다.'));
+                }
+                var fd = new FormData();
+                fd.append('estimateCode', String(estimateCode || '').trim());
+                fd.append('rowKey', String(rowKey || '').trim());
+                fd.append('file', file);
+                return fetch(window.location.origin + '/api/estimate-finance-file-upload', {
+                    method: 'POST',
+                    headers: { Authorization: 'Bearer ' + res.data.session.access_token },
+                    body: fd,
+                }).then(function (r) {
+                    return r.text().then(function (text) {
+                        var j = {};
+                        try {
+                            j = text && text.length ? JSON.parse(text) : {};
+                        } catch (_e) {
+                            j = { ok: false, error: '업로드 응답 파싱 실패' };
+                        }
+                        return { ok: r.ok, status: r.status, body: j };
+                    });
+                });
+            }).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true) {
+                    var msg = (r.body && r.body.error) || '세금계산서 파일 업로드 실패';
+                    return Promise.reject(new Error(msg));
+                }
+                return {
+                    storagePath: r.body.path,
+                    name: r.body.name || (file && file.name) || '첨부',
+                    mimeType: r.body.mimeType || (file && file.type) || 'application/octet-stream',
+                };
+            });
+        }
+
+        function uploadEstimateFinanceFilesToStorage(estimateCode, rowKey, files) {
+            var list = Array.isArray(files) ? files : [];
+            if (list.length === 0) return Promise.resolve([]);
+            return list.reduce(function (acc, file) {
+                return acc.then(function (arr) {
+                    return uploadEstimateFinanceFileToStorage(estimateCode, rowKey, file).then(function (meta) {
+                        arr.push(meta);
+                        return arr;
+                    });
+                });
+            }, Promise.resolve([]));
+        }
+
+        function attachmentsMetaFromSavedRowFiles(rowFileId) {
+            if (!rowFileId || !window.savedRowFiles || !window.savedRowFiles[rowFileId]) return null;
+            var list = window.savedRowFiles[rowFileId];
+            return {
+                rowFileKey: rowFileId,
+                attachments: list.map(function (f) {
+                    return {
+                        name: (f && f.name) ? String(f.name) : '파일',
+                        mimeType: (f && (f.mimeType || f.type)) ? String(f.mimeType || f.type) : 'application/octet-stream',
+                        storagePath: f && typeof f.storagePath === 'string' ? f.storagePath.trim() : '',
+                        legacyDataUrl:
+                            f && f.data && String(f.data).indexOf('data:') === 0 ? String(f.data) : '',
+                    };
+                }),
+            };
+        }
+
+        function mergeFinanceAttachmentsIntoValues9(values, type, rowFileId) {
+            if (type !== 'sales' && type !== 'purchase') return;
+            ensureFinanceRowMetaSlot(values, type);
+            var meta = attachmentsMetaFromSavedRowFiles(rowFileId);
+            if (meta && meta.attachments && meta.attachments.length) {
+                values[9].attachments = meta.attachments;
+                values[9].rowFileKey = meta.rowFileKey;
+            } else if (values[9]) {
+                delete values[9].attachments;
+                delete values[9].rowFileKey;
+            }
+        }
+
         function upsertExpenseToServer(item) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.resolve({
@@ -926,7 +1043,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return Promise.resolve({ ok: false, error: '저장할 업체 데이터가 올바르지 않습니다.' });
             }
             var payloadWrapper = { action: 'upsert', item: item };
-            var maxBytes = 4 * 1024 * 1024 - 80 * 1024;
+            var heavyUrls =
+                (item.licenseDataUrl && String(item.licenseDataUrl).length > 500) ||
+                (item.bankDataUrl && String(item.bankDataUrl).length > 500);
+            var maxBytes = heavyUrls ? 4 * 1024 * 1024 - 80 * 1024 : 512 * 1024;
             if (bpsUtf8ByteLength(JSON.stringify(payloadWrapper)) > maxBytes) {
                 return Promise.resolve({
                     ok: false,
@@ -2954,7 +3074,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('contractorDetailSlidePanel').classList.remove('active');
         }
 
-        // 저장 (첨부는 FileReader로 data URL 보관 — 보기/다운로드에 사용)
+        // 저장 (첨부는 Supabase Storage — contractor-file-upload)
         function saveContractor() {
             const name = document.getElementById('contractorName').value.trim();
             const phone = document.getElementById('contractorPhone').value.trim();
@@ -2967,111 +3087,126 @@ import { createProjectRegister } from './estimate-project-register.js';
                 alert('업체명은 필수 입력 항목입니다.');
                 return;
             }
-
-            function readFile(file) {
-                return new Promise(function(resolve) {
-                    if (!file) {
-                        resolve(null);
-                        return;
-                    }
-                    const reader = new FileReader();
-                    reader.onload = function() {
-                        resolve({
-                            dataUrl: reader.result,
-                            name: file.name || '첨부',
-                            type: file.type || 'application/octet-stream'
-                        });
-                    };
-                    reader.onerror = function() {
-                        resolve(null);
-                    };
-                    reader.readAsDataURL(file);
-                });
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                alert('로그인(Supabase)이 필요합니다.');
+                return;
             }
 
-            Promise.all([readFile(licenseFile), readFile(bankFile)]).then(function(results) {
-                const licenseNew = results[0];
-                const bankNew = results[1];
+            function finish() {
+                closeContractorPanel();
+                renderContractorTable();
+            }
 
-                function finish() {
-                    closeContractorPanel();
-                    renderContractorTable();
-                }
-
-                if (contractorEditingId) {
-                    const index = contractors.findIndex(function(c) {
-                        return c.id === contractorEditingId;
+            if (contractorEditingId) {
+                const index = contractors.findIndex(function (c) {
+                    return c.id === contractorEditingId;
+                });
+                if (index === -1) return;
+                const prev = contractors[index];
+                const cid = prev.id;
+                const licP = licenseFile
+                    ? uploadContractorFileToStorage(cid, 'license', licenseFile)
+                    : Promise.resolve(null);
+                const bankP = bankFile ? uploadContractorFileToStorage(cid, 'bank', bankFile) : Promise.resolve(null);
+                Promise.all([licP, bankP])
+                    .then(function (results) {
+                        const licMeta = results[0];
+                        const bankMeta = results[1];
+                        const next = {
+                            id: prev.id,
+                            name: name,
+                            phone: phone,
+                            date: prev.date,
+                            hasLicense: prev.hasLicense,
+                            hasBankAccount: prev.hasBankAccount,
+                            licenseStoragePath: prev.licenseStoragePath,
+                            licenseFileName: prev.licenseFileName,
+                            licenseMimeType: prev.licenseMimeType,
+                            licenseDataUrl: prev.licenseDataUrl,
+                            bankStoragePath: prev.bankStoragePath,
+                            bankFileName: prev.bankFileName,
+                            bankMimeType: prev.bankMimeType,
+                            bankDataUrl: prev.bankDataUrl,
+                        };
+                        if (licMeta) {
+                            next.hasLicense = true;
+                            next.licenseStoragePath = licMeta.storagePath;
+                            next.licenseFileName = licMeta.name;
+                            next.licenseMimeType = licMeta.mimeType;
+                            delete next.licenseDataUrl;
+                        }
+                        if (bankMeta) {
+                            next.hasBankAccount = true;
+                            next.bankStoragePath = bankMeta.storagePath;
+                            next.bankFileName = bankMeta.name;
+                            next.bankMimeType = bankMeta.mimeType;
+                            delete next.bankDataUrl;
+                        }
+                        return upsertContractorToServer(next).then(function (remote) {
+                            if (!remote.ok) {
+                                alert(remote.error || '업체 서버 저장 실패');
+                                return;
+                            }
+                            contractors[index] = next;
+                            alert('업체 정보가 수정되었습니다.');
+                            contractorEditingId = null;
+                            finish();
+                        });
+                    })
+                    .catch(function (e) {
+                        alert((e && e.message) || '파일 업로드에 실패했습니다.');
                     });
-                    if (index === -1) return;
-                    const prev = contractors[index];
-                    const next = {
-                        id: prev.id,
+                return;
+            }
+
+            const newId =
+                contractors.length > 0
+                    ? Math.max.apply(
+                          null,
+                          contractors.map(function (c) {
+                              return c.id;
+                          })
+                      ) + 1
+                    : 1;
+            const licP = licenseFile
+                ? uploadContractorFileToStorage(newId, 'license', licenseFile)
+                : Promise.resolve(null);
+            const bankP = bankFile ? uploadContractorFileToStorage(newId, 'bank', bankFile) : Promise.resolve(null);
+            Promise.all([licP, bankP])
+                .then(function (results) {
+                    const licMeta = results[0];
+                    const bankMeta = results[1];
+                    const newContractor = {
+                        id: newId,
                         name: name,
                         phone: phone,
-                        date: prev.date,
-                        hasLicense: prev.hasLicense,
-                        hasBankAccount: prev.hasBankAccount,
-                        licenseDataUrl: prev.licenseDataUrl,
-                        licenseFileName: prev.licenseFileName,
-                        licenseMimeType: prev.licenseMimeType,
-                        bankDataUrl: prev.bankDataUrl,
-                        bankFileName: prev.bankFileName,
-                        bankMimeType: prev.bankMimeType
+                        date: new Date().toISOString().slice(0, 10),
+                        hasLicense: !!licMeta,
+                        hasBankAccount: !!bankMeta,
                     };
-                    if (licenseNew) {
-                        next.hasLicense = true;
-                        next.licenseDataUrl = licenseNew.dataUrl;
-                        next.licenseFileName = licenseNew.name;
-                        next.licenseMimeType = licenseNew.type;
+                    if (licMeta) {
+                        newContractor.licenseStoragePath = licMeta.storagePath;
+                        newContractor.licenseFileName = licMeta.name;
+                        newContractor.licenseMimeType = licMeta.mimeType;
                     }
-                    if (bankNew) {
-                        next.hasBankAccount = true;
-                        next.bankDataUrl = bankNew.dataUrl;
-                        next.bankFileName = bankNew.name;
-                        next.bankMimeType = bankNew.type;
+                    if (bankMeta) {
+                        newContractor.bankStoragePath = bankMeta.storagePath;
+                        newContractor.bankFileName = bankMeta.name;
+                        newContractor.bankMimeType = bankMeta.mimeType;
                     }
-                    upsertContractorToServer(next).then(function (remote) {
+                    return upsertContractorToServer(newContractor).then(function (remote) {
                         if (!remote.ok) {
                             alert(remote.error || '업체 서버 저장 실패');
                             return;
                         }
-                        contractors[index] = next;
-                        alert('업체 정보가 수정되었습니다.');
-                        contractorEditingId = null;
+                        contractors.push(newContractor);
+                        alert('업체가 등록되었습니다.');
                         finish();
                     });
-                    return;
-                }
-                const newContractor = {
-                    id: contractors.length > 0 ? Math.max.apply(null, contractors.map(function(c) {
-                        return c.id;
-                    })) + 1 : 1,
-                    name: name,
-                    phone: phone,
-                    date: new Date().toISOString().slice(0, 10),
-                    hasLicense: !!licenseNew,
-                    hasBankAccount: !!bankNew
-                };
-                if (licenseNew) {
-                    newContractor.licenseDataUrl = licenseNew.dataUrl;
-                    newContractor.licenseFileName = licenseNew.name;
-                    newContractor.licenseMimeType = licenseNew.type;
-                }
-                if (bankNew) {
-                    newContractor.bankDataUrl = bankNew.dataUrl;
-                    newContractor.bankFileName = bankNew.name;
-                    newContractor.bankMimeType = bankNew.type;
-                }
-                upsertContractorToServer(newContractor).then(function (remote) {
-                    if (!remote.ok) {
-                        alert(remote.error || '업체 서버 저장 실패');
-                        return;
-                    }
-                    contractors.push(newContractor);
-                    alert('업체가 등록되었습니다.');
-                    finish();
+                })
+                .catch(function (e) {
+                    alert((e && e.message) || '파일 업로드에 실패했습니다.');
                 });
-            });
         }
 
         // 수정
@@ -3184,7 +3319,28 @@ import { createProjectRegister } from './estimate-project-register.js';
         function downloadCurrentAttachmentFile(index) {
             const files = window.currentAttachmentFiles || [];
             const file = files[index];
-            if (!file || !file.data) return;
+            if (!file) return;
+            if (file.data && /^https?:\/\//i.test(String(file.data))) {
+                fetch(String(file.data))
+                    .then(function (res) {
+                        return res.blob();
+                    })
+                    .then(function (blob) {
+                        var url = URL.createObjectURL(blob);
+                        var a = document.createElement('a');
+                        a.href = url;
+                        a.download = file.name || '첨부파일_' + (index + 1);
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    })
+                    .catch(function () {
+                        alert('다운로드에 실패했습니다.');
+                    });
+                return;
+            }
+            if (!file.data) return;
             const link = document.createElement('a');
             link.href = file.data;
             link.download = file.name || ('첨부파일_' + (index + 1));
@@ -3200,6 +3356,30 @@ import { createProjectRegister } from './estimate-project-register.js';
             const imageType = type === 'license' ? '사업자등록증' : '통장사본';
             if (type === 'license') {
                 if (!contractor.hasLicense) return;
+                const sp =
+                    contractor.licenseStoragePath && String(contractor.licenseStoragePath).trim();
+                if (sp) {
+                    bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
+                        if (!r.ok || !r.body || !r.body.url) {
+                            alert('파일을 불러올 수 없습니다.');
+                            return;
+                        }
+                        openAttachmentListModal(
+                            [
+                                {
+                                    name:
+                                        contractor.licenseFileName ||
+                                        (contractor.name || '업체') + '_' + imageType,
+                                    type: contractor.licenseMimeType || 'image/png',
+                                    data: r.body.url,
+                                    date: contractor.date || new Date().toISOString().slice(0, 10),
+                                },
+                            ],
+                            '첨부파일'
+                        );
+                    });
+                    return;
+                }
                 if (contractor.licenseDataUrl) {
                     openAttachmentListModal([{
                         name: contractor.licenseFileName || ((contractor.name || '업체') + '_' + imageType),
@@ -3213,6 +3393,29 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return;
             }
             if (!contractor.hasBankAccount) return;
+            const bsp = contractor.bankStoragePath && String(contractor.bankStoragePath).trim();
+            if (bsp) {
+                bpsAuthedPost('/api/storage-sign', { path: bsp }).then(function (r) {
+                    if (!r.ok || !r.body || !r.body.url) {
+                        alert('파일을 불러올 수 없습니다.');
+                        return;
+                    }
+                    openAttachmentListModal(
+                        [
+                            {
+                                name:
+                                    contractor.bankFileName ||
+                                    (contractor.name || '업체') + '_' + imageType,
+                                type: contractor.bankMimeType || 'image/png',
+                                data: r.body.url,
+                                date: contractor.date || new Date().toISOString().slice(0, 10),
+                            },
+                        ],
+                        '첨부파일'
+                    );
+                });
+                return;
+            }
             if (contractor.bankDataUrl) {
                 openAttachmentListModal([{
                     name: contractor.bankFileName || ((contractor.name || '업체') + '_' + imageType),
@@ -3972,7 +4175,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             const tasks = receipts.map(function (item, idx) {
                 const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
                 if (sp) {
-                    return bpsAuthedPost('/api/expense-receipt-sign', { path: sp }).then(function (r) {
+                    return bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
                         if (!r.ok || !r.body || !r.body.url) return null;
                         const url = r.body.url;
                         const mime = item.mimeType ? String(item.mimeType) : '';
@@ -7952,12 +8155,19 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
         function migrateFinanceRowMetaV1ToV2(m) {
             if (!m || typeof m !== 'object' || Array.isArray(m)) return { contractorBy: '', internalBy: '' };
+            var base;
             if (m.contractorBy !== undefined || m.internalBy !== undefined) {
-                return { contractorBy: String(m.contractorBy || ''), internalBy: String(m.internalBy || '') };
+                base = { contractorBy: String(m.contractorBy || ''), internalBy: String(m.internalBy || '') };
+            } else if (m.kind === 'contractor') {
+                base = { contractorBy: String(m.by || ''), internalBy: '' };
+            } else if (m.kind === 'internal') {
+                base = { contractorBy: '', internalBy: String(m.by || '') };
+            } else {
+                base = { contractorBy: '', internalBy: '' };
             }
-            if (m.kind === 'contractor') return { contractorBy: String(m.by || ''), internalBy: '' };
-            if (m.kind === 'internal') return { contractorBy: '', internalBy: String(m.by || '') };
-            return { contractorBy: '', internalBy: '' };
+            if (Array.isArray(m.attachments)) base.attachments = m.attachments;
+            if (typeof m.rowFileKey === 'string' && m.rowFileKey) base.rowFileKey = m.rowFileKey;
+            return base;
         }
         function getFinanceRowMetaV2(values, type) {
             if (type !== 'sales' && type !== 'purchase') return { contractorBy: '', internalBy: '' };
@@ -8132,19 +8342,24 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             if (type === 'sales' || type === 'purchase') {
                 var pm = prevValues ? getFinanceRowMetaV2(prevValues, type) : { contractorBy: '', internalBy: '' };
+                function mergeFileMeta(obj) {
+                    if (pm.attachments && pm.attachments.length) obj.attachments = pm.attachments;
+                    if (typeof pm.rowFileKey === 'string' && pm.rowFileKey) obj.rowFileKey = pm.rowFileKey;
+                    return obj;
+                }
                 if (isCurrentUserExternalContractor()) {
                     values[8] = prevValues && prevValues[8] != null ? prevValues[8] : '';
                     var c7 = String(values[7] != null ? values[7] : '');
-                    values[9] = {
+                    values[9] = mergeFileMeta({
                         contractorBy: c7.trim() ? uid : '',
                         internalBy: pm.internalBy || '',
-                    };
+                    });
                     return;
                 }
                 if (String(values[8] != null ? values[8] : '').trim()) {
-                    values[9] = { contractorBy: pm.contractorBy || '', internalBy: uid };
+                    values[9] = mergeFileMeta({ contractorBy: pm.contractorBy || '', internalBy: uid });
                 } else {
-                    values[9] = { contractorBy: pm.contractorBy || '', internalBy: '' };
+                    values[9] = mergeFileMeta({ contractorBy: pm.contractorBy || '', internalBy: '' });
                 }
                 return;
             }
@@ -8200,6 +8415,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             formatFinanceMemoCellHtml: formatFinanceMemoCellHtml,
             cloneFinanceRowValuesForContractorModal: cloneFinanceRowValuesForContractorModal,
             stampFinanceRowMemoMetaAfterEdit: stampFinanceRowMemoMetaAfterEdit,
+            mergeFinanceAttachmentsIntoValues9: mergeFinanceAttachmentsIntoValues9,
             isCurrentUserExternalContractor: isCurrentUserExternalContractor,
         });
         const {
@@ -8297,13 +8513,35 @@ import { createProjectRegister } from './estimate-project-register.js';
                 row.dataset.rowFileId = rowFileId;
                 if (!window.savedRowFiles) window.savedRowFiles = {};
                 window.savedRowFiles[rowFileId] = JSON.parse(JSON.stringify(window.uploadedFiles[fileRowId]));
-            } else {
+                } else {
                 if (row.dataset.rowFileId) {
                     if (window.savedRowFiles && window.savedRowFiles[row.dataset.rowFileId]) delete window.savedRowFiles[row.dataset.rowFileId];
                     row.removeAttribute('data-row-file-id');
                 }
                 rowFileId = null;
             }
+
+            var prevForStamp = null;
+            try {
+                if (row.dataset.rowValues) {
+                    var pv = JSON.parse(row.dataset.rowValues);
+                    migrateSalesRowValuesIfOld(pv);
+                    if (type === 'purchase' && pv.length > 0 && pv.length < 6) pv.unshift('');
+                    if (type === 'sales') normalizeSalesVatIncluded(pv);
+                    ensureFinanceRowMetaSlot(pv, type);
+                    prevForStamp = pv;
+                }
+            } catch (_e) {}
+            if (type === 'sales') {
+                migrateSalesRowValuesIfOld(values);
+                normalizeSalesVatIncluded(values);
+            } else if (type === 'purchase') {
+                migrateSalesRowValuesIfOld(values);
+                if (values.length > 0 && values.length < 6) values.unshift('');
+            }
+            ensureFinanceRowMetaSlot(values, type);
+            stampFinanceRowMemoMetaAfterEdit(values, type, prevForStamp);
+            mergeFinanceAttachmentsIntoValues9(values, type, rowFileId);
 
             row.setAttribute('data-saved', 'true');
             row.dataset.rowValues = JSON.stringify(values);
@@ -8527,6 +8765,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             row.setAttribute('data-saved', 'true');
             row.removeAttribute('data-original');
 
+            var prevRowValuesSnap = row.dataset.rowValues;
             var values = [];
             var fileRowId = '';
             row.querySelectorAll('td').forEach(function(td) {
@@ -8547,7 +8786,6 @@ import { createProjectRegister } from './estimate-project-register.js';
                     values.push(fc > 0 ? fc : '-');
                 } else if (td.classList.contains('payment-action-cell')) values.push(null);
             });
-            row.dataset.rowValues = JSON.stringify(values);
             var type = row.getAttribute('data-row-type') || 'sales';
             var rowFileId = row.dataset.rowFileId;
             if (fileRowId && window.uploadedFiles && window.uploadedFiles[fileRowId] && window.uploadedFiles[fileRowId].length > 0) {
@@ -8560,6 +8798,28 @@ import { createProjectRegister } from './estimate-project-register.js';
                 row.removeAttribute('data-row-file-id');
                 rowFileId = null;
             }
+            var prevForStamp = null;
+            try {
+                if (prevRowValuesSnap) {
+                    var pv2 = JSON.parse(prevRowValuesSnap);
+                    migrateSalesRowValuesIfOld(pv2);
+                    if (type === 'purchase' && pv2.length > 0 && pv2.length < 6) pv2.unshift('');
+                    if (type === 'sales') normalizeSalesVatIncluded(pv2);
+                    ensureFinanceRowMetaSlot(pv2, type);
+                    prevForStamp = pv2;
+                }
+            } catch (_e) {}
+            if (type === 'sales') {
+                migrateSalesRowValuesIfOld(values);
+                normalizeSalesVatIncluded(values);
+            } else if (type === 'purchase') {
+                migrateSalesRowValuesIfOld(values);
+                if (values.length > 0 && values.length < 6) values.unshift('');
+            }
+            ensureFinanceRowMetaSlot(values, type);
+            stampFinanceRowMemoMetaAfterEdit(values, type, prevForStamp);
+            mergeFinanceAttachmentsIntoValues9(values, type, rowFileId);
+            row.dataset.rowValues = JSON.stringify(values);
             var actionHtml = '<td class="payment-action-cell">' + paymentRowMenuHtml(true) + '</td>';
             var fileCellHtml = '-';
             if (rowFileId && window.savedRowFiles && window.savedRowFiles[rowFileId] && window.savedRowFiles[rowFileId].length > 0) {
@@ -8675,39 +8935,70 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
         }
 
-        // 다중 파일 선택 처리 (기존 파일 있으면 추가, 없으면 새로)
+        // 다중 파일 선택 처리 (기존 파일 있으면 추가 — Supabase Storage 업로드)
         function handleMultiFileSelect(input, rowId) {
-            if (input.files && input.files.length > 0) {
-                if (!window.uploadedFiles) window.uploadedFiles = {};
-                const existing = window.uploadedFiles[rowId] || [];
-                const newFiles = Array.from(input.files);
-                const results = [...existing];
-                let completed = 0;
-                const total = newFiles.length;
-                if (total === 0) return;
-                newFiles.forEach((file, idx) => {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        results.push({ name: file.name, data: e.target.result, type: file.type, date: new Date().toISOString().slice(0, 10) });
-                        completed++;
-                        if (completed === total) {
-                            window.uploadedFiles[rowId] = results;
-                            const td = input.parentElement;
-                            const count = results.length;
-                            td.innerHTML = `
-                                <input type="file" id="${rowId}" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, '${rowId}')">
-                                <button class="btn-file-view" onclick="showFileList('${rowId}')" title="첨부파일 보기">
-                                    <i class="fas fa-eye"></i> (${count})
-                                </button>
-                                <button class="btn-file-upload" onclick="document.getElementById('${rowId}').click()" title="파일 추가" style="margin-left:4px;">
-                                    <i class="fas fa-plus"></i>
-                                </button>
-                            `;
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                });
+            if (!input.files || input.files.length === 0) return;
+            var tbody = input.closest('tbody');
+            var tid = tbody && tbody.id ? tbody.id : '';
+            var estimateCode = '';
+            if (tid.indexOf('salesList-') === 0) estimateCode = tid.slice('salesList-'.length);
+            else if (tid.indexOf('purchaseList-') === 0) estimateCode = tid.slice('purchaseList-'.length);
+            else {
+                var modalRoot = document.getElementById('financeRowModalRoot');
+                var mc =
+                    modalRoot && modalRoot.dataset && modalRoot.dataset.financeUploadCode
+                        ? String(modalRoot.dataset.financeUploadCode).trim()
+                        : '';
+                if (mc) estimateCode = mc;
             }
+            if (!estimateCode) {
+                alert('견적 코드를 찾을 수 없어 Storage에 올릴 수 없습니다.');
+                return;
+            }
+            var row = input.closest('tr');
+            var rowKey = (row && row.dataset && row.dataset.rowFileId) ? row.dataset.rowFileId : rowId;
+            if (!window.uploadedFiles) window.uploadedFiles = {};
+            var existing = window.uploadedFiles[rowId] || [];
+            var newFiles = Array.from(input.files);
+            uploadEstimateFinanceFilesToStorage(estimateCode, rowKey, newFiles)
+                .then(function (uploaded) {
+                    var merged = existing.concat(
+                        uploaded.map(function (u) {
+                            return {
+                                name: u.name,
+                                type: u.mimeType,
+                                data: '',
+                                storagePath: u.storagePath,
+                                date: new Date().toISOString().slice(0, 10),
+                            };
+                        })
+                    );
+                    window.uploadedFiles[rowId] = merged;
+                    var td = input.parentElement;
+                    var count = merged.length;
+                    td.innerHTML =
+                        '<input type="file" id="' +
+                        rowId +
+                        '" class="file-input-hidden" accept="image/*,application/pdf" multiple onchange="handleMultiFileSelect(this, \'' +
+                        rowId +
+                        '\')">' +
+                        '<button class="btn-file-view" onclick="showFileList(\'' +
+                        rowId +
+                        '\')" title="첨부파일 보기">' +
+                        '<i class="fas fa-eye"></i> (' +
+                        count +
+                        ')</button>' +
+                        '<button class="btn-file-upload" onclick="document.getElementById(\'' +
+                        rowId +
+                        '\').click()" title="파일 추가" style="margin-left:4px;">' +
+                        '<i class="fas fa-plus"></i>' +
+                        '</button>';
+                    var fi = td.querySelector('input[type="file"]');
+                    if (fi) fi.value = '';
+                })
+                .catch(function (e) {
+                    alert((e && e.message) || '파일 업로드에 실패했습니다.');
+                });
         }
 
         // 파일 목록 모달 표시
@@ -8775,11 +9066,82 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.body.appendChild(modal);
         }
 
+        function resolveFinanceAttachmentPreviewUrl(file, done) {
+            var sp = file && typeof file.storagePath === 'string' ? file.storagePath.trim() : '';
+            if (sp) {
+                bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
+                    if (!r.ok || !r.body || !r.body.url) {
+                        alert('파일을 불러올 수 없습니다.');
+                        return;
+                    }
+                    done(r.body.url);
+                });
+                return;
+            }
+            var d = file && file.data;
+            if (d) {
+                done(d);
+                return;
+            }
+            alert('파일 데이터가 없습니다.');
+        }
+
+        function downloadFinanceAttachmentBlob(file) {
+            var sp = file && typeof file.storagePath === 'string' ? file.storagePath.trim() : '';
+            if (sp) {
+                bpsAuthedPost('/api/storage-sign', { path: sp }).then(function (r) {
+                    if (!r.ok || !r.body || !r.body.url) {
+                        alert('다운로드 링크를 만들 수 없습니다.');
+                        return;
+                    }
+                    fetch(r.body.url)
+                        .then(function (res) {
+                            return res.blob();
+                        })
+                        .then(function (blob) {
+                            var url = URL.createObjectURL(blob);
+                            var a = document.createElement('a');
+                            a.href = url;
+                            a.download = (file && file.name) ? file.name : 'download';
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        })
+                        .catch(function () {
+                            alert('다운로드에 실패했습니다.');
+                        });
+                });
+                return;
+            }
+            var fd = file && file.data;
+            if (!fd || String(fd).indexOf('data:') !== 0) {
+                alert('다운로드할 데이터가 없습니다.');
+                return;
+            }
+            var byteString = atob(fd.split(',')[1]);
+            var mimeString = fd.split(',')[0].split(':')[1].split(';')[0];
+            var ab = new ArrayBuffer(byteString.length);
+            var ia = new Uint8Array(ab);
+            for (var i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+            var blob = new Blob([ab], { type: mimeString });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = (file && file.name) ? file.name : 'download';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         // 목록에서 파일 보기
         function viewFileFromList(rowId, index) {
             if (window.uploadedFiles && window.uploadedFiles[rowId] && window.uploadedFiles[rowId][index]) {
                 const file = window.uploadedFiles[rowId][index];
-                viewFileModal(file.name, file.data, file.type);
+                resolveFinanceAttachmentPreviewUrl(file, function (url) {
+                    viewFileModal(file.name, url, file.type);
+                });
             }
         }
 
@@ -8832,55 +9194,23 @@ import { createProjectRegister } from './estimate-project-register.js';
         function viewSavedFileByIndex(rowFileId, index) {
             if (window.savedRowFiles && window.savedRowFiles[rowFileId] && window.savedRowFiles[rowFileId][index]) {
                 const file = window.savedRowFiles[rowFileId][index];
-                viewFileModal(file.name, file.data, file.type);
+                resolveFinanceAttachmentPreviewUrl(file, function (url) {
+                    viewFileModal(file.name, url, file.type);
+                });
             }
         }
 
         function downloadSavedFileByIndex(rowFileId, index) {
             if (!window.savedRowFiles || !window.savedRowFiles[rowFileId] || !window.savedRowFiles[rowFileId][index]) return;
             const file = window.savedRowFiles[rowFileId][index];
-            const byteString = atob(file.data.split(',')[1]);
-            const mimeString = file.data.split(',')[0].split(':')[1].split(';')[0];
-            const ab = new ArrayBuffer(byteString.length);
-            const ia = new Uint8Array(ab);
-            for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-            const blob = new Blob([ab], { type: mimeString });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = file.name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            downloadFinanceAttachmentBlob(file);
         }
 
         // 목록에서 파일 다운로드
         function downloadFileFromList(rowId, index) {
             if (window.uploadedFiles && window.uploadedFiles[rowId] && window.uploadedFiles[rowId][index]) {
                 const file = window.uploadedFiles[rowId][index];
-                
-                // Base64 데이터를 Blob으로 변환
-                const byteString = atob(file.data.split(',')[1]);
-                const mimeString = file.data.split(',')[0].split(':')[1].split(';')[0];
-                const ab = new ArrayBuffer(byteString.length);
-                const ia = new Uint8Array(ab);
-                
-                for (let i = 0; i < byteString.length; i++) {
-                    ia[i] = byteString.charCodeAt(i);
-                }
-                
-                const blob = new Blob([ab], { type: mimeString });
-                
-                // 다운로드 링크 생성
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = file.name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                downloadFinanceAttachmentBlob(file);
                 
                 // 알림 표시
                 const btn = event.target.closest('button');

@@ -1,6 +1,10 @@
 export const runtime = 'nodejs';
 
 import { requireActiveUser } from './_lib/activeAuth.js';
+import {
+    collectStoragePathsFromEstimatePayload,
+    removeStorageObjectsByPaths,
+} from './_lib/expenseReceiptsStorage.js';
 
 function jsonResponse(status, body) {
     return new Response(JSON.stringify(body), {
@@ -62,6 +66,21 @@ export default {
             if (action === 'delete') {
                 const code = String(body && body.code ? body.code : '').trim();
                 if (!code) return jsonResponse(400, { ok: false, error: 'code is required' });
+
+                const { data: row, error: selErr } = await supabaseAdmin
+                    .from('estimate_records')
+                    .select('payload')
+                    .eq('code', code)
+                    .maybeSingle();
+                if (selErr) return jsonResponse(500, { ok: false, error: selErr.message });
+                const paths = collectStoragePathsFromEstimatePayload(row && row.payload);
+                if (paths.length) {
+                    try {
+                        await removeStorageObjectsByPaths(supabaseAdmin, paths);
+                    } catch (e) {
+                        return jsonResponse(500, { ok: false, error: e?.message || String(e) });
+                    }
+                }
 
                 const { error } = await supabaseAdmin.from('estimate_records').delete().eq('code', code);
                 if (error) return jsonResponse(500, { ok: false, error: error.message });

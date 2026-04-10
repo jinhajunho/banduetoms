@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { requireActiveUser } from './_lib/activeAuth.js';
-import { getExpenseReceiptsBucket } from './_lib/expenseReceiptsStorage.js';
+import { getExpenseReceiptsBucket, isAllowedStorageObjectPath } from './_lib/expenseReceiptsStorage.js';
 
 function jsonResponse(status, body) {
     return new Response(JSON.stringify(body), {
@@ -32,7 +32,7 @@ export default {
 
             const body = await request.json().catch(() => ({}));
             const path = body && typeof body.path === 'string' ? body.path.trim() : '';
-            if (!path || !/^expenses\/\d+\//.test(path)) {
+            if (!path || !isAllowedStorageObjectPath(path)) {
                 return jsonResponse(400, { ok: false, error: 'invalid path' });
             }
 
