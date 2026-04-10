@@ -696,6 +696,70 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        function expenseItemHasHeavyDataUrls(item) {
+            var rec = item && Array.isArray(item.receipts) ? item.receipts : [];
+            for (var i = 0; i < rec.length; i++) {
+                var r = rec[i];
+                var du = r && r.dataUrl ? String(r.dataUrl) : '';
+                if (du.length > 500) return true;
+            }
+            return false;
+        }
+
+        /** 경비 영수증: Supabase Storage 업로드 (multipart). DB 경비 id 기준 경로 */
+        function uploadExpenseReceiptToStorage(expenseId, file) {
+            return window.__bpsSupabase.auth.getSession().then(function (res) {
+                if (res.error || !res.data || !res.data.session) {
+                    return Promise.reject(new Error('로그인이 필요합니다.'));
+                }
+                var fd = new FormData();
+                fd.append('expenseId', String(expenseId));
+                fd.append('file', file);
+                return fetch(window.location.origin + '/api/expense-receipt-upload', {
+                    method: 'POST',
+                    headers: { Authorization: 'Bearer ' + res.data.session.access_token },
+                    body: fd,
+                }).then(function (r) {
+                    return r.text().then(function (text) {
+                        var j = {};
+                        try {
+                            j = text && text.length ? JSON.parse(text) : {};
+                        } catch (_e) {
+                            j = { ok: false, error: '업로드 응답 파싱 실패' };
+                        }
+                        return { ok: r.ok, status: r.status, body: j };
+                    });
+                });
+            }).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true) {
+                    var msg = (r.body && r.body.error) || '영수증 업로드 실패';
+                    return Promise.reject(new Error(msg));
+                }
+                return {
+                    storagePath: r.body.path,
+                    name: r.body.name || (file && file.name) || '영수증',
+                    mimeType: r.body.mimeType || (file && file.type) || 'application/octet-stream',
+                };
+            });
+        }
+
+        function uploadExpenseReceiptFilesToStorage(expenseId, files) {
+            var id = Number(expenseId);
+            if (!Number.isFinite(id) || id < 1) {
+                return Promise.reject(new Error('경비 id가 올바르지 않습니다.'));
+            }
+            var list = Array.isArray(files) ? files : [];
+            if (list.length === 0) return Promise.resolve([]);
+            return list.reduce(function (acc, file) {
+                return acc.then(function (arr) {
+                    return uploadExpenseReceiptToStorage(id, file).then(function (meta) {
+                        arr.push(meta);
+                        return arr;
+                    });
+                });
+            }, Promise.resolve([]));
+        }
+
         function upsertExpenseToServer(item) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.resolve({
@@ -709,7 +773,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return Promise.resolve({ ok: false, error: '저장할 경비 데이터가 올바르지 않습니다.' });
             }
             var payloadWrapper = { action: 'upsert', item: item };
-            var maxBytes = 4 * 1024 * 1024 - 80 * 1024;
+            var maxBytes = expenseItemHasHeavyDataUrls(item)
+                ? 4 * 1024 * 1024 - 80 * 1024
+                : 512 * 1024;
             if (bpsUtf8ByteLength(JSON.stringify(payloadWrapper)) > maxBytes) {
                 return Promise.resolve({
                     ok: false,
@@ -3769,17 +3835,24 @@ import { createProjectRegister } from './estimate-project-register.js';
                 runAfterSave([]);
                 return;
             }
-            let read = 0;
-            const results = [];
-            files.forEach((file, i) => {
-                const reader = new FileReader();
-                reader.onload = function() {
-                    results[i] = { dataUrl: reader.result, name: file.name || '영수증' };
-                    read++;
-                    if (read === files.length) runAfterSave(results);
-                };
-                reader.readAsDataURL(file);
-            });
+            var targetExpenseId;
+            if (expenseEditingId != null && Number.isFinite(Number(expenseEditingId))) {
+                targetExpenseId = Number(expenseEditingId);
+            } else {
+                var maxIdNew = 0;
+                expenses.forEach(function (e) {
+                    var n = Number(e && e.id);
+                    if (Number.isFinite(n) && n > maxIdNew) maxIdNew = n;
+                });
+                targetExpenseId = maxIdNew + 1;
+            }
+            uploadExpenseReceiptFilesToStorage(targetExpenseId, files)
+                .then(function (uploaded) {
+                    runAfterSave(uploaded);
+                })
+                .catch(function (e) {
+                    alert((e && e.message) || '영수증 업로드에 실패했습니다.');
+                });
         }
 
         // 수정
@@ -3881,7 +3954,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!expense) return;
             const receipts = getExpenseReceipts(expense);
             if (receipts.length === 0) return;
-            const files = receipts.map(function(item, idx) {
+
+            function fileMetaFromDataUrl(item, idx) {
                 const dataUrl = item && (item.dataUrl || item);
                 const src = typeof dataUrl === 'string' ? dataUrl : (dataUrl && dataUrl.dataUrl);
                 if (!src) return null;
@@ -3893,12 +3967,48 @@ import { createProjectRegister } from './estimate-project-register.js';
                     data: src,
                     date: expense.date || new Date().toISOString().slice(0, 10)
                 };
-            }).filter(Boolean);
-            if (files.length === 0) {
-                alert('저장된 영수증 이미지가 없습니다.');
-                return;
             }
-            openAttachmentListModal(files, '첨부파일');
+
+            const tasks = receipts.map(function (item, idx) {
+                const sp = item && typeof item.storagePath === 'string' ? item.storagePath.trim() : '';
+                if (sp) {
+                    return bpsAuthedPost('/api/expense-receipt-sign', { path: sp }).then(function (r) {
+                        if (!r.ok || !r.body || !r.body.url) return null;
+                        const url = r.body.url;
+                        const mime = item.mimeType ? String(item.mimeType) : '';
+                        const defaultName = '영수증_' + (idx + 1);
+                        const nm = ((item && item.name) ? String(item.name) : defaultName).replace(
+                            /[\\/:*?"<>|]/g,
+                            '_'
+                        );
+                        const isPdf =
+                            mime === 'application/pdf' ||
+                            /\.pdf(\?|#|$)/i.test(url) ||
+                            /\.pdf$/i.test(nm);
+                        const type = isPdf ? 'application/pdf' : mime.indexOf('image/') === 0 ? mime : 'image/jpeg';
+                        return {
+                            name: nm,
+                            type: type,
+                            data: url,
+                            date: expense.date || new Date().toISOString().slice(0, 10),
+                        };
+                    });
+                }
+                return Promise.resolve(fileMetaFromDataUrl(item, idx));
+            });
+
+            Promise.all(tasks)
+                .then(function (files) {
+                    const list = files.filter(Boolean);
+                    if (list.length === 0) {
+                        alert('저장된 영수증 파일이 없습니다.');
+                        return;
+                    }
+                    openAttachmentListModal(list, '첨부파일');
+                })
+                .catch(function (e) {
+                    alert((e && e.message) || '영수증을 불러오지 못했습니다.');
+                });
         }
 
         // CSV 다운로드
@@ -4804,7 +4914,15 @@ import { createProjectRegister } from './estimate-project-register.js';
             var receipts = [];
             if (hasR && prev && getExpenseReceipts(prev).length) {
                 getExpenseReceipts(prev).forEach(function (r) {
-                    receipts.push({ dataUrl: r.dataUrl, name: r.name || '영수증' });
+                    if (r && r.storagePath) {
+                        receipts.push({
+                            storagePath: String(r.storagePath),
+                            name: r.name || '영수증',
+                            mimeType: r.mimeType || '',
+                        });
+                    } else if (r && r.dataUrl) {
+                        receipts.push({ dataUrl: r.dataUrl, name: r.name || '영수증' });
+                    }
                 });
             }
             var o = {
@@ -8870,8 +8988,16 @@ import { createProjectRegister } from './estimate-project-register.js';
             modal.className = 'image-modal active';
             const ft = fileType || '';
             const fd = typeof fileData === 'string' ? fileData : '';
-            const isPdf = ft === 'application/pdf' || fd.indexOf('data:application/pdf') === 0;
-            const isImage = (ft.indexOf('image/') === 0) || fd.indexOf('data:image') === 0 || fd.indexOf('placeholder') !== -1;
+            const isRemote = /^https?:\/\//i.test(fd);
+            const isPdf =
+                ft === 'application/pdf' ||
+                fd.indexOf('data:application/pdf') === 0 ||
+                (isRemote && /\.pdf(\?|#|$)/i.test(fd));
+            const isImage =
+                (ft.indexOf('image/') === 0) ||
+                fd.indexOf('data:image') === 0 ||
+                fd.indexOf('placeholder') !== -1 ||
+                (isRemote && !isPdf);
 
             let content = '';
             if (isImage && !isPdf) {

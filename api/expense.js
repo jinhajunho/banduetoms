@@ -1,6 +1,7 @@
 export const runtime = 'nodejs';
 
 import { requireActiveUser } from './_lib/activeAuth.js';
+import { removeExpenseReceiptObjectsFromPayload } from './_lib/expenseReceiptsStorage.js';
 
 function jsonResponse(status, body) {
     return new Response(JSON.stringify(body), {
@@ -66,6 +67,20 @@ export default {
                 const id = body && body.id != null ? Number(body.id) : NaN;
                 if (!Number.isFinite(id)) {
                     return jsonResponse(400, { ok: false, error: 'id is required' });
+                }
+
+                const { data: row, error: selErr } = await supabaseAdmin
+                    .from('expense_records')
+                    .select('payload')
+                    .eq('id', id)
+                    .maybeSingle();
+                if (selErr) return jsonResponse(500, { ok: false, error: selErr.message });
+                if (row && row.payload && typeof row.payload === 'object') {
+                    try {
+                        await removeExpenseReceiptObjectsFromPayload(supabaseAdmin, row.payload);
+                    } catch (_e) {
+                        /* Storage 정리 실패해도 DB 삭제는 진행 */
+                    }
                 }
 
                 const { error } = await supabaseAdmin.from('expense_records').delete().eq('id', id);
