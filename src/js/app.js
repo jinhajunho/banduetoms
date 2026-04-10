@@ -869,29 +869,24 @@ import { createProjectRegister } from './estimate-project-register.js';
             return false;
         }
 
-        /** 경비 영수증: Supabase Storage 업로드 (multipart). DB 경비 id 기준 경로 */
-        function uploadExpenseReceiptToStorage(expenseId, file) {
-            return window.__bpsSupabase.auth.getSession().then(function (res) {
-                if (res.error || !res.data || !res.data.session) {
-                    return Promise.reject(new Error('로그인이 필요합니다.'));
-                }
-                var fd = new FormData();
-                fd.append('expenseId', String(expenseId));
-                fd.append('file', file);
-                return fetch(window.location.origin + '/api/storage', {
-                    method: 'POST',
-                    headers: { Authorization: 'Bearer ' + res.data.session.access_token },
-                    body: fd,
-                }).then(function (r) {
-                    return r.text().then(function (text) {
-                        var j = {};
-                        try {
-                            j = text && text.length ? JSON.parse(text) : {};
-                        } catch (_e) {
-                            j = { ok: false, error: '업로드 응답 파싱 실패' };
-                        }
-                        return { ok: r.ok, status: r.status, body: j };
-                    });
+        /** 경비 영수증: Storage multipart (토큰은 호출부에서 1회만 받아 병렬 업로드에 재사용) */
+        function uploadExpenseReceiptToStorageWithToken(expenseId, file, accessToken) {
+            var fd = new FormData();
+            fd.append('expenseId', String(expenseId));
+            fd.append('file', file);
+            return fetch(window.location.origin + '/api/storage', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + accessToken },
+                body: fd,
+            }).then(function (r) {
+                return r.text().then(function (text) {
+                    var j = {};
+                    try {
+                        j = text && text.length ? JSON.parse(text) : {};
+                    } catch (_e) {
+                        j = { ok: false, error: '업로드 응답 파싱 실패' };
+                    }
+                    return { ok: r.ok, status: r.status, body: j };
                 });
             }).then(function (r) {
                 if (!r.ok || !r.body || r.body.ok !== true) {
@@ -906,6 +901,22 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        function uploadExpenseReceiptToStorage(expenseId, file) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.reject(new Error('로그인이 필요합니다.'));
+            }
+            return window.__bpsSupabase.auth.getSession().then(function (res) {
+                if (res.error || !res.data || !res.data.session) {
+                    return Promise.reject(new Error('로그인이 필요합니다.'));
+                }
+                return uploadExpenseReceiptToStorageWithToken(
+                    expenseId,
+                    file,
+                    res.data.session.access_token
+                );
+            });
+        }
+
         function uploadExpenseReceiptFilesToStorage(expenseId, files) {
             var id = Number(expenseId);
             if (!Number.isFinite(id) || id < 1) {
@@ -913,14 +924,20 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             var list = Array.isArray(files) ? files : [];
             if (list.length === 0) return Promise.resolve([]);
-            return list.reduce(function (acc, file) {
-                return acc.then(function (arr) {
-                    return uploadExpenseReceiptToStorage(id, file).then(function (meta) {
-                        arr.push(meta);
-                        return arr;
-                    });
-                });
-            }, Promise.resolve([]));
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.reject(new Error('로그인이 필요합니다.'));
+            }
+            return window.__bpsSupabase.auth.getSession().then(function (res) {
+                if (res.error || !res.data || !res.data.session) {
+                    return Promise.reject(new Error('로그인이 필요합니다.'));
+                }
+                var tok = res.data.session.access_token;
+                return Promise.all(
+                    list.map(function (file) {
+                        return uploadExpenseReceiptToStorageWithToken(id, file, tok);
+                    })
+                );
+            });
         }
 
         function uploadContractorFileToStorage(contractorId, slot, file) {
