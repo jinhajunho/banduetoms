@@ -1,5 +1,6 @@
--- 업체 첨부: 클라이언트에서 Supabase Storage로 직접 업로드할 때 필요한 RLS 정책
--- (Vercel 서버리스 본문 한도 ~4.5MB 를 피하기 위함)
+-- 업체 첨부: 앱이 "큰 파일"만 브라우저→Storage 직접 업로드할 때 필요한 RLS 정책(선택).
+-- 작은 파일은 계속 /api/storage(서비스 롤) 경로라 이 SQL 없이도 저장됩니다.
+-- (Vercel 본문 한도를 넘는 통장 스캔 등만 직접 업로드 분기)
 --
 -- Supabase Dashboard → SQL Editor 에서 1회 실행.
 -- 버킷 이름을 바꿨다면 bucket_id 조건과 VITE_SUPABASE_EXPENSE_RECEIPTS_BUCKET / 서버 env 를 동일하게 맞추세요.
