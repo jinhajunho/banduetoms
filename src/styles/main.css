@@ -707,23 +707,28 @@
             text-align: center;
         }
 
-        /* 미수금/업체정보관리/경비지출관리/판관비관리: 헤더/값 중앙정렬 */
+        /* 미수금/업체정보관리/경비지출관리: 헤더/값 중앙정렬 */
         #page-unpaid table thead th,
         #page-unpaid table tbody td,
-        #page-contractors .contractor-list-search-wrap {
-            margin-bottom: 12px;
-            max-width: min(100%, 400px);
-        }
-
-        #page-contractors .contractor-list-search-input {
-            max-width: 100%;
-        }
-
         #page-contractors table thead th,
         #page-contractors table tbody td,
         #page-expenses table thead th,
         #page-expenses table tbody td {
             text-align: center !important;
+        }
+
+        /* 업체 목록: 검색은 표 상단 맨 우측 */
+        #page-contractors .contractor-list-search-wrap {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #page-contractors .contractor-list-search-input {
+            max-width: min(100%, 400px);
+            flex: 0 1 400px;
         }
 
         /* 판관비관리: 기본은 중앙, 메모(5열)만 좌정렬 */
