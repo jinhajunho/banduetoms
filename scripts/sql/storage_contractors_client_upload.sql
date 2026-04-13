@@ -1,6 +1,5 @@
--- 업체 첨부: 앱이 "큰 파일"만 브라우저→Storage 직접 업로드할 때 필요한 RLS 정책(선택).
--- 작은 파일은 계속 /api/storage(서비스 롤) 경로라 이 SQL 없이도 저장됩니다.
--- (Vercel 본문 한도를 넘는 통장 스캔 등만 직접 업로드 분기)
+-- (선택·레거시) 예전 방식: 클라이언트가 JWT로 storage.from().upload() 할 때만 필요.
+-- 현재 앱은 큰 파일도 서명 URL(uploadToSignedUrl) 경로를 쓰므로 이 SQL 없이 동작하는 것이 정상입니다.
 --
 -- Supabase Dashboard → SQL Editor 에서 1회 실행.
 -- 버킷 이름을 바꿨다면 bucket_id 조건과 VITE_SUPABASE_EXPENSE_RECEIPTS_BUCKET / 서버 env 를 동일하게 맞추세요.

@@ -1086,8 +1086,8 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
 
         /**
-         * 큰 파일만: 브라우저 → Supabase Storage 직접 (Vercel 본문 제한 회피).
-         * 이 경로만 Storage RLS(authenticated)가 필요할 수 있음 — scripts/sql/storage_contractors_client_upload.sql
+         * 큰 파일: JSON으로 서명 토큰만 Vercel 경유 → 파일 본문은 uploadToSignedUrl 로 Supabase 직행
+         * (Vercel 본문 한도 회피 + storage.objects RLS 없이 업로드 가능)
          */
         function uploadContractorFileDirectToStorage(contractorId, slot, file) {
             if (!window.__bpsSupabase || !window.__bpsSupabase.storage) {
@@ -1098,9 +1098,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return Promise.reject(new Error('업체 id가 올바르지 않습니다.'));
             }
             var sl = slot === 'bank' ? 'bank' : 'license';
-            var safeName = bpsSanitizeStorageFileName(file && file.name);
-            var objectPath = 'contractors/' + cid + '/' + sl + '/' + Date.now() + '_' + safeName;
-            var bucket = getBpsExpenseReceiptsBucketName();
+            var bucketDefault = getBpsExpenseReceiptsBucketName();
+            var displayName = file && file.name ? String(file.name) : bpsSanitizeStorageFileName(file && file.name);
 
             return bpsResolveClientContractorFileMime(file).then(function (mime) {
                 if (!mime) {
@@ -1108,32 +1107,46 @@ import { createProjectRegister } from './estimate-project-register.js';
                         new Error('지원 형식: JPG, PNG, GIF, WEBP, PDF (파일 종류를 확인해 주세요)')
                     );
                 }
-                return window.__bpsSupabase.storage
-                    .from(bucket)
-                    .upload(objectPath, file, {
-                        contentType: mime,
-                        upsert: true,
-                    })
-                    .then(function (res) {
-                        var err = res.error;
-                        var data = res.data;
-                        if (err) {
-                            var msg = err.message || 'Storage 업로드 실패';
-                            if (/row-level security|rls|policy|permission denied|not authorized/i.test(msg)) {
-                                msg +=
-                                    ' Supabase Storage에 contractors/ 경로 업로드 정책(authenticated INSERT·UPDATE)을 추가해 주세요. scripts/sql/storage_contractors_client_upload.sql 참고.';
+                var sz = file && typeof file.size === 'number' ? file.size : 0;
+                if (sz < 1) {
+                    return Promise.reject(new Error('파일이 비어 있습니다.'));
+                }
+                return bpsAuthedPost('/api/storage', {
+                    action: 'contractorSignedUpload',
+                    contractorId: cid,
+                    slot: sl,
+                    fileName: displayName,
+                    contentType: mime,
+                    fileSize: sz,
+                }).then(function (r) {
+                    if (!r.ok || !r.body || r.body.ok !== true) {
+                        return Promise.reject(new Error((r.body && r.body.error) || '업로드 준비 실패'));
+                    }
+                    var bkt = (r.body.bucket && String(r.body.bucket).trim()) || bucketDefault;
+                    var pth = r.body.path && String(r.body.path).trim();
+                    var tok = r.body.token != null ? String(r.body.token) : '';
+                    if (!pth || !tok) {
+                        return Promise.reject(new Error('업로드 서명 응답이 올바르지 않습니다.'));
+                    }
+                    return window.__bpsSupabase.storage
+                        .from(bkt)
+                        .uploadToSignedUrl(pth, tok, file, { contentType: mime })
+                        .then(function (res) {
+                            var err = res.error;
+                            var data = res.data;
+                            if (err) {
+                                return Promise.reject(new Error(err.message || 'Storage 업로드 실패'));
                             }
-                            return Promise.reject(new Error(msg));
-                        }
-                        if (!data || !data.path) {
-                            return Promise.reject(new Error('Storage 업로드 응답이 올바르지 않습니다.'));
-                        }
-                        return {
-                            storagePath: data.path,
-                            name: file && file.name ? String(file.name) : safeName,
-                            mimeType: mime,
-                        };
-                    });
+                            if (!data || !data.path) {
+                                return Promise.reject(new Error('Storage 업로드 응답이 올바르지 않습니다.'));
+                            }
+                            return {
+                                storagePath: data.path,
+                                name: displayName,
+                                mimeType: mime,
+                            };
+                        });
+                });
             });
         }
 

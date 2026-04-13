@@ -1,7 +1,8 @@
 /**
  * Vercel Hobby: 함수 개수 한도(12) 대응 — Storage 서명·업로드를 단일 엔드포인트로 통합.
  *
- * POST + Content-Type: application/json  → { path } / { paths } 서명 URL, 또는 { deletePath } Storage 객체 삭제
+ * POST + Content-Type: application/json  → { path } / { paths } 서명 URL, { deletePath } 삭제,
+ *   { action: 'contractorSignedUpload', ... } 업체 대용량용 서명 업로드 토큰
  * POST + multipart/form-data:
  *   - expenseId + file          → 경비 영수증
  *   - contractorId + slot + file → 업체 첨부
@@ -136,6 +137,57 @@ async function handleSignJson(request, supabaseAdmin) {
             results.push({ path, url: data.signedUrl });
         }
         return jsonResponse(200, { ok: true, results, expiresIn: sec });
+    }
+
+    /** 큰 업체 첨부: 서비스 롤로 서명 업로드 토큰만 발급 — 본문은 클라이언트→Supabase 직접 (RLS 불필요) */
+    if (body && body.action === 'contractorSignedUpload') {
+        const contractorId = body.contractorId != null ? Number(body.contractorId) : NaN;
+        const slot = String(body.slot || '')
+            .trim()
+            .toLowerCase();
+        const fileName = body.fileName != null ? String(body.fileName) : '';
+        const contentTypeNorm = normalizeFileMimeType(body.contentType);
+        const fileSize = body.fileSize != null ? Number(body.fileSize) : NaN;
+
+        if (!Number.isFinite(contractorId) || contractorId < 1) {
+            return jsonResponse(400, { ok: false, error: 'contractorId is required' });
+        }
+        if (slot !== 'license' && slot !== 'bank') {
+            return jsonResponse(400, { ok: false, error: 'slot must be license or bank' });
+        }
+        if (!ALLOWED_MIME.has(contentTypeNorm)) {
+            return jsonResponse(400, { ok: false, error: '지원 형식: JPG, PNG, GIF, WEBP, PDF' });
+        }
+        const maxBytes = parseMaxUploadBytes();
+        if (!Number.isFinite(fileSize) || fileSize < 1 || fileSize > maxBytes) {
+            return jsonResponse(400, { ok: false, error: 'fileSize is invalid or too large' });
+        }
+
+        const safeName = sanitizeExpenseReceiptFileName(fileName);
+        const objectPath = 'contractors/' + contractorId + '/' + slot + '/' + Date.now() + '_' + safeName;
+        if (!isAllowedStorageObjectPath(objectPath)) {
+            return jsonResponse(400, { ok: false, error: 'invalid path' });
+        }
+
+        const { data, error } = await supabaseAdmin.storage
+            .from(bucket)
+            .createSignedUploadUrl(objectPath, { upsert: true });
+        if (error || !data) {
+            return jsonResponse(500, {
+                ok: false,
+                error: error?.message || 'signed upload URL 생성 실패',
+            });
+        }
+        const token = data.token != null ? String(data.token) : '';
+        if (!token) {
+            return jsonResponse(500, { ok: false, error: 'signed upload token missing' });
+        }
+        return jsonResponse(200, {
+            ok: true,
+            bucket,
+            path: objectPath,
+            token,
+        });
     }
 
     const path = body && typeof body.path === 'string' ? body.path.trim() : '';
