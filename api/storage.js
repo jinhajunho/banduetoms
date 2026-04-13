@@ -52,6 +52,44 @@ const ALLOWED_MIME = new Set([
     'application/pdf',
 ]);
 
+/** 브라우저/OS별로 선언 MIME이 달라질 수 있어 정규화 */
+const MIME_CANON = {
+    'image/jpg': 'image/jpeg',
+    'image/pjpeg': 'image/jpeg',
+    'image/x-citrix-jpeg': 'image/jpeg',
+    'image/x-png': 'image/png',
+};
+
+function normalizeFileMimeType(fileType) {
+    const raw = fileType && String(fileType).trim();
+    if (!raw) return 'application/octet-stream';
+    const lower = raw.toLowerCase();
+    return MIME_CANON[lower] || lower;
+}
+
+/** 선언된 타입이 없거나 octet-stream일 때 버퍼 앞부분으로 판별 */
+function sniffMimeFromBuffer(buf) {
+    if (!buf || buf.length < 4) return null;
+    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+    if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return 'image/gif';
+    if (buf.length >= 12) {
+        const head = buf.toString('ascii', 0, 4);
+        const webp = buf.toString('ascii', 8, 12);
+        if (head === 'RIFF' && webp === 'WEBP') return 'image/webp';
+    }
+    if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return 'application/pdf';
+    return null;
+}
+
+function resolveAllowedMime(file, buf) {
+    const declared = normalizeFileMimeType(file.type);
+    if (ALLOWED_MIME.has(declared)) return declared;
+    const sniffed = sniffMimeFromBuffer(buf);
+    if (sniffed && ALLOWED_MIME.has(sniffed)) return sniffed;
+    return null;
+}
+
 async function handleSignJson(request, supabaseAdmin) {
     const body = await request.json().catch(() => ({}));
     const bucket = getExpenseReceiptsBucket();
@@ -129,14 +167,14 @@ async function handleExpenseReceiptUpload(form, supabaseAdmin) {
     }
 
     const maxBytes = parseMaxUploadBytes();
-    const mime = (file.type && String(file.type).trim()) || 'application/octet-stream';
-    if (!ALLOWED_MIME.has(mime)) {
-        return jsonResponse(400, { ok: false, error: '지원 형식: JPG, PNG, GIF, WEBP, PDF' });
-    }
-
     const buf = Buffer.from(await file.arrayBuffer());
     if (buf.length > maxBytes) {
         return jsonResponse(400, { ok: false, error: '파일이 너무 큽니다. 이미지·PDF 용량을 줄여 주세요.' });
+    }
+
+    const mime = resolveAllowedMime(file, buf);
+    if (!mime) {
+        return jsonResponse(400, { ok: false, error: '지원 형식: JPG, PNG, GIF, WEBP, PDF' });
     }
 
     const safeName = sanitizeExpenseReceiptFileName(file.name);
@@ -182,14 +220,14 @@ async function handleContractorUpload(form, supabaseAdmin) {
     }
 
     const maxBytes = parseMaxUploadBytes();
-    const mime = (file.type && String(file.type).trim()) || 'application/octet-stream';
-    if (!ALLOWED_MIME.has(mime)) {
-        return jsonResponse(400, { ok: false, error: '지원 형식: JPG, PNG, GIF, WEBP, PDF' });
-    }
-
     const buf = Buffer.from(await file.arrayBuffer());
     if (buf.length > maxBytes) {
         return jsonResponse(400, { ok: false, error: '파일이 너무 큽니다. 이미지·PDF 용량을 줄여 주세요.' });
+    }
+
+    const mime = resolveAllowedMime(file, buf);
+    if (!mime) {
+        return jsonResponse(400, { ok: false, error: '지원 형식: JPG, PNG, GIF, WEBP, PDF' });
     }
 
     const safeName = sanitizeExpenseReceiptFileName(file.name);
@@ -228,14 +266,14 @@ async function handleEstimateFinanceUpload(form, supabaseAdmin) {
     }
 
     const maxBytes = parseMaxUploadBytes();
-    const mime = (file.type && String(file.type).trim()) || 'application/octet-stream';
-    if (!ALLOWED_MIME.has(mime)) {
-        return jsonResponse(400, { ok: false, error: '지원 형식: JPG, PNG, GIF, WEBP, PDF' });
-    }
-
     const buf = Buffer.from(await file.arrayBuffer());
     if (buf.length > maxBytes) {
         return jsonResponse(400, { ok: false, error: '파일이 너무 큽니다. 이미지·PDF 용량을 줄여 주세요.' });
+    }
+
+    const mime = resolveAllowedMime(file, buf);
+    if (!mime) {
+        return jsonResponse(400, { ok: false, error: '지원 형식: JPG, PNG, GIF, WEBP, PDF' });
     }
 
     const safeName = sanitizeExpenseReceiptFileName(file.name);
@@ -260,11 +298,12 @@ async function handleEstimateFinanceUpload(form, supabaseAdmin) {
 
 async function handleMultipart(request, supabaseAdmin) {
     const form = await request.formData();
-    if (form.has('estimateCode') && form.has('rowKey')) {
-        return handleEstimateFinanceUpload(form, supabaseAdmin);
-    }
+    // 업체 첨부를 먼저 분기 (페이지에 견적용 필드가 섞여 있어도 오인 방지)
     if (form.has('contractorId') && form.has('slot')) {
         return handleContractorUpload(form, supabaseAdmin);
+    }
+    if (form.has('estimateCode') && form.has('rowKey')) {
+        return handleEstimateFinanceUpload(form, supabaseAdmin);
     }
     if (form.has('expenseId')) {
         return handleExpenseReceiptUpload(form, supabaseAdmin);

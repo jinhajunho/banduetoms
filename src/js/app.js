@@ -878,6 +878,43 @@ import { createProjectRegister } from './estimate-project-register.js';
             return false;
         }
 
+        /** Storage multipart 응답 — HTML/413 등 비JSON일 때 원인 힌트 */
+        function bpsParseStorageUploadResponse(text, httpStatus) {
+            var raw = String(text || '');
+            var trimmed = raw.replace(/^\uFEFF/, '').trim();
+            if (!trimmed) {
+                return {
+                    ok: false,
+                    error:
+                        '업로드 응답이 비어 있습니다. (HTTP ' +
+                        (httpStatus != null ? httpStatus : '?') +
+                        ')',
+                };
+            }
+            try {
+                var j = JSON.parse(trimmed);
+                return j && typeof j === 'object' ? j : { ok: false, error: '업로드 응답 형식이 올바르지 않습니다.' };
+            } catch (_e) {
+                var hint = '';
+                if (
+                    httpStatus === 413 ||
+                    /payload too large|request entity too large|content too large/i.test(raw)
+                ) {
+                    hint =
+                        '파일이 서버에서 허용하는 크기를 초과했을 수 있습니다. 용량을 줄이거나 나눠서 올려 주세요.';
+                } else if (/<\s*html[\s>]/i.test(raw) || /DOCTYPE\s+html/i.test(raw)) {
+                    hint =
+                        '서버가 오류 페이지(HTML)를 반환했습니다. 네트워크·로그인·용량 제한을 확인해 주세요.';
+                } else {
+                    hint =
+                        '응답이 JSON이 아닙니다 (HTTP ' + (httpStatus != null ? httpStatus : '?') + ').';
+                }
+                var sn = trimmed.replace(/\s+/g, ' ');
+                if (sn.length > 120) sn = sn.slice(0, 117) + '…';
+                return { ok: false, error: '업로드 응답을 읽지 못했습니다. ' + hint + (sn ? ' — ' + sn : '') };
+            }
+        }
+
         /** 경비 영수증: Storage multipart (토큰은 호출부에서 1회만 받아 병렬 업로드에 재사용) */
         function uploadExpenseReceiptToStorageWithToken(expenseId, file, accessToken) {
             var fd = new FormData();
@@ -889,12 +926,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 body: fd,
             }).then(function (r) {
                 return r.text().then(function (text) {
-                    var j = {};
-                    try {
-                        j = text && text.length ? JSON.parse(text) : {};
-                    } catch (_e) {
-                        j = { ok: false, error: '업로드 응답 파싱 실패' };
-                    }
+                    var j = bpsParseStorageUploadResponse(text, r.status);
                     return { ok: r.ok, status: r.status, body: j };
                 });
             }).then(function (r) {
@@ -964,12 +996,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     body: fd,
                 }).then(function (r) {
                     return r.text().then(function (text) {
-                        var j = {};
-                        try {
-                            j = text && text.length ? JSON.parse(text) : {};
-                        } catch (_e) {
-                            j = { ok: false, error: '업로드 응답 파싱 실패' };
-                        }
+                        var j = bpsParseStorageUploadResponse(text, r.status);
                         return { ok: r.ok, status: r.status, body: j };
                     });
                 });
@@ -999,12 +1026,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             })
                 .then(function (r) {
                     return r.text().then(function (text) {
-                        var j = {};
-                        try {
-                            j = text && text.length ? JSON.parse(text) : {};
-                        } catch (_e) {
-                            j = { ok: false, error: '업로드 응답 파싱 실패' };
-                        }
+                        var j = bpsParseStorageUploadResponse(text, r.status);
                         return { ok: r.ok, status: r.status, body: j };
                     });
                 })
@@ -1051,12 +1073,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     body: fd,
                 }).then(function (r) {
                     return r.text().then(function (text) {
-                        var j = {};
-                        try {
-                            j = text && text.length ? JSON.parse(text) : {};
-                        } catch (_e) {
-                            j = { ok: false, error: '업로드 응답 파싱 실패' };
-                        }
+                        var j = bpsParseStorageUploadResponse(text, r.status);
                         return { ok: r.ok, status: r.status, body: j };
                     });
                 });
