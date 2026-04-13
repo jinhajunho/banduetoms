@@ -340,6 +340,18 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         /** 견적 + 수동 일정을 대시보드 캘린더용 이벤트 형태로 합침 */
         function getDashboardCalendarEvents() {
+            const isExternal = isCurrentUserExternalContractor();
+            const myName = String(currentUserAccessProfile && currentUserAccessProfile.name ? currentUserAccessProfile.name : '')
+                .trim()
+                .toLowerCase();
+            const myContractorName = String(
+                currentUserAccessProfile && currentUserAccessProfile.contractorName
+                    ? currentUserAccessProfile.contractorName
+                    : ''
+            )
+                .trim()
+                .toLowerCase();
+
             function toNum(v) {
                 const n = parseFloat(String(v == null ? '' : v).replace(/원/g, '').replace(/,/g, '').trim(), 10);
                 return isNaN(n) ? 0 : n;
@@ -373,7 +385,18 @@ import { createProjectRegister } from './estimate-project-register.js';
                         _isManualTask: false,
                     };
                 });
-            const fromMan = manualCalendarTasks.map(function (t) {
+            const fromMan = manualCalendarTasks
+                .filter(function (t) {
+                    if (!isExternal) return true;
+                    const assignee = String(t && t.assignee ? t.assignee : '')
+                        .trim()
+                        .toLowerCase();
+                    if (!assignee) return false;
+                    if (myName && assignee === myName) return true;
+                    if (myContractorName && assignee === myContractorName) return true;
+                    return false;
+                })
+                .map(function (t) {
                 const id = String(t.id || '').trim();
                 return {
                     id: id,
@@ -393,7 +416,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     _isManualTask: true,
                     _taskBody: t.body != null ? String(t.body) : '',
                 };
-            });
+                });
             return fromEst.concat(fromMan);
         }
 
