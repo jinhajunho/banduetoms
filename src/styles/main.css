@@ -2089,13 +2089,19 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
         }
 
         .dashboard-calendar-filter-right .dashboard-search-wrap {
             margin-left: 0;
             min-width: 200px;
             max-width: 320px;
+            width: 320px;
+            flex: 0 0 320px;
+        }
+
+        #dashboardCalendarRegisterBtn {
+            flex-shrink: 0;
         }
 
         .filter-btn {
@@ -2172,10 +2178,13 @@
             .dashboard-calendar-filter-right {
                 margin-left: 0;
                 width: 100%;
+                flex-wrap: wrap;
             }
 
             .dashboard-calendar-filter-right .dashboard-search-wrap {
                 max-width: 100%;
+                width: 100%;
+                flex: 1 1 100%;
             }
         }
 
