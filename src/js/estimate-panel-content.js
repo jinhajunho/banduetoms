@@ -88,8 +88,16 @@ export function createRenderPanelContent(api) {
                     </div>
                     <div class="basic-info-grid">
                         <div class="basic-info-card">
-                            <div class="basic-info-card-title">
-                                <i class="fas fa-calendar-alt"></i> 일정/상태
+                            <div class="basic-info-card-head">
+                                <div class="basic-info-card-title">
+                                    <i class="fas fa-calendar-alt"></i> 일정/상태
+                                </div>
+                                <label class="basic-info-calendar-toggle">
+                                    <input type="checkbox" id="edit_showOnDashboardCalendar" ${
+                                        item.showOnDashboardCalendar !== false ? 'checked' : ''
+                                    } ${api.getBasicInfoEditMode() || api.getIsNewEstimate() ? '' : 'disabled'}>
+                                    <span>캘린더 표시</span>
+                                </label>
                             </div>
                             <div class="basic-info-row">
                                 <div class="basic-info-label">프로젝트 코드</div>

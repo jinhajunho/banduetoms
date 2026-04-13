@@ -44,6 +44,9 @@ export async function saveEstimateChanges(api) {
             api.getCurrentEditItem().contractor = contractorCheck.value;
         }
 
+        const showCalElNew = document.getElementById('edit_showOnDashboardCalendar');
+        const showOnDashboardCalendarNew = showCalElNew ? !!showCalElNew.checked : true;
+
         const cur = api.getCurrentEditItem();
         if (!cur || !cur.building || !cur.project) {
             alert('건물명과 공사명은 필수 입력 항목입니다.');
@@ -87,6 +90,7 @@ export async function saveEstimateChanges(api) {
             aggregatePurchaseGross: cur.aggregatePurchaseGross,
             aggregateTransferGross: cur.aggregateTransferGross,
             salesDates: api.deriveSalesDatesFromSalesRows(cur.salesRows || []),
+            showOnDashboardCalendar: showOnDashboardCalendarNew,
         };
         api.seedEstimateAggregates(newEstimate);
 
@@ -150,6 +154,11 @@ export async function saveEstimateChanges(api) {
             cur.purchase = parseInt(document.getElementById('edit_purchase').value, 10) || 0;
         }
         api.readBusinessIncomeFormIntoItem(cur);
+
+        const showCalElEdit = document.getElementById('edit_showOnDashboardCalendar');
+        if (showCalElEdit) {
+            cur.showOnDashboardCalendar = !!showCalElEdit.checked;
+        }
 
         const index = api.findEstimateIndexByCode(cur.code);
         if (index !== -1) {

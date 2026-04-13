@@ -1,5 +1,12 @@
 /** 대시보드 캘린더·KPI — app.js에서 주입: getEstimates, showPage, renderTable, openPanel */
 export function createDashboard(api) {
+    function escHtmlText(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
     // 대시보드 캘린더 (마크업은 public/partials/page-dashboard.html)
     let dashboardCalendarYear = new Date().getFullYear();
     let dashboardCalendarMonth = new Date().getMonth();
@@ -7,6 +14,9 @@ export function createDashboard(api) {
     let dashboardCalendarSearchTerm = '';
 
     function getDashboardEvents() {
+        if (typeof api.getDashboardCalendarEvents === 'function') {
+            return api.getDashboardCalendarEvents();
+        }
         function toNum(v) {
             const n = parseFloat(String(v == null ? '' : v).replace(/원/g, '').replace(/,/g, '').trim(), 10);
             return isNaN(n) ? 0 : n;
@@ -14,7 +24,6 @@ export function createDashboard(api) {
         function purchaseNetFromRows(rows) {
             if (!Array.isArray(rows) || rows.length === 0) return 0;
             return rows.reduce(function (sum, r) {
-                // values[2] = vat별도(매입)
                 return sum + toNum(r && r[2] != null ? r[2] : 0);
             }, 0);
         }
@@ -30,11 +39,10 @@ export function createDashboard(api) {
             endDate: e.endDate || '',
             date: e.date || '',
             amount: e.revenue || 0,
-            // 캘린더 일정 상세: "매입정보 탭의 매입액"에 직접 연동
             purchase: e.purchase || 0,
             purchaseNet: purchaseNetFromRows(e.purchaseRows),
-            // 캘린더 일정 상세: "사업소득 탭의 사업소득금액"에 직접 연동
             businessIncomeGross: e.businessIncomeGross || 0,
+            _isManualTask: false,
         }));
     }
 
@@ -116,6 +124,14 @@ export function createDashboard(api) {
     function matchesDashboardSearch(event) {
         const q = String(dashboardCalendarSearchTerm || '').trim().toLowerCase();
         if (!q) return true;
+        if (event._isManualTask) {
+            const text = [
+                event.project || '',
+                event.manager || '',
+                event._taskBody || '',
+            ].join(' ').toLowerCase();
+            return text.includes(q);
+        }
         const text = [
             event.code || '',
             event.building || '',
@@ -481,21 +497,7 @@ export function createDashboard(api) {
 
         titleEl.textContent = dashboardCalendarYear + '년 ' + (dashboardCalendarMonth + 1) + '월';
 
-        const eventsList = api.getEstimates().map(function (e) {
-            return {
-                id: e.code,
-                code: e.code || '',
-                building: e.building || '',
-                project: e.project || '',
-                manager: e.manager || '',
-                contractor: e.contractor || '',
-                status: e.status || '견적',
-                startDate: e.startDate || '',
-                endDate: e.endDate || '',
-                date: e.date || '',
-                amount: e.revenue || 0
-            };
-        });
+        const eventsList = getDashboardEvents();
 
         const gridDates = [];
         const dayCells = [];
@@ -573,6 +575,32 @@ export function createDashboard(api) {
         const modal = document.getElementById('dashboardEventModal');
         const body = document.getElementById('dashboardEventModalBody');
         if (!modal || !body) return;
+
+        if (event && event._isManualTask) {
+            const st = event.status === '완료' ? 'completed' : 'progress';
+            body.innerHTML =
+                '<div class="modal-info"><div class="info-label">상태</div><div class="info-value"><span class="status-badge ' + st + '">' +
+                escHtmlText(event.status || '-') +
+                '</span></div></div>' +
+                '<div class="modal-info"><div class="info-label">작업제목</div><div class="info-value">' +
+                escHtmlText(event.project || '-') +
+                '</div></div>' +
+                '<div class="modal-info"><div class="info-label">작업내용</div><div class="info-value" style="white-space:pre-wrap;">' +
+                escHtmlText(event._taskBody || '-') +
+                '</div></div>' +
+                '<div class="modal-info"><div class="info-label">담당자</div><div class="info-value">' +
+                escHtmlText(event.manager || '-') +
+                '</div></div>' +
+                '<div class="modal-info"><div class="info-label">진행일</div><div class="info-value">' +
+                escHtmlText(event.startDate || '-') +
+                '</div></div>' +
+                '<div class="modal-info"><div class="info-label">완료일</div><div class="info-value">' +
+                escHtmlText(event.endDate || '-') +
+                '</div></div>';
+            modal.classList.add('active');
+            return;
+        }
+
         // 캘린더 셀에서 전달된 event는 렌더 시점 스냅샷일 수 있으므로,
         // 모달은 항상 최신 estimates 목록에서 다시 조회해 금액을 계산합니다.
         const rawCode = (event && (event.code || event.id) != null) ? String(event.code || event.id).trim() : '';
@@ -719,52 +747,142 @@ export function createDashboard(api) {
         }
     }
 
+    function openDashboardManualTaskModal() {
+        const modal = document.getElementById('dashboardManualTaskModal');
+        if (!modal) return;
+        const st = document.getElementById('dashboardManualTaskStatus');
+        const title = document.getElementById('dashboardManualTaskTitle');
+        const bodyEl = document.getElementById('dashboardManualTaskBody');
+        const asg = document.getElementById('dashboardManualTaskAssignee');
+        const sd = document.getElementById('dashboardManualTaskStart');
+        const ed = document.getElementById('dashboardManualTaskEnd');
+        if (st) st.value = '진행';
+        if (title) title.value = '';
+        if (bodyEl) bodyEl.value = '';
+        if (asg) asg.value = '';
+        if (sd) sd.value = '';
+        if (ed) ed.value = '';
+        modal.classList.add('active');
+    }
+
+    function closeDashboardManualTaskModal() {
+        const modal = document.getElementById('dashboardManualTaskModal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    function submitDashboardManualTask() {
+        if (typeof api.saveManualCalendarTask !== 'function') return;
+        const st = document.getElementById('dashboardManualTaskStatus');
+        const title = document.getElementById('dashboardManualTaskTitle');
+        const bodyEl = document.getElementById('dashboardManualTaskBody');
+        const asg = document.getElementById('dashboardManualTaskAssignee');
+        const sd = document.getElementById('dashboardManualTaskStart');
+        const ed = document.getElementById('dashboardManualTaskEnd');
+        const task = {
+            status: st ? st.value : '진행',
+            title: title ? title.value.trim() : '',
+            body: bodyEl ? bodyEl.value : '',
+            assignee: asg ? asg.value.trim() : '',
+            startDate: sd ? sd.value : '',
+            endDate: ed ? ed.value : '',
+        };
+        const p = api.saveManualCalendarTask(task);
+        if (p && typeof p.then === 'function') {
+            p.then(function (r) {
+                if (!r || !r.ok) {
+                    alert((r && r.error) || '저장에 실패했습니다.');
+                    return;
+                }
+                closeDashboardManualTaskModal();
+                const sync = api.syncManualCalendarTasks;
+                if (typeof sync === 'function') {
+                    const sp = sync();
+                    if (sp && typeof sp.then === 'function') {
+                        sp.then(function () {
+                            renderDashboardCalendar();
+                        });
+                    } else {
+                        renderDashboardCalendar();
+                    }
+                } else {
+                    renderDashboardCalendar();
+                }
+            });
+        }
+    }
+
     // 대시보드 렌더링
     function renderDashboard() {
-        const now = new Date();
-        const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        const monthEstimates = api.getEstimates().filter(e => e.date && e.date.slice(0, 7) === thisMonth);
-        const monthRevenue = monthEstimates.reduce((sum, e) => sum + (e.revenue || 0), 0);
-        const progressCount = api.getEstimates().filter(e => e.status === '진행').length;
-        const completeCount = api.getEstimates().filter(e => e.status === '완료').length;
-        const estimateCount = api.getEstimates().filter(e => e.status === '견적').length;
+        function renderDashboardInner() {
+            const now = new Date();
+            const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            const monthEstimates = api.getEstimates().filter(e => e.date && e.date.slice(0, 7) === thisMonth);
+            const monthRevenue = monthEstimates.reduce((sum, e) => sum + (e.revenue || 0), 0);
+            const progressCount = api.getEstimates().filter(e => e.status === '진행').length;
+            const completeCount = api.getEstimates().filter(e => e.status === '완료').length;
+            const estimateCount = api.getEstimates().filter(e => e.status === '견적').length;
 
-        const elRevenue = document.getElementById('dashboardMonthRevenue');
-        const elProgress = document.getElementById('dashboardProgressCount');
-        const elComplete = document.getElementById('dashboardCompleteCount');
-        const elEst = document.getElementById('dashboardEstimateCount');
-        if (elRevenue) elRevenue.textContent = monthRevenue.toLocaleString() + '원';
-        if (elProgress) elProgress.textContent = progressCount + '건';
-        if (elComplete) elComplete.textContent = completeCount + '건';
-        if (elEst) elEst.textContent = estimateCount + '건';
+            const elRevenue = document.getElementById('dashboardMonthRevenue');
+            const elProgress = document.getElementById('dashboardProgressCount');
+            const elComplete = document.getElementById('dashboardCompleteCount');
+            const elEst = document.getElementById('dashboardEstimateCount');
+            if (elRevenue) elRevenue.textContent = monthRevenue.toLocaleString() + '원';
+            if (elProgress) elProgress.textContent = progressCount + '건';
+            if (elComplete) elComplete.textContent = completeCount + '건';
+            if (elEst) elEst.textContent = estimateCount + '건';
 
-        renderDashboardCalendar();
+            renderDashboardCalendar();
 
-        document.querySelectorAll('#page-dashboard .filter-btn').forEach(btn => {
-            btn.onclick = function() {
-                document.querySelectorAll('#page-dashboard .filter-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                dashboardCalendarFilter = this.getAttribute('data-filter') || 'all';
-                renderDashboardCalendar();
-            };
-        });
+            document.querySelectorAll('#page-dashboard .filter-btn').forEach(btn => {
+                btn.onclick = function() {
+                    document.querySelectorAll('#page-dashboard .filter-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    dashboardCalendarFilter = this.getAttribute('data-filter') || 'all';
+                    renderDashboardCalendar();
+                };
+            });
 
-        const searchInput = document.getElementById('dashboardCalendarSearch');
-        const clearBtn = document.getElementById('dashboardCalendarSearchClear');
-        if (searchInput) {
-            searchInput.value = dashboardCalendarSearchTerm;
-            searchInput.oninput = function () {
-                dashboardCalendarSearchTerm = this.value || '';
-                renderDashboardCalendar();
-            };
+            const searchInput = document.getElementById('dashboardCalendarSearch');
+            const clearBtn = document.getElementById('dashboardCalendarSearchClear');
+            if (searchInput) {
+                searchInput.value = dashboardCalendarSearchTerm;
+                searchInput.oninput = function () {
+                    dashboardCalendarSearchTerm = this.value || '';
+                    renderDashboardCalendar();
+                };
+            }
+            if (clearBtn) {
+                clearBtn.onclick = function () {
+                    dashboardCalendarSearchTerm = '';
+                    if (searchInput) searchInput.value = '';
+                    renderDashboardCalendar();
+                    if (searchInput) searchInput.focus();
+                };
+            }
+
+            const regBtn = document.getElementById('dashboardCalendarRegisterBtn');
+            if (regBtn) {
+                regBtn.onclick = function () {
+                    openDashboardManualTaskModal();
+                };
+            }
+            const manClose = document.getElementById('dashboardManualTaskModalClose');
+            const manCancel = document.getElementById('dashboardManualTaskModalCancel');
+            const manSave = document.getElementById('dashboardManualTaskModalSave');
+            if (manClose) manClose.onclick = closeDashboardManualTaskModal;
+            if (manCancel) manCancel.onclick = closeDashboardManualTaskModal;
+            if (manSave) manSave.onclick = submitDashboardManualTask;
         }
-        if (clearBtn) {
-            clearBtn.onclick = function () {
-                dashboardCalendarSearchTerm = '';
-                if (searchInput) searchInput.value = '';
-                renderDashboardCalendar();
-                if (searchInput) searchInput.focus();
-            };
+
+        if (typeof api.syncManualCalendarTasks === 'function') {
+            const p = api.syncManualCalendarTasks();
+            if (p && typeof p.then === 'function') {
+                p.then(renderDashboardInner).catch(renderDashboardInner);
+            } else {
+                renderDashboardInner();
+            }
+        } else {
+            renderDashboardInner();
         }
     }
 
@@ -780,6 +898,12 @@ export function createDashboard(api) {
             if (dayModal) {
                 dayModal.addEventListener('click', function(e) {
                     if (e.target === dayModal) closeDashboardDayEventsModal();
+                });
+            }
+            const manModal = document.getElementById('dashboardManualTaskModal');
+            if (manModal) {
+                manModal.addEventListener('click', function(e) {
+                    if (e.target === manModal) closeDashboardManualTaskModal();
                 });
             }
         });

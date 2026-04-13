@@ -288,6 +288,99 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         const estimates = [];
 
+        /** 대시보드 «캘린더 등록» 수동 일정 — POST /api/calendar-tasks */
+        let manualCalendarTasks = [];
+
+        function syncManualCalendarTasksFromServer() {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
+                return Promise.resolve(false);
+            }
+            return bpsAuthedPost('/api/calendar-tasks', { action: 'list' })
+                .then(function (r) {
+                    if (r.ok && r.body && Array.isArray(r.body.items)) {
+                        manualCalendarTasks = r.body.items.map(function (x) {
+                            return { ...x };
+                        });
+                        return true;
+                    }
+                    return false;
+                })
+                .catch(function () {
+                    return false;
+                });
+        }
+
+        function saveManualCalendarTask(task) {
+            return bpsAuthedPost('/api/calendar-tasks', { action: 'upsert', task: task }).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true) {
+                    return {
+                        ok: false,
+                        error: (r.body && r.body.error) || '캘린더 일정 저장에 실패했습니다.',
+                    };
+                }
+                return { ok: true, id: r.body.id };
+            });
+        }
+
+        /** 견적 + 수동 일정을 대시보드 캘린더용 이벤트 형태로 합침 */
+        function getDashboardCalendarEvents() {
+            function toNum(v) {
+                const n = parseFloat(String(v == null ? '' : v).replace(/원/g, '').replace(/,/g, '').trim(), 10);
+                return isNaN(n) ? 0 : n;
+            }
+            function purchaseNetFromRows(rows) {
+                if (!Array.isArray(rows) || rows.length === 0) return 0;
+                return rows.reduce(function (sum, r) {
+                    return sum + toNum(r && r[2] != null ? r[2] : 0);
+                }, 0);
+            }
+            const fromEst = estimates
+                .filter(function (e) {
+                    return e.showOnDashboardCalendar !== false;
+                })
+                .map(function (e) {
+                    return {
+                        id: e.code,
+                        code: e.code || '',
+                        building: e.building || '',
+                        project: e.project || '',
+                        manager: e.manager || '',
+                        contractor: e.contractor || '',
+                        status: e.status || '견적',
+                        startDate: e.startDate || '',
+                        endDate: e.endDate || '',
+                        date: e.date || '',
+                        amount: e.revenue || 0,
+                        purchase: e.purchase || 0,
+                        purchaseNet: purchaseNetFromRows(e.purchaseRows),
+                        businessIncomeGross: e.businessIncomeGross || 0,
+                        _isManualTask: false,
+                    };
+                });
+            const fromMan = manualCalendarTasks.map(function (t) {
+                const id = String(t.id || '').trim();
+                return {
+                    id: id,
+                    code: '',
+                    building: '',
+                    project: t.title || '',
+                    manager: t.assignee || '',
+                    contractor: '',
+                    status: t.status || '진행',
+                    startDate: t.startDate || '',
+                    endDate: t.endDate || '',
+                    date: t.startDate || '',
+                    amount: 0,
+                    purchase: 0,
+                    purchaseNet: 0,
+                    businessIncomeGross: 0,
+                    _isManualTask: true,
+                    _taskBody: t.body != null ? String(t.body) : '',
+                };
+            });
+            return fromEst.concat(fromMan);
+        }
+
         /** 매출 내역 행(values[0])에서 유효한 YYYY-MM-DD만 추출(경영실적·미수 등과 동일 규칙) */
         function deriveSalesDatesFromSalesRows(salesRows) {
             const out = [];
@@ -322,6 +415,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (e.businessIncomeGross === undefined) e.businessIncomeGross = 0;
                 if (e.businessIncomeTransferDate === undefined) e.businessIncomeTransferDate = '';
                 if (e.businessIncomePaidStatus === undefined) e.businessIncomePaidStatus = '미지급';
+                if (e.showOnDashboardCalendar === undefined) e.showOnDashboardCalendar = true;
                 if (e.salesRows.length > 0) {
                     e.salesDates = deriveSalesDatesFromSalesRows(e.salesRows);
                 } else if (!Array.isArray(e.salesDates)) {
@@ -9072,6 +9166,9 @@ import { createProjectRegister } from './estimate-project-register.js';
         (function initDashboardModule() {
             const d = createDashboard({
                 getEstimates: function () { return estimates; },
+                getDashboardCalendarEvents: getDashboardCalendarEvents,
+                syncManualCalendarTasks: syncManualCalendarTasksFromServer,
+                saveManualCalendarTask: saveManualCalendarTask,
                 showPage: showPage,
                 renderTable: renderTable,
                 openPanel: openPanel,
@@ -10539,6 +10636,11 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
 
             readBusinessIncomeFormIntoItem(currentEditItem);
+
+            const showCalEl = document.getElementById('edit_showOnDashboardCalendar');
+            if (showCalEl) {
+                currentEditItem.showOnDashboardCalendar = !!showCalEl.checked;
+            }
 
             const index = findEstimateIndexByCode(currentEditItem.code);
             if (index !== -1) {

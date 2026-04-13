@@ -18,9 +18,12 @@
         <button type="button" class="filter-btn active" data-filter="all">전체</button>
         <button type="button" class="filter-btn" data-filter="진행">진행</button>
         <button type="button" class="filter-btn" data-filter="완료">완료</button>
-        <div class="dashboard-search-wrap">
-            <input type="text" id="dashboardCalendarSearch" class="dashboard-search-input" placeholder="캘린더 검색">
-            <button type="button" id="dashboardCalendarSearchClear" class="dashboard-search-clear" aria-label="검색어 지우기">&times;</button>
+        <div class="dashboard-calendar-filter-right">
+            <button type="button" class="btn btn-primary btn-sm" id="dashboardCalendarRegisterBtn">캘린더 등록</button>
+            <div class="dashboard-search-wrap">
+                <input type="text" id="dashboardCalendarSearch" class="dashboard-search-input" placeholder="캘린더 검색">
+                <button type="button" id="dashboardCalendarSearchClear" class="dashboard-search-clear" aria-label="검색어 지우기">&times;</button>
+            </div>
         </div>
     </div>
 
@@ -43,6 +46,53 @@
         <div id="dashboardEventModalBody"></div>
     </div>
 </div>
+<!-- 캘린더 수동 일정 등록 -->
+<div class="modal event-modal" id="dashboardManualTaskModal">
+    <div class="modal-content dashboard-manual-task-modal-content">
+        <div class="modal-header">
+            <div class="modal-title">캘린더 일정 등록</div>
+            <button type="button" class="modal-close" id="dashboardManualTaskModalClose" aria-label="닫기">&times;</button>
+        </div>
+        <div class="dashboard-manual-task-form">
+            <div class="modal-form-row">
+                <label class="modal-form-label" for="dashboardManualTaskStatus">상태</label>
+                <select id="dashboardManualTaskStatus" class="modal-form-control">
+                    <option value="견적">견적</option>
+                    <option value="진행" selected>진행</option>
+                    <option value="완료">완료</option>
+                    <option value="보류">보류</option>
+                </select>
+            </div>
+            <div class="modal-form-row">
+                <label class="modal-form-label" for="dashboardManualTaskTitle">작업제목</label>
+                <input type="text" id="dashboardManualTaskTitle" class="modal-form-control" placeholder="제목" autocomplete="off">
+            </div>
+            <div class="modal-form-row">
+                <label class="modal-form-label" for="dashboardManualTaskBody">작업내용</label>
+                <textarea id="dashboardManualTaskBody" class="modal-form-control dashboard-manual-task-textarea" rows="3" placeholder="내용"></textarea>
+            </div>
+            <div class="modal-form-row">
+                <label class="modal-form-label" for="dashboardManualTaskAssignee">담당자</label>
+                <input type="text" id="dashboardManualTaskAssignee" class="modal-form-control" placeholder="담당자" autocomplete="off">
+            </div>
+            <div class="modal-form-row modal-form-row--2col">
+                <div>
+                    <label class="modal-form-label" for="dashboardManualTaskStart">진행일</label>
+                    <input type="date" id="dashboardManualTaskStart" class="modal-form-control">
+                </div>
+                <div>
+                    <label class="modal-form-label" for="dashboardManualTaskEnd">완료일</label>
+                    <input type="date" id="dashboardManualTaskEnd" class="modal-form-control">
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer dashboard-manual-task-modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" id="dashboardManualTaskModalCancel">취소</button>
+            <button type="button" class="btn btn-primary btn-sm" id="dashboardManualTaskModalSave">저장</button>
+        </div>
+    </div>
+</div>
+
 <!-- 일자별 일정 목록 모달 -->
 <div class="modal event-modal" id="dashboardDayEventsModal">
     <div class="modal-content">

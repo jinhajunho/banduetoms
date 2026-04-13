@@ -2084,6 +2084,20 @@
             align-items: center;
         }
 
+        .dashboard-calendar-filter-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-calendar-filter-right .dashboard-search-wrap {
+            margin-left: 0;
+            min-width: 200px;
+            max-width: 320px;
+        }
+
         .filter-btn {
             padding: 8px 16px;
             background: white;
@@ -2154,6 +2168,100 @@
                 min-width: 100%;
                 max-width: 100%;
             }
+
+            .dashboard-calendar-filter-right {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .dashboard-calendar-filter-right .dashboard-search-wrap {
+                max-width: 100%;
+            }
+        }
+
+        .dashboard-manual-task-modal-content {
+            max-width: 440px;
+            width: 100%;
+        }
+
+        .dashboard-manual-task-form {
+            padding: 0 20px 8px;
+        }
+
+        .dashboard-manual-task-form .modal-form-row {
+            margin-bottom: 12px;
+        }
+
+        .dashboard-manual-task-form .modal-form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-600);
+            margin-bottom: 4px;
+        }
+
+        .dashboard-manual-task-form .modal-form-control {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .dashboard-manual-task-textarea {
+            resize: vertical;
+            min-height: 72px;
+        }
+
+        .dashboard-manual-task-form .modal-form-row--2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .dashboard-manual-task-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 20px 16px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        /* 프로젝트 기본정보: 일정/상태 카드 — 캘린더 표시 토글 */
+        .basic-info-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .basic-info-card-head .basic-info-card-title {
+            margin-bottom: 0;
+        }
+
+        .basic-info-calendar-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--gray-700);
+            cursor: pointer;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .basic-info-calendar-toggle input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .basic-info-calendar-toggle input:disabled {
+            cursor: default;
+            opacity: 0.85;
         }
 
 

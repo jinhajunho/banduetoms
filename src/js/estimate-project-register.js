@@ -48,6 +48,7 @@ export function createProjectRegister(api) {
             aggregateTransferGross: 0,
             salesDates: [],
             purchaseTaxIssued: false,
+            showOnDashboardCalendar: true,
         });
 
         api.renderPanelContent(api.getCurrentEditItem());
