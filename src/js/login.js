@@ -17,10 +17,7 @@ function virtualEmail(userId) {
 async function fetchProfileStatus(displayUserId) {
     const uid = String(displayUserId || '').trim();
     if (!uid) return { ok: false, error: 'empty' };
-    const u =
-        window.location.origin +
-        '/api/auth/profile-status?displayUserId=' +
-        encodeURIComponent(uid);
+    const u = window.location.origin + '/api/auth?displayUserId=' + encodeURIComponent(uid);
     const r = await fetch(u);
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return { ok: false, status: r.status, error: j.error || r.statusText };
@@ -28,7 +25,7 @@ async function fetchProfileStatus(displayUserId) {
 }
 
 async function postSetPassword(displayUserId, password) {
-    const r = await fetch(window.location.origin + '/api/auth/set-password', {
+    const r = await fetch(window.location.origin + '/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayUserId, password }),

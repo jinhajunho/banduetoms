@@ -8600,7 +8600,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.resolve(false);
             }
-            return bpsAdminApi('/api/admin/list-users', {}).then(function (r) {
+            return bpsAdminApi('/api/admin', { action: 'list-users' }).then(function (r) {
                 if (!r.ok || !r.body || !Array.isArray(r.body.users)) return false;
                 const localNameMap = {};
                 userAccounts.forEach(function (u) {
@@ -8647,7 +8647,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
 
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
-                bpsAdminApi('/api/admin/update-profile', {
+                bpsAdminApi('/api/admin', {
+                    action: 'update-profile',
                     displayUserId: String(userId || '').trim().toLowerCase(),
                     active: nextActive,
                 })
@@ -8939,8 +8940,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                         extraAllowedPages: cleanedExtra,
                     };
                     var req = creating
-                        ? bpsAdminApi('/api/admin/create-user', payloadCreate)
-                        : bpsAdminApi('/api/admin/update-profile', payloadUpdate);
+                        ? bpsAdminApi('/api/admin', { action: 'create-user', ...payloadCreate })
+                        : bpsAdminApi('/api/admin', { action: 'update-profile', ...payloadUpdate });
                     req.then(function (r) {
                         if (!r.ok) {
                             var errMsg = (r.body && r.body.error) ? r.body.error : '저장에 실패했습니다.';
@@ -9017,13 +9018,13 @@ import { createProjectRegister } from './estimate-project-register.js';
                             return;
                         }
                         var token = sessionData.session.access_token;
-                        var res = await fetch(window.location.origin + '/api/admin/reset-password', {
+                        var res = await fetch(window.location.origin + '/api/admin', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 Authorization: 'Bearer ' + token,
                             },
-                            body: JSON.stringify({ displayUserId: uid.toLowerCase() }),
+                            body: JSON.stringify({ action: 'reset-password', displayUserId: uid.toLowerCase() }),
                         });
                         var j = await res.json().catch(function () {
                             return {};
