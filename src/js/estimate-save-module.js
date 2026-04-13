@@ -165,7 +165,7 @@ export async function saveEstimateChanges(api) {
 
         api.setIsEditMode(false);
         api.renderPanelContent(api.getCurrentEditItem());
-        api.renderTable();
+        api.renderTable({ preservePage: true });
 
         api.setIsPanelDirty(false);
         api.showToast('저장되었습니다.');

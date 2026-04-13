@@ -78,26 +78,26 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (pageName === 'dashboard') renderDashboard();
             if (pageName === 'estimate') {
                 applyEstimatePageRoleLabels();
-                renderTable();
+                renderTable({ preservePage: true });
             }
             if (pageName === 'performance') renderPerformanceData();
             if (pageName === 'weekly') renderWeeklyReport();
             if (pageName === 'expenses') {
                 fillExpenseMonthFilter();
-                renderExpenseTable();
+                renderExpenseTable({ preservePage: true });
                 if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                     syncExpensesFromServer();
                 }
             }
             if (pageName === 'sga') {
                 fillSgaMonthFilter();
-                renderSgaTable();
+                renderSgaTable({ preservePage: true });
                 if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                     syncSgaFromServer();
                 }
             }
             if (pageName === 'contractors') {
-                renderContractorTable();
+                renderContractorTable({ preservePage: true });
                 if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                     syncContractorsFromServer();
                 }
@@ -729,7 +729,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 estimates.splice(0, estimates.length, ...list);
                 const estPage = document.getElementById('page-estimate');
                 if (estPage && estPage.classList.contains('active')) {
-                    renderTable();
+                    renderTable({ preservePage: true });
                 }
                 // 첫 진입 시 showPage('dashboard')가 서버 동기화보다 먼저 돌아 캘린더가 비는 문제 방지
                 const dashPage = document.getElementById('page-dashboard');
@@ -816,7 +816,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     expenses.splice(0, expenses.length, ...list);
                     expenseSyncLastSuccessAt = Date.now();
                     fillExpenseMonthFilter();
-                    renderExpenseTable();
+                    renderExpenseTable({ preservePage: true });
                     return true;
                 })
                 .catch(function () {
@@ -1368,7 +1368,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 });
                 sgaExpenses.splice(0, sgaExpenses.length, ...list);
                 fillSgaMonthFilter();
-                renderSgaTable();
+                renderSgaTable({ preservePage: true });
                 renderPerformanceData();
                 return true;
             }).catch(function () {
@@ -1439,7 +1439,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     return { ...x };
                 });
                 contractors.splice(0, contractors.length, ...list);
-                renderContractorTable();
+                renderContractorTable({ preservePage: true });
                 return true;
             }).catch(function () {
                 return false;
@@ -1530,7 +1530,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             const idx = estimates.findIndex(function (e) { return String(e.code || '') === code; });
             if (idx !== -1) estimates.splice(idx, 1);
             closePanel(true);
-            renderTable();
+            renderTable({ preservePage: true });
             showToast('견적이 삭제되었습니다.');
         }
 
@@ -3784,7 +3784,7 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             function finish() {
                 closeContractorPanel();
-                renderContractorTable();
+                renderContractorTable({ preservePage: true });
             }
 
             if (contractorEditingId) {
@@ -3952,7 +3952,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     return;
                 }
                 contractors = contractors.filter(c => c.id !== id);
-                renderContractorTable();
+                renderContractorTable({ preservePage: true });
                 closeContractorPanel();
                 alert('삭제되었습니다.');
             });
@@ -4234,19 +4234,19 @@ import { createProjectRegister } from './estimate-project-register.js';
         // 업체정보 페이지 표시 시 테이블 렌더링
         window.addEventListener('hashchange', function() {
             if (window.location.hash === '#contractors') {
-                renderContractorTable();
+                renderContractorTable({ preservePage: true });
                 if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                     syncContractorsFromServer();
                 }
             } else if (window.location.hash === '#expenses') {
                 fillExpenseMonthFilter();
-                renderExpenseTable();
+                renderExpenseTable({ preservePage: true });
                 if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                     syncExpensesFromServer();
                 }
             } else if (window.location.hash === '#sga') {
                 fillSgaMonthFilter();
-                renderSgaTable();
+                renderSgaTable({ preservePage: true });
                 if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                     syncSgaFromServer();
                 }
@@ -4502,7 +4502,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             function afterSave() {
                 closeSgaPanel();
                 fillSgaMonthFilter();
-                renderSgaTable();
+                renderSgaTable({ preservePage: true });
                 renderPerformanceData();
             }
 
@@ -4584,7 +4584,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     return row.id !== id;
                 });
                 fillSgaMonthFilter();
-                renderSgaTable();
+                renderSgaTable({ preservePage: true });
                 renderPerformanceData();
                 closeSgaPanel();
                 alert('삭제되었습니다.');
@@ -4889,7 +4889,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     }
                     closeExpensePanel();
                     fillExpenseMonthFilter();
-                    renderExpenseTable();
+                    renderExpenseTable({ preservePage: true });
                 }
                 finishSave().catch(function (e) {
                     alert((e && e.message) || '경비 저장 중 오류가 발생했습니다.');
@@ -4966,7 +4966,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     return;
                 }
                 expenses = expenses.filter(e => e.id !== id);
-                renderExpenseTable();
+                renderExpenseTable({ preservePage: true });
                 closeExpensePanel();
                 alert('삭제되었습니다.');
             });
@@ -8733,7 +8733,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     applyRoleBasedNavigation();
                 }
                 renderUsersTable();
-                renderTable();
+                renderTable({ preservePage: true });
                 persistUserAccounts();
                 showToast('계정 설정이 저장되었습니다.');
                 isCreatingAccount = false;
@@ -8841,7 +8841,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 applyRoleBasedNavigation();
             }
             renderUsersTable();
-            renderTable();
+            renderTable({ preservePage: true });
             persistUserAccounts();
             showToast('계정 설정이 저장되었습니다.');
             isCreatingAccount = false;
@@ -10492,7 +10492,7 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             basicInfoEditMode = false;
             renderPanelContent(currentEditItem);
-            renderTable();
+            renderTable({ preservePage: true });
             showToast('기본정보가 저장되었습니다.');
         }
 
@@ -10530,7 +10530,7 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             businessInfoEditMode = false;
             renderPanelContent(currentEditItem);
-            renderTable();
+            renderTable({ preservePage: true });
             showToast('사업소득이 저장되었습니다.');
         }
 
@@ -10763,7 +10763,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
             if (item) {
                 item.status = newStatus;
-                renderTable();
+                renderTable({ preservePage: true });
                 // 경영실적·대시보드 등 다른 탭도 즉시 반영
                 try {
                     persistEstimateToServerByCode(c);
