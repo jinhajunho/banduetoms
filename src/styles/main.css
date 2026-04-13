@@ -2193,6 +2193,12 @@
             width: 100%;
         }
 
+        .dashboard-manual-task-header-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .dashboard-manual-task-form {
             padding: 0 20px 8px;
         }

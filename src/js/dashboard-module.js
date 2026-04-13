@@ -578,75 +578,18 @@ export function createDashboard(api) {
         if (!modal || !body) return;
 
         if (event && event._isManualTask) {
-            const st = event.status === '완료' ? 'completed' : 'progress';
-            const taskId = String(event.id || '').trim();
-            body.innerHTML =
-                '<div class="modal-info"><div class="info-label">상태</div><div class="info-value"><span class="status-badge ' + st + '">' +
-                escHtmlText(event.status || '-') +
-                '</span></div></div>' +
-                '<div class="modal-info"><div class="info-label">작업제목</div><div class="info-value">' +
-                escHtmlText(event.project || '-') +
-                '</div></div>' +
-                '<div class="modal-info"><div class="info-label">작업내용</div><div class="info-value" style="white-space:pre-wrap;">' +
-                escHtmlText(event._taskBody || '-') +
-                '</div></div>' +
-                '<div class="modal-info"><div class="info-label">담당자</div><div class="info-value">' +
-                escHtmlText(event.manager || '-') +
-                '</div></div>' +
-                '<div class="modal-info"><div class="info-label">진행일</div><div class="info-value">' +
-                escHtmlText(event.startDate || '-') +
-                '</div></div>' +
-                '<div class="modal-info"><div class="info-label">완료일</div><div class="info-value">' +
-                escHtmlText(event.endDate || '-') +
-                '</div></div>' +
-                '<div class="dashboard-event-modal-actions">' +
-                '<button type="button" class="btn btn-secondary btn-sm" id="dashboardManualTaskEditBtn">수정</button>' +
-                '<button type="button" class="btn btn-danger btn-sm" id="dashboardManualTaskDeleteBtn">삭제</button>' +
-                '</div>';
-            modal.classList.add('active');
-            const editBtn = body.querySelector('#dashboardManualTaskEditBtn');
-            if (editBtn) {
-                editBtn.onclick = function () {
-                    closeDashboardEventModal();
-                    openDashboardManualTaskModal({
-                        id: taskId,
-                        status: event.status || '진행',
-                        title: event.project || '',
-                        body: event._taskBody || '',
-                        assignee: event.manager || '',
-                        startDate: event.startDate || '',
-                        endDate: event.endDate || '',
-                    });
-                };
-            }
-            const deleteBtn = body.querySelector('#dashboardManualTaskDeleteBtn');
-            if (deleteBtn) {
-                deleteBtn.onclick = function () {
-                    if (!taskId) return;
-                    if (!confirm('이 캘린더 일정을 삭제하시겠습니까?')) return;
-                    if (typeof api.deleteManualCalendarTask !== 'function') return;
-                    api.deleteManualCalendarTask(taskId).then(function (r) {
-                        if (!r || !r.ok) {
-                            alert((r && r.error) || '삭제에 실패했습니다.');
-                            return;
-                        }
-                        closeDashboardEventModal();
-                        const sync = api.syncManualCalendarTasks;
-                        if (typeof sync === 'function') {
-                            const sp = sync();
-                            if (sp && typeof sp.then === 'function') {
-                                sp.then(function () {
-                                    renderDashboardCalendar();
-                                });
-                            } else {
-                                renderDashboardCalendar();
-                            }
-                        } else {
-                            renderDashboardCalendar();
-                        }
-                    });
-                };
-            }
+            openDashboardManualTaskModal(
+                {
+                    id: String(event.id || '').trim(),
+                    status: event.status || '진행',
+                    title: event.project || '',
+                    body: event._taskBody || '',
+                    assignee: event.manager || '',
+                    startDate: event.startDate || '',
+                    endDate: event.endDate || '',
+                },
+                { viewMode: true }
+            );
             return;
         }
 
@@ -796,11 +739,45 @@ export function createDashboard(api) {
         }
     }
 
-    function openDashboardManualTaskModal(task) {
+    function applyManualTaskModalMode(mode) {
+        const isView = mode === 'view';
+        const hasExisting = !!currentManualTaskEditingId;
+        const titleEl = document.getElementById('dashboardManualTaskModalTitle');
+        const editBtn = document.getElementById('dashboardManualTaskModalEdit');
+        const cancelBtn = document.getElementById('dashboardManualTaskModalCancel');
+        const deleteBtn = document.getElementById('dashboardManualTaskModalDelete');
+        const saveBtn = document.getElementById('dashboardManualTaskModalSave');
+        const controls = [
+            document.getElementById('dashboardManualTaskStatus'),
+            document.getElementById('dashboardManualTaskTitle'),
+            document.getElementById('dashboardManualTaskBody'),
+            document.getElementById('dashboardManualTaskAssignee'),
+            document.getElementById('dashboardManualTaskStart'),
+            document.getElementById('dashboardManualTaskEnd'),
+        ];
+
+        controls.forEach(function (el) {
+            if (!el) return;
+            if (isView) el.setAttribute('disabled', 'disabled');
+            else el.removeAttribute('disabled');
+        });
+
+        if (titleEl) {
+            if (!hasExisting) titleEl.textContent = '캘린더 일정 등록';
+            else titleEl.textContent = isView ? '캘린더 일정 상세' : '캘린더 일정 수정';
+        }
+        if (editBtn) editBtn.style.display = hasExisting && isView ? '' : 'none';
+        if (cancelBtn) cancelBtn.textContent = isView ? '닫기' : '취소';
+        if (deleteBtn) deleteBtn.style.display = hasExisting && !isView ? '' : 'none';
+        if (saveBtn) {
+            saveBtn.style.display = isView ? 'none' : '';
+            saveBtn.textContent = hasExisting ? '저장' : '저장';
+        }
+    }
+
+    function openDashboardManualTaskModal(task, options) {
         const modal = document.getElementById('dashboardManualTaskModal');
         if (!modal) return;
-        const titleEl = modal.querySelector('.modal-title');
-        const saveBtn = document.getElementById('dashboardManualTaskModalSave');
         const st = document.getElementById('dashboardManualTaskStatus');
         const title = document.getElementById('dashboardManualTaskTitle');
         const bodyEl = document.getElementById('dashboardManualTaskBody');
@@ -809,14 +786,14 @@ export function createDashboard(api) {
         const ed = document.getElementById('dashboardManualTaskEnd');
         const isEdit = !!(task && task.id);
         currentManualTaskEditingId = isEdit ? String(task.id).trim() : '';
-        if (titleEl) titleEl.textContent = isEdit ? '캘린더 일정 수정' : '캘린더 일정 등록';
-        if (saveBtn) saveBtn.textContent = isEdit ? '수정' : '저장';
         if (st) st.value = (task && task.status) || '진행';
         if (title) title.value = (task && task.title) || '';
         if (bodyEl) bodyEl.value = (task && task.body) || '';
         if (asg) asg.value = (task && task.assignee) || '';
         if (sd) sd.value = (task && task.startDate) || '';
         if (ed) ed.value = (task && task.endDate) || '';
+        const viewMode = !!(options && options.viewMode && isEdit);
+        applyManualTaskModalMode(viewMode ? 'view' : (isEdit ? 'edit' : 'new'));
         modal.classList.add('active');
     }
 
@@ -824,6 +801,33 @@ export function createDashboard(api) {
         const modal = document.getElementById('dashboardManualTaskModal');
         if (modal) modal.classList.remove('active');
         currentManualTaskEditingId = '';
+    }
+
+    function deleteDashboardManualTask() {
+        const taskId = String(currentManualTaskEditingId || '').trim();
+        if (!taskId) return;
+        if (!confirm('이 캘린더 일정을 삭제하시겠습니까?')) return;
+        if (typeof api.deleteManualCalendarTask !== 'function') return;
+        api.deleteManualCalendarTask(taskId).then(function (r) {
+            if (!r || !r.ok) {
+                alert((r && r.error) || '삭제에 실패했습니다.');
+                return;
+            }
+            closeDashboardManualTaskModal();
+            const sync = api.syncManualCalendarTasks;
+            if (typeof sync === 'function') {
+                const sp = sync();
+                if (sp && typeof sp.then === 'function') {
+                    sp.then(function () {
+                        renderDashboardCalendar();
+                    });
+                } else {
+                    renderDashboardCalendar();
+                }
+            } else {
+                renderDashboardCalendar();
+            }
+        });
     }
 
     function submitDashboardManualTask() {
@@ -924,10 +928,14 @@ export function createDashboard(api) {
                 };
             }
             const manClose = document.getElementById('dashboardManualTaskModalClose');
+            const manEdit = document.getElementById('dashboardManualTaskModalEdit');
             const manCancel = document.getElementById('dashboardManualTaskModalCancel');
+            const manDelete = document.getElementById('dashboardManualTaskModalDelete');
             const manSave = document.getElementById('dashboardManualTaskModalSave');
             if (manClose) manClose.onclick = closeDashboardManualTaskModal;
+            if (manEdit) manEdit.onclick = function () { applyManualTaskModalMode('edit'); };
             if (manCancel) manCancel.onclick = closeDashboardManualTaskModal;
+            if (manDelete) manDelete.onclick = deleteDashboardManualTask;
             if (manSave) manSave.onclick = submitDashboardManualTask;
         }
 
