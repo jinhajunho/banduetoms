@@ -2797,10 +2797,21 @@ import { createProjectRegister } from './estimate-project-register.js';
             renderContractorTable({ preservePage: true });
         }
 
-        document.addEventListener('input', function (e) {
-            if (e.target && e.target.id === 'contractorListSearch') {
-                contractorListPage = 1;
-                renderContractorTable({ preservePage: true });
+        function runContractorListSearch() {
+            contractorListPage = 1;
+            renderContractorTable({ preservePage: true });
+        }
+
+        document.addEventListener('click', function (e) {
+            if (e.target && e.target.id === 'contractorListSearchBtn') {
+                runContractorListSearch();
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.target && e.target.id === 'contractorListSearch' && e.key === 'Enter') {
+                e.preventDefault();
+                runContractorListSearch();
             }
         });
 

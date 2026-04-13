@@ -717,7 +717,7 @@
             text-align: center !important;
         }
 
-        /* 업체 목록: 검색은 표 상단 맨 우측 */
+        /* 업체 목록: 검색 입력 + 버튼 묶음을 표 상단 맨 우측 */
         #page-contractors .contractor-list-search-wrap {
             display: flex;
             justify-content: flex-end;
@@ -726,9 +726,22 @@
             box-sizing: border-box;
         }
 
+        #page-contractors .contractor-list-search-inner {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+            max-width: min(100%, 480px);
+            flex: 0 1 480px;
+        }
+
         #page-contractors .contractor-list-search-input {
-            max-width: min(100%, 400px);
-            flex: 0 1 400px;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        #page-contractors .contractor-list-search-btn {
+            flex-shrink: 0;
+            white-space: nowrap;
         }
 
         /* 판관비관리: 기본은 중앙, 메모(5열)만 좌정렬 */
