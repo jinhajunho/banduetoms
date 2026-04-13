@@ -3,8 +3,10 @@
                 </div>
 
                 <div class="admin-settings-tabs">
-                    <button type="button" id="adminTabBtnAccount" class="admin-settings-tab active" onclick="switchAdminSettingsTab('account')">계정</button>
-                    <button type="button" id="adminTabBtnFilterValues" class="admin-settings-tab" onclick="switchAdminSettingsTab('filter-values')">필터값</button>
+                    <div class="admin-settings-tabs-left">
+                        <button type="button" id="adminTabBtnAccount" class="admin-settings-tab active" onclick="switchAdminSettingsTab('account')">계정</button>
+                        <button type="button" id="adminTabBtnFilterValues" class="admin-settings-tab" onclick="switchAdminSettingsTab('filter-values')">필터값</button>
+                    </div>
                     <div class="admin-settings-tabs-spacer"></div>
                     <button id="adminAddAccountBtn" class="btn btn-primary" onclick="openAddUserModal()">
                         <i class="fas fa-plus"></i>

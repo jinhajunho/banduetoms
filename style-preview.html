@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Style Preview</title>
+    <script type="module">
+        import '/src/styles/main.css';
+    </script>
+    <style>
+        .preview-wrap {
+            max-width: 1200px;
+            margin: 24px auto 40px;
+            padding: 0 16px;
+        }
+        .preview-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        .preview-card {
+            background: #fff;
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .preview-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .preview-muted {
+            color: var(--gray-500);
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .demo-sidebar {
+            position: relative;
+            width: 260px;
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            overflow: hidden;
+            background: #fff;
+        }
+        .demo-sidebar .nav-menu {
+            padding-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="preview-wrap">
+        <div class="preview-title">
+            <h1 class="page-title">비주얼 프리뷰</h1>
+            <button class="btn btn-secondary btn-sm" id="toggleDark">다크모드 토글</button>
+        </div>
+
+        <div class="preview-grid">
+            <section class="preview-card">
+                <h3 class="card-title">사이드바 토글/네비</h3>
+                <div class="demo-sidebar">
+                    <div class="logo"><span class="logo-text">반듯한시공</span></div>
+                    <button class="sidebar-toggle" type="button"><i class="fas fa-chevron-left"></i></button>
+                    <div class="nav-menu">
+                        <div class="nav-item active"><i class="fas fa-home"></i><span>대시보드</span></div>
+                        <div class="nav-item"><i class="fas fa-folder"></i><span>프로젝트관리</span></div>
+                        <div class="nav-item"><i class="fas fa-wallet"></i><span>경비지출관리</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="preview-card">
+                <h3 class="card-title">탭 스타일</h3>
+                <div class="tabs">
+                    <div class="tabs-left">
+                        <button class="tab active" type="button">전체</button>
+                        <button class="tab" type="button">진행</button>
+                        <button class="tab" type="button">완료</button>
+                    </div>
+                </div>
+                <div class="new-estimate-tabs">
+                    <button class="new-estimate-tab active" type="button"><span>기본정보</span></button>
+                    <button class="new-estimate-tab" type="button"><span>매출정보</span></button>
+                    <button class="new-estimate-tab" type="button"><span>매입정보</span></button>
+                </div>
+            </section>
+
+            <section class="preview-card">
+                <h3 class="card-title">테이블 섹션/버튼</h3>
+                <div class="table-section">
+                    <table>
+                        <thead>
+                            <tr><th>번호</th><th>업체명</th><th>전화번호</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1</td><td>도급사1</td><td>010-1111-1111</td></tr>
+                            <tr><td>2</td><td>도급사2</td><td>010-2222-2222</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="preview-row" style="margin-top:12px;">
+                    <button class="btn btn-primary btn-sm" type="button">저장</button>
+                    <button class="btn btn-secondary btn-sm" type="button">취소</button>
+                    <button class="btn btn-danger btn-sm" type="button">삭제</button>
+                </div>
+            </section>
+
+            <section class="preview-card">
+                <h3 class="card-title">모달/패널 느낌</h3>
+                <div class="modal event-modal active" style="position: static; background: rgba(17,24,39,0.12);">
+                    <div class="modal-content" style="max-width: 560px;">
+                        <div class="modal-header">
+                            <div class="modal-title">샘플 모달</div>
+                            <button type="button" class="modal-close">&times;</button>
+                        </div>
+                        <div class="preview-row">
+                            <span class="badge badge-progress">진행</span>
+                            <span class="badge badge-complete">완료</span>
+                            <span class="badge badge-hold">보류</span>
+                        </div>
+                        <p class="preview-muted">현재 메인 CSS 적용 상태만 확인하는 샘플 페이지입니다.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('toggleDark')?.addEventListener('click', function () {
+            document.body.classList.toggle('dark-mode');
+        });
+    </script>
+</body>
+</html>
+
