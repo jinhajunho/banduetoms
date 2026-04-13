@@ -710,6 +710,15 @@
         /* 미수금/업체정보관리/경비지출관리/판관비관리: 헤더/값 중앙정렬 */
         #page-unpaid table thead th,
         #page-unpaid table tbody td,
+        #page-contractors .contractor-list-search-wrap {
+            margin-bottom: 12px;
+            max-width: min(100%, 400px);
+        }
+
+        #page-contractors .contractor-list-search-input {
+            max-width: 100%;
+        }
+
         #page-contractors table thead th,
         #page-contractors table tbody td,
         #page-expenses table thead th,

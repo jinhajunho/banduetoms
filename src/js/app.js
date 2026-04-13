@@ -2797,6 +2797,13 @@ import { createProjectRegister } from './estimate-project-register.js';
             renderContractorTable({ preservePage: true });
         }
 
+        document.addEventListener('input', function (e) {
+            if (e.target && e.target.id === 'contractorListSearch') {
+                contractorListPage = 1;
+                renderContractorTable({ preservePage: true });
+            }
+        });
+
         function goExpenseListPage(p) {
             if (p < 1) return;
             expenseListPage = p;
@@ -3234,24 +3241,66 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        function getContractorListSearchQuery() {
+            const el = document.getElementById('contractorListSearch');
+            return el && el.value ? String(el.value).trim().toLowerCase() : '';
+        }
+
+        function filterContractorsBySearchQuery(list, q) {
+            if (!q) return list.slice();
+            return list.filter(function (c) {
+                const name = (c && c.name != null ? String(c.name) : '').toLowerCase();
+                const phoneRaw = c && c.phone != null ? String(c.phone) : '';
+                const phone = phoneRaw.toLowerCase();
+                const digits = phoneRaw.replace(/\D/g, '');
+                const qDigits = q.replace(/\D/g, '');
+                if (name.indexOf(q) !== -1) return true;
+                if (phone.indexOf(q) !== -1) return true;
+                if (qDigits && digits.indexOf(qDigits) !== -1) return true;
+                return false;
+            });
+        }
+
         // 테이블 렌더링
         function renderContractorTable(options) {
             const preservePage = options && options.preservePage === true;
             if (!preservePage) contractorListPage = 1;
             const tbody = document.getElementById('contractorTableBody');
             const sorted = sortContractorsByRegisterDateDesc(contractors);
-            const totalItems = sorted.length;
+            const filtered = filterContractorsBySearchQuery(sorted, getContractorListSearchQuery());
+            const totalItems = filtered.length;
             const totalPages = Math.max(1, Math.ceil(totalItems / ESTIMATE_PAGE_SIZE));
             if (contractorListPage > totalPages) contractorListPage = totalPages;
             if (contractorListPage < 1) contractorListPage = 1;
             const sliceStart = (contractorListPage - 1) * ESTIMATE_PAGE_SIZE;
-            const pageRows = sorted.slice(sliceStart, sliceStart + ESTIMATE_PAGE_SIZE);
+            const pageRows = filtered.slice(sliceStart, sliceStart + ESTIMATE_PAGE_SIZE);
 
-            if (sorted.length === 0) {
+            if (contractors.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">
                             등록된 업체가 없습니다
+                        </td>
+                    </tr>
+                `;
+                updateGenericListPagination(
+                    'contractorTablePagination',
+                    'contractorPaginationInfo',
+                    'contractorPaginationControls',
+                    0,
+                    1,
+                    1,
+                    ESTIMATE_PAGE_SIZE,
+                    'goContractorPage'
+                );
+                return;
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 40px; color: var(--gray-500);">
+                            검색 결과가 없습니다
                         </td>
                     </tr>
                 `;
