@@ -981,79 +981,147 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        /** 서버(api/storage)와 동일한 기본 버킷명 — index-bootstrap / login 에서 window 로 주입 */
+        function getBpsExpenseReceiptsBucketName() {
+            var b = typeof window !== 'undefined' ? window.__bpsExpenseReceiptsBucket : '';
+            return b && String(b).trim() ? String(b).trim() : 'expense-receipts';
+        }
+
+        function bpsSanitizeStorageFileName(name) {
+            var raw = String(name || 'file').replace(/[/\\]/g, '_');
+            var parts = raw.split(/[/\\]/);
+            var base = parts.pop() || 'file';
+            var cleaned = base.replace(/[^\w.\-가-힣()+\s]/g, '_').replace(/\s+/g, '_');
+            var limited = cleaned.length > 120 ? cleaned.slice(-120) : cleaned;
+            return limited || 'file';
+        }
+
+        var BPS_CONTRACTOR_UPLOAD_MIME_ALLOWED = {
+            'image/jpeg': true,
+            'image/png': true,
+            'image/gif': true,
+            'image/webp': true,
+            'application/pdf': true,
+        };
+
+        function bpsNormalizeClientDeclaredMime(declared) {
+            var d = (declared && String(declared).trim()) || '';
+            if (!d) return '';
+            var lower = d.toLowerCase();
+            var map = {
+                'image/jpg': 'image/jpeg',
+                'image/pjpeg': 'image/jpeg',
+                'image/x-citrix-jpeg': 'image/jpeg',
+                'image/x-png': 'image/png',
+            };
+            return map[lower] || lower;
+        }
+
+        function bpsSniffMimeFromUint8(u) {
+            if (!u || u.length < 4) return null;
+            if (u[0] === 0xff && u[1] === 0xd8 && u[2] === 0xff) return 'image/jpeg';
+            if (u[0] === 0x89 && u[1] === 0x50 && u[2] === 0x4e && u[3] === 0x47) return 'image/png';
+            if (u[0] === 0x47 && u[1] === 0x49 && u[2] === 0x46 && u[3] === 0x38) return 'image/gif';
+            if (u.length >= 12) {
+                var head = '';
+                var i;
+                for (i = 0; i < 4 && i < u.length; i++) head += String.fromCharCode(u[i]);
+                var webp = '';
+                for (i = 8; i < 12 && i < u.length; i++) webp += String.fromCharCode(u[i]);
+                if (head === 'RIFF' && webp === 'WEBP') return 'image/webp';
+            }
+            if (u[0] === 0x25 && u[1] === 0x50 && u[2] === 0x44 && u[3] === 0x46) return 'application/pdf';
+            return null;
+        }
+
+        function bpsResolveClientContractorFileMime(file) {
+            var declared = bpsNormalizeClientDeclaredMime(file && file.type);
+            if (declared && BPS_CONTRACTOR_UPLOAD_MIME_ALLOWED[declared]) {
+                return Promise.resolve(declared);
+            }
+            return file
+                .slice(0, 64)
+                .arrayBuffer()
+                .then(function (ab) {
+                    var sniffed = bpsSniffMimeFromUint8(new Uint8Array(ab));
+                    if (sniffed && BPS_CONTRACTOR_UPLOAD_MIME_ALLOWED[sniffed]) return sniffed;
+                    var n = (file && file.name && String(file.name).toLowerCase()) || '';
+                    if (n.endsWith('.pdf')) return 'application/pdf';
+                    return null;
+                });
+        }
+
+        /**
+         * 업체 첨부: Supabase Storage에 브라우저에서 직접 업로드 (Vercel 함수 본문 4.5MB 제한 회피).
+         * Storage RLS로 authenticated 사용자가 contractors/ 경로에 insert·update 할 수 있어야 합니다.
+         */
+        function uploadContractorFileDirectToStorage(contractorId, slot, file) {
+            if (!window.__bpsSupabase || !window.__bpsSupabase.storage) {
+                return Promise.reject(new Error('Storage를 사용할 수 없습니다.'));
+            }
+            var cid = Number(contractorId);
+            if (!Number.isFinite(cid) || cid < 1) {
+                return Promise.reject(new Error('업체 id가 올바르지 않습니다.'));
+            }
+            var sl = slot === 'bank' ? 'bank' : 'license';
+            var safeName = bpsSanitizeStorageFileName(file && file.name);
+            var objectPath = 'contractors/' + cid + '/' + sl + '/' + Date.now() + '_' + safeName;
+            var bucket = getBpsExpenseReceiptsBucketName();
+
+            return bpsResolveClientContractorFileMime(file).then(function (mime) {
+                if (!mime) {
+                    return Promise.reject(
+                        new Error('지원 형식: JPG, PNG, GIF, WEBP, PDF (파일 종류를 확인해 주세요)')
+                    );
+                }
+                return window.__bpsSupabase.storage
+                    .from(bucket)
+                    .upload(objectPath, file, {
+                        contentType: mime,
+                        upsert: true,
+                    })
+                    .then(function (res) {
+                        var err = res.error;
+                        var data = res.data;
+                        if (err) {
+                            var msg = err.message || 'Storage 업로드 실패';
+                            if (/row-level security|rls|policy|permission denied|not authorized/i.test(msg)) {
+                                msg +=
+                                    ' Supabase Storage에 contractors/ 경로 업로드 정책(authenticated INSERT·UPDATE)을 추가해 주세요. scripts/sql/storage_contractors_client_upload.sql 참고.';
+                            }
+                            return Promise.reject(new Error(msg));
+                        }
+                        if (!data || !data.path) {
+                            return Promise.reject(new Error('Storage 업로드 응답이 올바르지 않습니다.'));
+                        }
+                        return {
+                            storagePath: data.path,
+                            name: file && file.name ? String(file.name) : safeName,
+                            mimeType: mime,
+                        };
+                    });
+            });
+        }
+
         function uploadContractorFileToStorage(contractorId, slot, file) {
             return window.__bpsSupabase.auth.getSession().then(function (res) {
                 if (res.error || !res.data || !res.data.session) {
                     return Promise.reject(new Error('로그인이 필요합니다.'));
                 }
-                var fd = new FormData();
-                fd.append('contractorId', String(contractorId));
-                fd.append('slot', slot === 'bank' ? 'bank' : 'license');
-                fd.append('file', file);
-                return fetch(window.location.origin + '/api/storage', {
-                    method: 'POST',
-                    headers: { Authorization: 'Bearer ' + res.data.session.access_token },
-                    body: fd,
-                }).then(function (r) {
-                    return r.text().then(function (text) {
-                        var j = bpsParseStorageUploadResponse(text, r.status);
-                        return { ok: r.ok, status: r.status, body: j };
-                    });
-                });
-            }).then(function (r) {
-                if (!r.ok || !r.body || r.body.ok !== true) {
-                    var msg = (r.body && r.body.error) || '파일 업로드 실패';
-                    return Promise.reject(new Error(msg));
-                }
-                return {
-                    storagePath: r.body.path,
-                    name: r.body.name || (file && file.name) || '첨부',
-                    mimeType: r.body.mimeType || (file && file.type) || 'application/octet-stream',
-                };
+                return uploadContractorFileDirectToStorage(contractorId, slot, file);
             });
         }
 
-        function uploadContractorFileToStorageWithToken(contractorId, slot, file, accessToken) {
-            if (!accessToken) return Promise.reject(new Error('로그인이 필요합니다.'));
-            var fd = new FormData();
-            fd.append('contractorId', String(contractorId));
-            fd.append('slot', slot === 'bank' ? 'bank' : 'license');
-            fd.append('file', file);
-            return fetch(window.location.origin + '/api/storage', {
-                method: 'POST',
-                headers: { Authorization: 'Bearer ' + accessToken },
-                body: fd,
-            })
-                .then(function (r) {
-                    return r.text().then(function (text) {
-                        var j = bpsParseStorageUploadResponse(text, r.status);
-                        return { ok: r.ok, status: r.status, body: j };
-                    });
-                })
-                .then(function (r) {
-                    if (!r.ok || !r.body || r.body.ok !== true) {
-                        var msg = (r.body && r.body.error) || '파일 업로드 실패';
-                        return Promise.reject(new Error(msg));
-                    }
-                    return {
-                        storagePath: r.body.path,
-                        name: r.body.name || (file && file.name) || '첨부',
-                        mimeType: r.body.mimeType || (file && file.type) || 'application/octet-stream',
-                    };
-                });
+        function uploadContractorFileToStorageWithToken(contractorId, slot, file, _accessToken) {
+            return uploadContractorFileDirectToStorage(contractorId, slot, file);
         }
 
-        function uploadContractorFilesToStorage(contractorId, slot, files, accessToken) {
+        function uploadContractorFilesToStorage(contractorId, slot, files) {
             var list = Array.isArray(files) ? files : [];
             if (!list.length) return Promise.resolve([]);
             return Promise.all(
                 list.map(function (f) {
-                    return uploadContractorFileToStorageWithToken(
-                        contractorId,
-                        slot,
-                        f,
-                        accessToken
-                    );
+                    return uploadContractorFileDirectToStorage(contractorId, slot, f);
                 })
             );
         }
@@ -3611,7 +3679,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('contractorDetailSlidePanel').classList.remove('active');
         }
 
-        // 저장 (첨부는 Supabase Storage — /api/storage 업로드)
+        // 저장 (업체 첨부는 브라우저 → Supabase Storage 직접 업로드, DB만 /api/contractor)
         function saveContractor() {
             const name = document.getElementById('contractorName').value.trim();
             const phone = document.getElementById('contractorPhone').value.trim();
@@ -3627,15 +3695,6 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return;
             }
 
-            function getAccessTokenOnce() {
-                return window.__bpsSupabase.auth.getSession().then(function (res) {
-                    if (res.error || !res.data || !res.data.session) {
-                        return Promise.reject(new Error('로그인이 필요합니다.'));
-                    }
-                    return res.data.session.access_token;
-                });
-            }
-
             function finish() {
                 closeContractorPanel();
                 renderContractorTable();
@@ -3648,13 +3707,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (index === -1) return;
                 const prev = contractors[index];
                 const cid = prev.id;
-                getAccessTokenOnce()
-                    .then(function (tok) {
-                        return Promise.all([
-                            uploadContractorFilesToStorage(cid, 'license', licenseFiles, tok),
-                            uploadContractorFilesToStorage(cid, 'bank', bankFiles, tok),
-                        ]);
-                    })
+                Promise.all([
+                    uploadContractorFilesToStorage(cid, 'license', licenseFiles),
+                    uploadContractorFilesToStorage(cid, 'bank', bankFiles),
+                ])
                     .then(function (results) {
                         const licUploaded = Array.isArray(results[0]) ? results[0] : [];
                         const bankUploaded = Array.isArray(results[1]) ? results[1] : [];
@@ -3729,13 +3785,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                           })
                       ) + 1
                     : 1;
-            getAccessTokenOnce()
-                .then(function (tok) {
-                    return Promise.all([
-                        uploadContractorFilesToStorage(newId, 'license', licenseFiles, tok),
-                        uploadContractorFilesToStorage(newId, 'bank', bankFiles, tok),
-                    ]);
-                })
+            Promise.all([
+                uploadContractorFilesToStorage(newId, 'license', licenseFiles),
+                uploadContractorFilesToStorage(newId, 'bank', bankFiles),
+            ])
                 .then(function (results) {
                     const licMeta = Array.isArray(results[0]) ? results[0] : [];
                     const bankMeta = Array.isArray(results[1]) ? results[1] : [];

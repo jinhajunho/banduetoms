@@ -149,6 +149,10 @@ async function main() {
         },
     });
     window.__bpsSupabase = supabase;
+    window.__bpsExpenseReceiptsBucket =
+        (import.meta.env && import.meta.env.VITE_SUPABASE_EXPENSE_RECEIPTS_BUCKET
+            ? String(import.meta.env.VITE_SUPABASE_EXPENSE_RECEIPTS_BUCKET).trim()
+            : '') || 'expense-receipts';
 
     const { data: sessionData } = await supabase.auth.getSession();
     const session = sessionData && sessionData.session;
