@@ -364,7 +364,13 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             const fromEst = estimates
                 .filter(function (e) {
-                    return e.showOnDashboardCalendar !== false;
+                    if (e.showOnDashboardCalendar === false) return false;
+                    if (!isExternal) return true;
+                    const contractor = String(e && e.contractor ? e.contractor : '')
+                        .trim()
+                        .toLowerCase();
+                    const effectiveContractor = (myContractorName || myName || '').trim().toLowerCase();
+                    return !!effectiveContractor && contractor === effectiveContractor;
                 })
                 .map(function (e) {
                     return {
@@ -8440,16 +8446,16 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         function canCurrentUserAccessEstimateItem(item) {
             if (!isCurrentUserExternalContractor()) return true;
-            const myUserId = String(currentUserAccessProfile.userId || '').trim();
             const myName = String(currentUserAccessProfile.name || '').trim();
             const myContractor = String(currentUserAccessProfile.contractorName || '').trim();
             const effectiveContractor = myContractor || myName;
-            const createdBy = String(item.createdBy || '').trim();
             const manager = String(item.manager || '').trim();
             const contractor = String(item.contractor || '').trim();
-            const ownCreated = (!!myUserId && createdBy === myUserId) || (!!myName && manager === myName);
-            const sameContractor = !!effectiveContractor && contractor === effectiveContractor;
-            return ownCreated || sameContractor;
+            // 외부 계정은 "내 도급사 데이터만" 보여야 하므로 동일 도급사만 허용
+            if (!effectiveContractor) return false;
+            if (contractor) return contractor === effectiveContractor;
+            // 구버전 데이터 호환: contractor가 비어 있으면 담당자명이라도 일치할 때만 허용
+            return !!myName && manager === myName;
         }
 
         function renderUserRoleOptions(selectEl, type, selectedRole) {

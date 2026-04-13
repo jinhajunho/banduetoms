@@ -7,7 +7,7 @@ export function createRenderPanelContent(api) {
         const isExternalContractorView = api.isCurrentUserExternalContractor();
         const profile = api.getCurrentUserAccessProfile();
         const lockedContractorName = isExternalContractorView
-            ? String(profile.contractorName || item.contractor || '').trim()
+            ? String(item.contractor || profile.contractorName || '').trim()
             : '';
         const canViewSalesTab = !isExternalContractorView;
         const isTaxOrBiz = item.type === '세금계산서' || item.type === '사업소득' || item.type === '세금계산서/사업소득';
