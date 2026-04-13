@@ -322,6 +322,22 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        function deleteManualCalendarTask(id) {
+            const taskId = String(id || '').trim();
+            if (!taskId) {
+                return Promise.resolve({ ok: false, error: 'id가 필요합니다.' });
+            }
+            return bpsAuthedPost('/api/calendar-tasks', { action: 'delete', id: taskId }).then(function (r) {
+                if (!r.ok || !r.body || r.body.ok !== true) {
+                    return {
+                        ok: false,
+                        error: (r.body && r.body.error) || '캘린더 일정 삭제에 실패했습니다.',
+                    };
+                }
+                return { ok: true };
+            });
+        }
+
         /** 견적 + 수동 일정을 대시보드 캘린더용 이벤트 형태로 합침 */
         function getDashboardCalendarEvents() {
             function toNum(v) {
@@ -9170,6 +9186,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 getDashboardCalendarEvents: getDashboardCalendarEvents,
                 syncManualCalendarTasks: syncManualCalendarTasksFromServer,
                 saveManualCalendarTask: saveManualCalendarTask,
+                deleteManualCalendarTask: deleteManualCalendarTask,
                 showPage: showPage,
                 renderTable: renderTable,
                 openPanel: openPanel,
