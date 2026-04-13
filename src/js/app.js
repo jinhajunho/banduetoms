@@ -987,13 +987,33 @@ import { createProjectRegister } from './estimate-project-register.js';
             return b && String(b).trim() ? String(b).trim() : 'expense-receipts';
         }
 
+        /** Storage 키 조각 — 서버 sanitizeExpenseReceiptFileName 과 동일하게 ASCII만 (signed upload 호환) */
         function bpsSanitizeStorageFileName(name) {
             var raw = String(name || 'file').replace(/[/\\]/g, '_');
             var parts = raw.split(/[/\\]/);
             var base = parts.pop() || 'file';
-            var cleaned = base.replace(/[^\w.\-가-힣()+\s]/g, '_').replace(/\s+/g, '_');
-            var limited = cleaned.length > 120 ? cleaned.slice(-120) : cleaned;
-            return limited || 'file';
+            var lastDot = base.lastIndexOf('.');
+            var stem = base;
+            var ext = '';
+            if (lastDot > 0 && lastDot < base.length - 1) {
+                var maybeExt = base.slice(lastDot + 1).toLowerCase();
+                if (/^[a-z0-9]{1,10}$/.test(maybeExt)) {
+                    ext = '.' + maybeExt;
+                    stem = base.slice(0, lastDot);
+                }
+            }
+            var ascii = stem
+                .replace(/[^A-Za-z0-9._-]/g, '_')
+                .replace(/_+/g, '_')
+                .replace(/^\.+|\.+$/g, '')
+                .replace(/^_|_$/g, '');
+            var safeStem = ascii.length > 0 ? ascii : 'file';
+            var out = safeStem + ext;
+            if (out.length > 120) {
+                var maxStem = Math.max(1, 120 - ext.length);
+                out = safeStem.slice(0, maxStem) + ext;
+            }
+            return out || 'file';
         }
 
         var BPS_CONTRACTOR_UPLOAD_MIME_ALLOWED = {

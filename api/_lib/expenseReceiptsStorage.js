@@ -9,12 +9,35 @@ export function getExpenseReceiptsBucket() {
     return b && String(b).trim() ? String(b).trim() : 'expense-receipts';
 }
 
+/**
+ * Storage 객체 이름(키 일부)용. Supabase signed upload / 클라이언트 검증은 비ASCII 파일명을 거부하는 경우가 있어
+ * 경로에는 ASCII만 남기고, 원본 표시명은 API 응답의 name 필드로 별도 전달한다.
+ */
 export function sanitizeExpenseReceiptFileName(name) {
     const raw = String(name || 'file').replace(/[/\\]/g, '_');
     const base = raw.split(/[/\\]/).pop() || 'file';
-    const cleaned = base.replace(/[^\w.\-가-힣()+\s]/g, '_').replace(/\s+/g, '_');
-    const limited = cleaned.length > 120 ? cleaned.slice(-120) : cleaned;
-    return limited || 'file';
+    const lastDot = base.lastIndexOf('.');
+    let stem = base;
+    let ext = '';
+    if (lastDot > 0 && lastDot < base.length - 1) {
+        const maybeExt = base.slice(lastDot + 1).toLowerCase();
+        if (/^[a-z0-9]{1,10}$/.test(maybeExt)) {
+            ext = '.' + maybeExt;
+            stem = base.slice(0, lastDot);
+        }
+    }
+    const ascii = stem
+        .replace(/[^A-Za-z0-9._-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^\.+|\.+$/g, '')
+        .replace(/^_|_$/g, '');
+    const safeStem = ascii.length > 0 ? ascii : 'file';
+    let out = safeStem + ext;
+    if (out.length > 120) {
+        const maxStem = Math.max(1, 120 - ext.length);
+        out = safeStem.slice(0, maxStem) + ext;
+    }
+    return out || 'file';
 }
 
 /** 업로드·서명 허용 경로(앱 전용 prefix) */
