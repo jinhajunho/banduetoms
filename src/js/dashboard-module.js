@@ -14,6 +14,18 @@ export function createDashboard(api) {
     let dashboardCalendarSearchTerm = '';
     let currentManualTaskEditingId = '';
 
+    function getFixedManualTaskAssignee() {
+        if (typeof api.isCurrentUserExternalContractor !== 'function') return '';
+        if (!api.isCurrentUserExternalContractor()) return '';
+        const profile =
+            typeof api.getCurrentUserAccessProfile === 'function'
+                ? api.getCurrentUserAccessProfile()
+                : null;
+        const contractorName = String(profile && profile.contractorName ? profile.contractorName : '').trim();
+        const userName = String(profile && profile.name ? profile.name : '').trim();
+        return contractorName || userName || '';
+    }
+
     function getDashboardEvents() {
         if (typeof api.getDashboardCalendarEvents === 'function') {
             return api.getDashboardCalendarEvents();
@@ -742,6 +754,7 @@ export function createDashboard(api) {
     function applyManualTaskModalMode(mode) {
         const isView = mode === 'view';
         const hasExisting = !!currentManualTaskEditingId;
+        const fixedAssignee = getFixedManualTaskAssignee();
         const titleEl = document.getElementById('dashboardManualTaskModalTitle');
         const editBtn = document.getElementById('dashboardManualTaskModalEdit');
         const cancelBtn = document.getElementById('dashboardManualTaskModalCancel');
@@ -762,6 +775,13 @@ export function createDashboard(api) {
             else el.removeAttribute('disabled');
         });
 
+        const assigneeEl = document.getElementById('dashboardManualTaskAssignee');
+        if (assigneeEl && fixedAssignee) {
+            assigneeEl.value = fixedAssignee;
+            assigneeEl.setAttribute('disabled', 'disabled');
+            assigneeEl.setAttribute('title', '도급사 계정은 담당자가 고정됩니다.');
+        }
+
         if (titleEl) {
             if (!hasExisting) titleEl.textContent = '캘린더 일정 등록';
             else titleEl.textContent = isView ? '캘린더 일정 상세' : '캘린더 일정 수정';
@@ -778,6 +798,7 @@ export function createDashboard(api) {
     function openDashboardManualTaskModal(task, options) {
         const modal = document.getElementById('dashboardManualTaskModal');
         if (!modal) return;
+        const fixedAssignee = getFixedManualTaskAssignee();
         const st = document.getElementById('dashboardManualTaskStatus');
         const title = document.getElementById('dashboardManualTaskTitle');
         const bodyEl = document.getElementById('dashboardManualTaskBody');
@@ -789,7 +810,7 @@ export function createDashboard(api) {
         if (st) st.value = (task && task.status) || '진행';
         if (title) title.value = (task && task.title) || '';
         if (bodyEl) bodyEl.value = (task && task.body) || '';
-        if (asg) asg.value = (task && task.assignee) || '';
+        if (asg) asg.value = fixedAssignee || (task && task.assignee) || '';
         if (sd) sd.value = (task && task.startDate) || '';
         if (ed) ed.value = (task && task.endDate) || '';
         const viewMode = !!(options && options.viewMode && isEdit);
@@ -832,6 +853,7 @@ export function createDashboard(api) {
 
     function submitDashboardManualTask() {
         if (typeof api.saveManualCalendarTask !== 'function') return;
+        const fixedAssignee = getFixedManualTaskAssignee();
         const st = document.getElementById('dashboardManualTaskStatus');
         const title = document.getElementById('dashboardManualTaskTitle');
         const bodyEl = document.getElementById('dashboardManualTaskBody');
@@ -843,7 +865,7 @@ export function createDashboard(api) {
             status: st ? st.value : '진행',
             title: title ? title.value.trim() : '',
             body: bodyEl ? bodyEl.value : '',
-            assignee: asg ? asg.value.trim() : '',
+            assignee: fixedAssignee || (asg ? asg.value.trim() : ''),
             startDate: sd ? sd.value : '',
             endDate: ed ? ed.value : '',
         };

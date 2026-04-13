@@ -9210,6 +9210,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 syncManualCalendarTasks: syncManualCalendarTasksFromServer,
                 saveManualCalendarTask: saveManualCalendarTask,
                 deleteManualCalendarTask: deleteManualCalendarTask,
+                getCurrentUserAccessProfile: function () { return currentUserAccessProfile; },
                 showPage: showPage,
                 renderTable: renderTable,
                 openPanel: openPanel,
