@@ -322,7 +322,10 @@ export function createEstimateFinanceModal(api) {
         const name = document.getElementById('fm_name').value.trim();
         const net = parseFloat(document.getElementById('fm_net').value || '0', 10) || 0;
         const gross = parseFloat(document.getElementById('fm_gross').value || '0', 10) || 0;
-        if (!name || !gross) { alert('상호명과 금액(vat포함)은 필수입니다. 일자는 생략할 수 있습니다.'); return; }
+        if (!name) {
+            alert('상호명은 필수입니다. 금액(vat포함)은 비우거나 0으로 둘 수 있습니다. 일자는 생략할 수 있습니다.');
+            return;
+        }
         const parts = api.splitNetTaxFromGross(gross || Math.round(net * 1.1));
         let values;
         if (type === 'sales' || type === 'purchase') {

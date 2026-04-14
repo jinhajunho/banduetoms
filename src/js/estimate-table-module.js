@@ -11,6 +11,8 @@ export function renderEstimateTable(api, options) {
     const filterCategory1 = document.getElementById('filterCategory1').value;
     const filterCategory2 = document.getElementById('filterCategory2').value;
     const filterCategory3 = document.getElementById('filterCategory3').value;
+    const filterEstimateTypeEl = document.getElementById('filterEstimateType');
+    const filterEstimateType = filterEstimateTypeEl ? filterEstimateTypeEl.value : '';
     const filterTax = document.getElementById('filterTax').value;
     const filterCashflow = document.getElementById('filterCashflow')?.value || '';
     const filterSearch = document.getElementById('filterSearch').value.toLowerCase();
@@ -20,6 +22,7 @@ export function renderEstimateTable(api, options) {
         if (!api.canCurrentUserAccessEstimateItem(item)) return false;
         if (currentStatus !== 'all' && item.status !== currentStatus) return false;
         if (!api.itemMatchesEstimateDateFilter(item)) return false;
+        if (filterEstimateType && (item.type || '') !== filterEstimateType) return false;
         if (filterCategory1 && item.category1 !== filterCategory1) return false;
         if (filterCategory2 && item.category2 !== filterCategory2) return false;
         if (filterCategory3 && (item.category3 || '') !== filterCategory3) return false;

@@ -983,6 +983,20 @@
             min-height: 0;
         }
 
+        .estimate-filter-mid {
+            flex: 0 0 auto;
+            min-width: 140px;
+            max-width: 220px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .estimate-filter-mid .filter-group {
+            width: 100%;
+            min-width: 0;
+        }
+
         .estimate-filter-left-row {
             display: block;
         }
@@ -1127,6 +1141,11 @@
             .estimate-filter-right {
                 flex: 1 1 auto;
                 min-width: 0;
+            }
+
+            .estimate-filter-mid {
+                max-width: none;
+                width: 100%;
             }
 
             .estimate-filter-left-row {

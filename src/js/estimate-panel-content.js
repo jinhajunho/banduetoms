@@ -194,6 +194,8 @@ export function createRenderPanelContent(api) {
                                         <option value="세금계산서" ${item.type === '세금계산서' ? 'selected' : ''}>세금계산서</option>
                                         <option value="사업소득" ${item.type === '사업소득' ? 'selected' : ''}>사업소득</option>
                                         <option value="세금계산서/사업소득" ${item.type === '세금계산서/사업소득' ? 'selected' : ''}>세금계산서/사업소득</option>
+                                        <option value="자체인력" ${item.type === '자체인력' ? 'selected' : ''}>자체인력</option>
+                                        <option value="현금영수증" ${item.type === '현금영수증' ? 'selected' : ''}>현금영수증</option>
                                     </select>
                                 </div>
                             </div>

@@ -5732,8 +5732,8 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             if (rowMap.type != null && String(rowMap.type).trim() !== '') {
                 var t = String(rowMap.type).trim();
-                if (!/^(세금계산서|사업소득|세금계산서\/사업소득|자체인력)$/.test(t)) {
-                    return '과세유형(type)은 세금계산서, 사업소득, 세금계산서/사업소득, 자체인력 중 하나여야 합니다.';
+                if (!/^(세금계산서|사업소득|세금계산서\/사업소득|자체인력|현금영수증)$/.test(t)) {
+                    return '과세유형(type)은 세금계산서, 사업소득, 세금계산서/사업소득, 자체인력, 현금영수증 중 하나여야 합니다.';
                 }
                 item.type = t;
             }
@@ -9706,9 +9706,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const row = btn.closest('tr');
             const inputs = row.querySelectorAll('.row-input');
             
-            // 필수 입력 검증
+            // 필수 입력 검증 (금액 number 칸은 비워도 저장 가능)
             let hasEmptyField = false;
             inputs.forEach(input => {
+                if (input.tagName === 'INPUT' && input.type === 'number') return;
                 if (input.tagName === 'INPUT' && input.type !== 'file' && input.type !== 'date' && !input.value.trim()) {
                     hasEmptyField = true;
                     input.style.borderColor = 'var(--danger)';
@@ -9716,12 +9717,12 @@ import { createProjectRegister } from './estimate-project-register.js';
                     input.style.borderColor = '';
                 }
             });
-            
+
             if (hasEmptyField) {
-                alert('모든 필드를 입력해주세요.');
+                alert('필수 항목을 입력해주세요. (금액은 생략 가능)');
                 return;
             }
-            
+
             // 저장 확인
             if (!confirm('입력한 내용을 저장하시겠습니까?')) {
                 return;
@@ -9986,9 +9987,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const row = btn.closest('tr');
             const inputs = row.querySelectorAll('.row-input');
             
-            // 필수 입력 검증
+            // 필수 입력 검증 (금액 number 칸은 비워도 저장 가능)
             let hasEmptyField = false;
             inputs.forEach(input => {
+                if (input.tagName === 'INPUT' && input.type === 'number') return;
                 if (input.tagName === 'INPUT' && input.type !== 'file' && input.type !== 'date' && !input.value.trim()) {
                     hasEmptyField = true;
                     input.style.borderColor = 'var(--danger)';
@@ -9996,17 +9998,17 @@ import { createProjectRegister } from './estimate-project-register.js';
                     input.style.borderColor = '';
                 }
             });
-            
+
             if (hasEmptyField) {
-                alert('모든 필드를 입력해주세요.');
+                alert('필수 항목을 입력해주세요. (금액은 생략 가능)');
                 return;
             }
-            
+
             // 저장 확인
             if (!confirm('수정한 내용을 저장하시겠습니까?')) {
                 return;
             }
-            
+
             // 입력 필드를 읽기 전용으로 변경
             inputs.forEach(input => {
                 input.style.background = 'white';
