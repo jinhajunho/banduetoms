@@ -5613,9 +5613,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                     const dt = String(r && r[0] ? r[0] : '').trim();
                     const nm = String(r && r[1] ? r[1] : '').trim();
                     const gross = Math.max(0, Math.round(Number(r && r[2] != null ? r[2] : 0) || 0));
-                    const net = computeBizTaxFromGross(gross).net;
                     const paid = String(r && r[3] ? r[3] : '미지급') === '지급' ? '지급' : '미지급';
-                    return [dt, nm, String(net), paid].join('|');
+                    return [dt, nm, String(gross), paid].join('|');
                 })
                 .join(';');
         }
@@ -5667,11 +5666,11 @@ import { createProjectRegister } from './estimate-project-register.js';
             csv +=
                 '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,등록일,시작일,완료일,사업소득행들,매출행들,수금행들,매입행들,이체행들\n' +
                 csvEscape(
-                    '※ 한 프로젝트를 한 행에 입력합니다. 수금상태·세금계산서발행은 CSV에 넣지 않아도 행 합계 기준으로 자동 반영됩니다. 매출액/매입액/사업소득 총합/지급상태도 행 데이터 기준으로 계산됩니다. 사업소득행들: 일자|성함/업체명|차인지급액|지급여부(지급/미지급) 를 ; 로 연결. 매출행들/매입행들 기본형: 일자|상호명|vat포함|발행여부(발행/미발행)|메모. 수금행들/이체행들: 일자|상호명|vat포함|메모. 날짜는 YYYY-MM-DD.'
+                    '※ 한 프로젝트를 한 행에 입력합니다. 수금상태·세금계산서발행은 CSV에 넣지 않아도 행 합계 기준으로 자동 반영됩니다. 매출액/매입액/사업소득 총합/지급상태도 행 데이터 기준으로 계산됩니다. 사업소득행들: 일자|성함/업체명|사업소득금액(세전)|지급여부(지급/미지급) 를 ; 로 연결. 매출행들/매입행들 기본형: 일자|상호명|vat포함|발행여부(발행/미발행)|메모. 수금행들/이체행들: 일자|상호명|vat포함|메모. 날짜는 YYYY-MM-DD.'
                 ) +
                 '\n' +
                 ',견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,2026-01-15,2026-04-06,2026-04-07,' +
-                csvEscape('2026-04-12|김철수|1934300|지급;2026-04-25|(주)예시건설|966999|미지급') + ',' +
+                csvEscape('2026-04-12|김철수|2000000|지급;2026-04-25|(주)예시건설|1500000|미지급') + ',' +
                 csvEscape('2026-04-06|(주)예시건설|12000000|발행|1차 매출') + ',' +
                 csvEscape('2026-04-10|(주)예시건설|6000000|1차 수금;2026-04-20|(주)예시건설|6000000|2차 수금') + ',' +
                 csvEscape('2026-04-08|영진인프라|4800000|미발행|자재') + ',' +
@@ -6135,9 +6134,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                     var d = parts[0] || fallbackDate || new Date().toISOString().slice(0, 10);
                     if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return { ok: false, err: '사업소득행들 날짜는 YYYY-MM-DD 형식이어야 합니다.' };
                     var nm = parts[1] || fallbackName || '-';
-                    var net = parseEstimateImportNumber(parts[2]);
-                    if (Number.isNaN(net)) return { ok: false, err: '사업소득행들 차인지급액은 숫자여야 합니다.' };
-                    var gross = computeBizTaxFromGross(grossFromBizNet(Math.round(net || 0))).gross;
+                    var grossRaw = parseEstimateImportNumber(parts[2]);
+                    if (Number.isNaN(grossRaw)) return { ok: false, err: '사업소득행들 세전금액은 숫자여야 합니다.' };
+                    var gross = Math.max(0, Math.round(grossRaw || 0));
                     var paid = parts[3] || '미지급';
                     if (paid !== '지급' && paid !== '미지급') return { ok: false, err: '사업소득행들 지급여부는 지급 또는 미지급이어야 합니다.' };
                     outRows.push([d, nm, gross, paid]);
