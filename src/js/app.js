@@ -1867,7 +1867,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             const bizGross = bizTotals ? bizTotals.gross : Math.max(0, Math.round(Number(item.businessIncomeGross || 0) || 0));
             const bizNet = bizTotals ? bizTotals.net : computeBizTaxFromGross(bizGross).net;
             // 필터와 칩 색상 판정을 완전히 동일하게 맞추기 위해 "정확히 동일" 기준으로 완료 판정합니다.
-            const payDone = salesGross <= 0 ? true : pay === salesGross;
+            // 수금액이 '-'(0)이면 미수로 취급: 미수금 필터 기준과 동일하게 유지
+            const payDone = pay > 0 && pay === salesGross;
             const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
             const payHtml = pay <= 0 ? tableAmountDash() : tableCashflowChip(pay, payDone);
             const xferHtml = transfer <= 0 ? tableAmountDash() : tableCashflowChip(transfer, xferDone);

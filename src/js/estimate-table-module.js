@@ -52,7 +52,8 @@ export function renderEstimateTable(api, options) {
             const transfer = item.aggregateTransferGross != null ? item.aggregateTransferGross : 0;
             const biz = api.computeBizTaxFromGross(item.businessIncomeGross);
 
-            const payDone = salesGross <= 0 ? true : pay === salesGross;
+            // 수금액이 '-'(0)이면 미수로 취급: 미수금 필터에서 반드시 잡히게 유지
+            const payDone = pay > 0 && pay === salesGross;
             const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
             const netDone = biz.gross <= 0 ? true : item.businessIncomePaidStatus === '지급';
             const cashflowAllDone = payDone && xferDone && netDone;
