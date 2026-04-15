@@ -1,4 +1,14 @@
 export function renderEstimateTable(api, options) {
+    function collectRowNames(rows, nameIndex) {
+        if (!Array.isArray(rows) || rows.length === 0) return '';
+        return rows
+            .map(function (r) {
+                return String(r && r[nameIndex] != null ? r[nameIndex] : '').trim();
+            })
+            .filter(Boolean)
+            .join(' ');
+    }
+
     var preservePage = options && options.preservePage === true;
     var estimateListPage = api.getEstimateListPage();
     if (!preservePage) estimateListPage = 1;
@@ -67,7 +77,10 @@ export function renderEstimateTable(api, options) {
         }
 
         if (filterSearch) {
-            const searchText = `${item.code || ''} ${item.building} ${item.project} ${item.manager} ${item.contractor || ''} ${item.category3 || ''}`.toLowerCase();
+            const salesNames = collectRowNames(item.salesRows, 1);
+            const purchaseNames = collectRowNames(item.purchaseRows, 1);
+            const businessNames = collectRowNames(item.businessIncomeRows, 1);
+            const searchText = `${item.code || ''} ${item.building} ${item.project} ${item.manager} ${item.contractor || ''} ${item.category3 || ''} ${salesNames} ${purchaseNames} ${businessNames}`.toLowerCase();
             if (!searchText.includes(filterSearch)) return false;
         }
         return true;
