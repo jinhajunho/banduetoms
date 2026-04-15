@@ -137,11 +137,8 @@ export function createFinanceRecalc(api) {
             estRow.paymentRows = (payBody ? Array.from(payBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'payment').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.paymentRows || []));
             estRow.purchaseRows = (purchaseBody ? Array.from(purchaseBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'purchase').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.purchaseRows || []));
             estRow.transferRows = (transferBody ? Array.from(transferBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'transfer').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (estRow.transferRows || []));
-            if ((estRow.salesRows || []).length > 0) {
-                estRow.taxIssued = (estRow.salesRows || []).some(function (r) {
-                    return String(r && r[5] ? r[5] : '').trim() === '발행';
-                });
-            }
+            const salesTaxIssued = api.deriveSalesTaxIssuedFromSalesRows(estRow.salesRows);
+            if (salesTaxIssued !== null) estRow.taxIssued = salesTaxIssued;
             estRow.purchaseTaxIssued = api.derivePurchaseTaxIssuedFromRows(estRow.purchaseRows || []);
             estRow.revenue = salesTotal;
             estRow.purchase = purchaseTotal;
@@ -161,11 +158,8 @@ export function createFinanceRecalc(api) {
             currentEditItem.paymentRows = (payBody ? Array.from(payBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'payment').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.paymentRows || []));
             currentEditItem.purchaseRows = (purchaseBody ? Array.from(purchaseBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'purchase').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.purchaseRows || []));
             currentEditItem.transferRows = (transferBody ? Array.from(transferBody.rows).filter(r => (r.getAttribute('data-row-type') || '') === 'transfer').map(r => JSON.parse(r.dataset.rowValues || '[]')) : (currentEditItem.transferRows || []));
-            if ((currentEditItem.salesRows || []).length > 0) {
-                currentEditItem.taxIssued = (currentEditItem.salesRows || []).some(function (r) {
-                    return String(r && r[5] ? r[5] : '').trim() === '발행';
-                });
-            }
+            const curSalesTaxIssued = api.deriveSalesTaxIssuedFromSalesRows(currentEditItem.salesRows);
+            if (curSalesTaxIssued !== null) currentEditItem.taxIssued = curSalesTaxIssued;
             currentEditItem.purchaseTaxIssued = api.derivePurchaseTaxIssuedFromRows(currentEditItem.purchaseRows || []);
             currentEditItem.revenue = salesTotal;
             currentEditItem.purchase = purchaseTotal;
@@ -177,7 +171,7 @@ export function createFinanceRecalc(api) {
             const psEl = document.getElementById('edit_paidStatus');
             if (psEl) psEl.value = currentEditItem.paidStatus;
             const tiEl = document.getElementById('edit_taxIssued');
-            if (tiEl && (currentEditItem.salesRows || []).length > 0) {
+            if (tiEl && curSalesTaxIssued !== null) {
                 tiEl.value = currentEditItem.taxIssued ? 'true' : 'false';
             }
         }

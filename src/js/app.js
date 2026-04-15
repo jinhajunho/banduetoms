@@ -497,6 +497,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                 }
                 seedEstimateAggregates(e);
                 e.purchaseTaxIssued = derivePurchaseTaxIssuedFromRows(e.purchaseRows);
+                // 매입과 동일하게 매출 행이 있으면 taxIssued를 행 기준으로 맞춤(서버 요약 필드가 낡아도 칩·필터가 즉시 일치)
+                var salesTiSeed = deriveSalesTaxIssuedFromSalesRows(e.salesRows);
+                if (salesTiSeed !== null) e.taxIssued = salesTiSeed;
             });
         }
 
@@ -660,6 +663,18 @@ import { createProjectRegister } from './estimate-project-register.js';
         function derivePurchaseTaxIssuedFromRows(purchaseRows) {
             if (!Array.isArray(purchaseRows) || purchaseRows.length === 0) return false;
             return purchaseRows.some(function (r) {
+                return String(r && r[5] ? r[5] : '').trim() === '발행';
+            });
+        }
+
+        /** VAT포함 금액이 있는 매출 행만 대상으로, 전부 발행일 때만 true. 하나라도 미발행이면 false. 해당 행이 없으면 null(요약 유지). */
+        function deriveSalesTaxIssuedFromSalesRows(salesRows) {
+            var rows = Array.isArray(salesRows) ? salesRows : [];
+            var substantive = rows.filter(function (r) {
+                return (Number(r && r[4]) || 0) > 0;
+            });
+            if (!substantive.length) return null;
+            return substantive.every(function (r) {
                 return String(r && r[5] ? r[5] : '').trim() === '발행';
             });
         }
@@ -6271,6 +6286,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                             else base.paidStatus = '부분';
                         }
                     }
+                    var salesTiPacked = deriveSalesTaxIssuedFromSalesRows(base.salesRows);
+                    if (salesTiPacked !== null) base.taxIssued = salesTiPacked;
                     if (bizPacked.rows.length) {
                         var bizGrossSum2 = (base.businessIncomeRows || []).reduce(function (a, v) { return a + (Number(v && v[2]) || 0); }, 0);
                         var bizNetSum2 = (base.businessIncomeRows || []).reduce(function (a, v) { return a + (computeBizTaxFromGross(Number(v && v[2]) || 0).net); }, 0);
@@ -6378,7 +6395,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                         else if (paySum >= it.revenue) it.paidStatus = '전액';
                         else it.paidStatus = '부분';
                     }
-                    if ((it.salesRows || []).some(function (r) { return String(r && r[5] || '') === '발행'; })) it.taxIssued = true;
+                    var salesTiKind = deriveSalesTaxIssuedFromSalesRows(it.salesRows);
+                    if (salesTiKind !== null) it.taxIssued = salesTiKind;
                     applyEstimateDefaultsAndSeed([it]);
                     seedEstimateAggregates(it);
                     pendingItems.push(it);
@@ -11092,6 +11110,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             findEstimateByCode: findEstimateByCode,
             seedEstimateAggregates: seedEstimateAggregates,
             deriveSalesDatesFromSalesRows: deriveSalesDatesFromSalesRows,
+            deriveSalesTaxIssuedFromSalesRows: deriveSalesTaxIssuedFromSalesRows,
             derivePurchaseTaxIssuedFromRows: derivePurchaseTaxIssuedFromRows,
             derivePaidStatusFromAmounts: derivePaidStatusFromAmounts,
             computeBizTaxFromGross: computeBizTaxFromGross,
