@@ -36,6 +36,8 @@ export function createProjectRegister(api) {
             paidStatus: '미수',
             purchase: 0,
             taxIssued: false,
+            salesEntriesNone: false,
+            purchaseEntriesNone: false,
             hasSales: false,
             hasPurchase: false,
             businessIncomeTransferDate: '',

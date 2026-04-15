@@ -458,6 +458,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (!Array.isArray(e.purchaseRows)) e.purchaseRows = [];
                 if (!Array.isArray(e.transferRows)) e.transferRows = [];
                 if (!Array.isArray(e.businessIncomeRows)) e.businessIncomeRows = [];
+                if (e.salesEntriesNone === undefined) e.salesEntriesNone = false;
+                if (e.purchaseEntriesNone === undefined) e.purchaseEntriesNone = false;
                 if (e.businessIncomeGross === undefined) e.businessIncomeGross = 0;
                 if (e.businessIncomeTransferDate === undefined) e.businessIncomeTransferDate = '';
                 if (e.businessIncomeName === undefined) e.businessIncomeName = '';
@@ -1887,9 +1889,12 @@ import { createProjectRegister } from './estimate-project-register.js';
         function projectSalesPurchaseChipClass(isPurchaseSide, item, purchaseAmount) {
             // 매출 칩: 매출 행 기준 taxIssued(세금계산서 발행 여부)
             if (!isPurchaseSide) {
+                const salesAmount = Number(item && item.revenue != null ? item.revenue : 0) || 0;
+                if (item && item.salesEntriesNone === true && salesAmount > 0) return 'table-amount-chip--issued';
                 return item.taxIssued ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued';
             }
             // 매입 칩: 매입 행(values[5]) 발행/미발행만 반영 (매출 taxIssued와 무관)
+            if (item && item.purchaseEntriesNone === true && purchaseAmount > 0) return 'table-amount-chip--issued';
             if (purchaseAmount <= 0) return 'table-amount-chip--na';
             const pIssued = item.purchaseTaxIssued === true
                 ? true
@@ -1913,15 +1918,17 @@ import { createProjectRegister } from './estimate-project-register.js';
             const purchaseGross = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
             const pay = item.aggregatePaymentGross != null ? item.aggregatePaymentGross : 0;
             const transfer = item.aggregateTransferGross != null ? item.aggregateTransferGross : 0;
+            const salesNone = item && item.salesEntriesNone === true;
+            const purchaseNone = item && item.purchaseEntriesNone === true;
             const bizRows = Array.isArray(item.businessIncomeRows) ? item.businessIncomeRows : [];
             const bizTotals = bizRows.length ? computeBizTotalsFromRows(bizRows) : null;
             const bizGross = bizTotals ? bizTotals.gross : Math.max(0, Math.round(Number(item.businessIncomeGross || 0) || 0));
             const bizNet = bizTotals ? bizTotals.net : computeBizTaxFromGross(bizGross).net;
             // 필터와 칩 색상 판정을 완전히 동일하게 맞추기 위해 "정확히 동일" 기준으로 완료 판정합니다.
             // 수금액이 '-'(0)이면 미수로 취급: 미수금 필터 기준과 동일하게 유지
-            const payDone = pay > 0 && pay === salesGross;
-            const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
-            const hasSalesTarget = Number(salesGross) > 0;
+            const payDone = salesNone ? true : (pay > 0 && pay === salesGross);
+            const xferDone = purchaseNone ? true : (purchaseGross <= 0 ? true : transfer === purchaseGross);
+            const hasSalesTarget = !salesNone && Number(salesGross) > 0;
             const payHtml = pay <= 0
                 ? (hasSalesTarget
                     ? '<span class="table-amount-chip table-amount-chip--not-issued">-</span>'
@@ -1941,11 +1948,12 @@ import { createProjectRegister } from './estimate-project-register.js';
         function renderCashflowTransferNetCell(item) {
             const purchaseGross = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
             const transfer = item.aggregateTransferGross != null ? item.aggregateTransferGross : 0;
+            const purchaseNone = item && item.purchaseEntriesNone === true;
             const bizRows = Array.isArray(item.businessIncomeRows) ? item.businessIncomeRows : [];
             const bizTotals = bizRows.length ? computeBizTotalsFromRows(bizRows) : null;
             const bizGross = bizTotals ? bizTotals.gross : Math.max(0, Math.round(Number(item.businessIncomeGross || 0) || 0));
             const bizNet = bizTotals ? bizTotals.net : computeBizTaxFromGross(bizGross).net;
-            const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
+            const xferDone = purchaseNone ? true : (purchaseGross <= 0 ? true : transfer === purchaseGross);
             const xferHtml = transfer <= 0 ? tableAmountDash() : tableCashflowChip(transfer, xferDone);
             let netHtml;
             if (bizGross <= 0) netHtml = tableAmountDash();
@@ -1959,11 +1967,32 @@ import { createProjectRegister } from './estimate-project-register.js';
         /** 견적 목록 세금계산서 필터(도급사): 매입 측 발행 여부 — projectSalesPurchaseChipClass(매입)과 동일 기준 */
         function derivePurchaseTaxIssuedForEstimateFilter(item) {
             if (!item) return false;
+            if (item.purchaseEntriesNone === true) return true;
             const purchaseAmount = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
             if (purchaseAmount <= 0) return false;
             if (item.purchaseTaxIssued === true) return true;
             if (item.purchaseTaxIssued === false) return false;
             return derivePurchaseTaxIssuedFromRows(item.purchaseRows || []);
+        }
+
+        function toggleNoSalesEntries(checked) {
+            if (!currentEditItem) return;
+            currentEditItem.salesEntriesNone = !!checked;
+            const ix = findEstimateIndexByCode(currentEditItem.code);
+            if (ix !== -1) estimates[ix].salesEntriesNone = currentEditItem.salesEntriesNone;
+            renderTable({ preservePage: true });
+            if (!isNewEstimate && currentEditItem.code) persistEstimateToServerByCode(currentEditItem.code);
+            markPanelDirtyIfChanged();
+        }
+
+        function toggleNoPurchaseEntries(checked) {
+            if (!currentEditItem) return;
+            currentEditItem.purchaseEntriesNone = !!checked;
+            const ix = findEstimateIndexByCode(currentEditItem.code);
+            if (ix !== -1) estimates[ix].purchaseEntriesNone = currentEditItem.purchaseEntriesNone;
+            renderTable({ preservePage: true });
+            if (!isNewEstimate && currentEditItem.code) persistEstimateToServerByCode(currentEditItem.code);
+            markPanelDirtyIfChanged();
         }
 
         /** 대/중/소분류 마스터 — 기본 목록은 DB(category_settings) 시드 또는 서버 동기화로 채움 */
@@ -7683,6 +7712,119 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        function parsePerformanceAmount(v) {
+            const n = parseFloat(String(v == null ? '' : v).replace(/원/g, '').replace(/,/g, '').trim(), 10);
+            return isNaN(n) ? 0 : n;
+        }
+
+        function getPerformanceFallbackDate(item) {
+            const salesDates = getPerformanceSalesDateList(item);
+            if (salesDates.length) {
+                return salesDates.reduce(function (a, b) { return a < b ? a : b; });
+            }
+            const d = item && item.date ? String(item.date).trim().slice(0, 10) : '';
+            return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '';
+        }
+
+        function getPerformanceDateRowsFromEstimate(item) {
+            const rows = [];
+            const salesRows = Array.isArray(item && item.salesRows) ? item.salesRows : [];
+            const purchaseRows = Array.isArray(item && item.purchaseRows) ? item.purchaseRows : [];
+            const bizRows = Array.isArray(item && item.businessIncomeRows) ? item.businessIncomeRows : [];
+
+            salesRows.forEach(function (r) {
+                const d = String(r && r[0] ? r[0] : '').trim().slice(0, 10);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+                const revenue = Math.max(0, Math.round(parsePerformanceAmount(r && r[4])));
+                if (revenue <= 0) return;
+                rows.push({
+                    date: d,
+                    month: d.slice(0, 7),
+                    category1: (item.category1 || '').trim() || '-',
+                    category2: (item.category2 || '').trim() || '-',
+                    category3: (item.category3 || '').trim() || '-',
+                    revenue: revenue,
+                    purchase: 0,
+                });
+            });
+
+            purchaseRows.forEach(function (r) {
+                const d = String(r && r[0] ? r[0] : '').trim().slice(0, 10);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+                const purchase = Math.max(0, Math.round(parsePerformanceAmount(r && r[4])));
+                if (purchase <= 0) return;
+                rows.push({
+                    date: d,
+                    month: d.slice(0, 7),
+                    category1: (item.category1 || '').trim() || '-',
+                    category2: (item.category2 || '').trim() || '-',
+                    category3: (item.category3 || '').trim() || '-',
+                    revenue: 0,
+                    purchase: purchase,
+                });
+            });
+
+            bizRows.forEach(function (r) {
+                const d = String(r && r[0] ? r[0] : '').trim().slice(0, 10);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+                const purchase = Math.max(0, Math.round(parsePerformanceAmount(r && r[2])));
+                if (purchase <= 0) return;
+                rows.push({
+                    date: d,
+                    month: d.slice(0, 7),
+                    category1: (item.category1 || '').trim() || '-',
+                    category2: (item.category2 || '').trim() || '-',
+                    category3: (item.category3 || '').trim() || '-',
+                    revenue: 0,
+                    purchase: purchase,
+                });
+            });
+
+            // 하위호환: 행 데이터가 없는 과거 데이터는 요약값을 기준일 1건으로 보강
+            if (!rows.length) {
+                const d = getPerformanceFallbackDate(item);
+                if (d) {
+                    const revenue = Math.max(0, Math.round(Number(item && item.revenue || 0)));
+                    const purchase = Math.max(0, Math.round(getItemPurchaseTotal(item)));
+                    if (revenue > 0 || purchase > 0) {
+                        rows.push({
+                            date: d,
+                            month: d.slice(0, 7),
+                            category1: (item.category1 || '').trim() || '-',
+                            category2: (item.category2 || '').trim() || '-',
+                            category3: (item.category3 || '').trim() || '-',
+                            revenue: revenue,
+                            purchase: purchase,
+                        });
+                    }
+                }
+            }
+
+            return rows;
+        }
+
+        function performanceDateMatchesPeriod(dateStr) {
+            const d = String(dateStr || '').trim().slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+            if (performancePeriodMode === 'all') return true;
+            if (performancePeriodMode === 'month') {
+                const inp = document.getElementById('performanceFilterMonth');
+                const m = inp && inp.value ? inp.value.trim() : '';
+                if (!/^\d{4}-\d{2}$/.test(m)) return true;
+                return d.slice(0, 7) === m;
+            }
+            if (performancePeriodMode === 'range') {
+                const fromEl = document.getElementById('performanceDateFrom');
+                const toEl = document.getElementById('performanceDateTo');
+                let from = fromEl && fromEl.value ? fromEl.value : '';
+                let to = toEl && toEl.value ? toEl.value : '';
+                if (!from || !to) return true;
+                if (from > to) { const t = from; from = to; to = t; }
+                return d >= from && d <= to;
+            }
+            return true;
+        }
+
         /** 월별 집계 버킷: 매출발행일 중 가장 이른 날의 연-월 */
         function getPerformanceItemMonthKey(item) {
             const dates = getPerformanceSalesDateList(item);
@@ -7719,12 +7861,10 @@ import { createProjectRegister } from './estimate-project-register.js';
         function getLatestPerformanceMonthFromData() {
             let maxM = '';
             estimates.forEach(function (item) {
-                const dates = getPerformanceSalesDateList(item);
-                dates.forEach(function (d) {
-                    if (/^\d{4}-\d{2}/.test(d)) {
-                        const m = d.slice(0, 7);
-                        if (!maxM || m > maxM) maxM = m;
-                    }
+                const rows = getPerformanceDateRowsFromEstimate(item);
+                rows.forEach(function (r) {
+                    const m = String(r && r.month ? r.month : '').trim();
+                    if (/^\d{4}-\d{2}$/.test(m) && (!maxM || m > maxM)) maxM = m;
                 });
             });
             return maxM;
@@ -7876,17 +8016,30 @@ import { createProjectRegister } from './estimate-project-register.js';
                 }
             }
 
-            const data = estimates.filter(itemMatchesPerformancePeriod);
+            const dataRows = estimates
+                .flatMap(getPerformanceDateRowsFromEstimate)
+                .filter(function (r) { return performanceDateMatchesPeriod(r.date); });
             const toggleSgaOn = performanceSgaMode === 'include';
             const sgaInEffect = toggleSgaOn && performancePeriodMode !== 'range';
             const sgaData = sgaInEffect ? sgaExpenses.filter(sgaItemMatchesPerformancePeriod) : [];
             const totalSga = sgaData.reduce(function(sum, item) { return sum + (Number(item.amount) || 0); }, 0);
 
-            const avgTotalsAll = getPerformanceAvgUnitTotals(data);
+            const avgTotalsAll = (function () {
+                let unitRevSum = 0;
+                let unitCount = 0;
+                dataRows.forEach(function (r) {
+                    if ((r.category3 || '').trim() === '공사') return;
+                    if ((Number(r.revenue) || 0) <= 0) return;
+                    unitRevSum += (Number(r.revenue) || 0);
+                    unitCount++;
+                });
+                const avgRounded = unitCount > 0 ? Math.round(unitRevSum / unitCount) : 0;
+                return { unitRevSum: unitRevSum, unitCount: unitCount, avgRounded: avgRounded };
+            })();
 
             // KPI 카드 업데이트
-            const totalRevenue = data.reduce((sum, item) => sum + (item.revenue || 0), 0);
-            const totalPurchase = data.reduce((sum, item) => sum + getItemPurchaseTotal(item), 0);
+            const totalRevenue = dataRows.reduce((sum, row) => sum + (Number(row.revenue) || 0), 0);
+            const totalPurchase = dataRows.reduce((sum, row) => sum + (Number(row.purchase) || 0), 0);
             const totalProfit = totalRevenue - totalPurchase - (sgaInEffect ? totalSga : 0);
             const margin = totalRevenue > 0 ? (totalProfit / totalRevenue * 100) : 0;
 
@@ -7914,17 +8067,17 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             // 월별 테이블 (매출발행일 기준 월 버킷)
             const byMonth = {};
-            data.forEach(item => {
-                const month = getPerformanceItemMonthKey(item);
+            dataRows.forEach(function (row) {
+                const month = String(row.month || '').trim();
                 if (!month) return;
                 if (!byMonth[month]) {
                     byMonth[month] = { month, count: 0, revenue: 0, purchase: 0, sga: 0, unitRevSum: 0, unitCount: 0 };
                 }
                 byMonth[month].count++;
-                byMonth[month].revenue += (item.revenue || 0);
-                byMonth[month].purchase += getItemPurchaseTotal(item);
-                if (!isPerformanceAvgUnitExcluded(item)) {
-                    byMonth[month].unitRevSum += (item.revenue || 0);
+                byMonth[month].revenue += (Number(row.revenue) || 0);
+                byMonth[month].purchase += (Number(row.purchase) || 0);
+                if ((row.category3 || '').trim() !== '공사' && (Number(row.revenue) || 0) > 0) {
+                    byMonth[month].unitRevSum += (Number(row.revenue) || 0);
                     byMonth[month].unitCount++;
                 }
             });
@@ -7989,9 +8142,9 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             // 전체기간 분류별(대분류/중분류)
             const categoryOverallByKey = {};
-            data.forEach(item => {
-                const c1 = (item.category1 || '').trim() || '-';
-                const c2 = (item.category2 || '').trim() || '-';
+            dataRows.forEach(function (srcRow) {
+                const c1 = (srcRow.category1 || '').trim() || '-';
+                const c2 = (srcRow.category2 || '').trim() || '-';
                 const key = c1 + '||' + c2;
                 if (!categoryOverallByKey[key]) {
                     categoryOverallByKey[key] = {
@@ -8004,13 +8157,13 @@ import { createProjectRegister } from './estimate-project-register.js';
                         unitCount: 0
                     };
                 }
-                const row = categoryOverallByKey[key];
-                row.count++;
-                row.revenue += (item.revenue || 0);
-                row.purchase += getItemPurchaseTotal(item);
-                if (!isPerformanceAvgUnitExcluded(item)) {
-                    row.unitRevSum += (item.revenue || 0);
-                    row.unitCount++;
+                const agg = categoryOverallByKey[key];
+                agg.count++;
+                agg.revenue += (Number(srcRow.revenue) || 0);
+                agg.purchase += (Number(srcRow.purchase) || 0);
+                if ((srcRow.category3 || '').trim() !== '공사' && (Number(srcRow.revenue) || 0) > 0) {
+                    agg.unitRevSum += (Number(srcRow.revenue) || 0);
+                    agg.unitCount++;
                 }
             });
             const sgaShareFactorOverall = sgaInEffect && totalRevenue > 0 ? totalSga / totalRevenue : 0;
@@ -8019,14 +8172,12 @@ import { createProjectRegister } from './estimate-project-register.js';
                 ...s,
                 latestMonth: (function () {
                     let latest = '';
-                    data.forEach(function (item) {
+                    dataRows.forEach(function (item) {
                         const c1 = (item.category1 || '').trim() || '-';
                         const c2 = (item.category2 || '').trim() || '-';
                         if (c1 !== s.category1 || c2 !== s.category2) return;
-                        getPerformanceSalesDateList(item).forEach(function (d) {
-                            const m = String(d || '').slice(0, 7);
-                            if (/^\d{4}-\d{2}$/.test(m) && (!latest || m > latest)) latest = m;
-                        });
+                        const m = String(item && item.month ? item.month : '').slice(0, 7);
+                        if (/^\d{4}-\d{2}$/.test(m) && (!latest || m > latest)) latest = m;
                     });
                     return latest;
                 })(),
@@ -8111,8 +8262,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (!month) return;
                 monthlySgaMap[month] = (monthlySgaMap[month] || 0) + (Number(item.amount) || 0);
             });
-            data.forEach(item => {
-                const month = getPerformanceItemMonthKey(item);
+            dataRows.forEach(function (item) {
+                const month = String(item && item.month ? item.month : '').trim();
                 if (!month) return;
                 const c1 = (item.category1 || '').trim() || '-';
                 const c2 = (item.category2 || '').trim() || '-';
@@ -8132,8 +8283,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 const row = categoryMonthlyByKey[key];
                 row.count++;
                 row.revenue += (item.revenue || 0);
-                row.purchase += getItemPurchaseTotal(item);
-                if (!isPerformanceAvgUnitExcluded(item)) {
+                row.purchase += (item.purchase || 0);
+                if ((item.category3 || '').trim() !== '공사' && (item.revenue || 0) > 0) {
                     row.unitRevSum += (item.revenue || 0);
                     row.unitCount++;
                 }
@@ -11458,6 +11609,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 addPaymentRow,
                 addPurchaseRow,
                 addTransferRow,
+                toggleNoSalesEntries,
+                toggleNoPurchaseEntries,
                 onFinanceRowClick,
                 togglePaymentRowInline,
                 deleteRow,

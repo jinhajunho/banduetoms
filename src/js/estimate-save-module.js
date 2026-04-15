@@ -70,6 +70,8 @@ export async function saveEstimateChanges(api) {
             manager: cur.manager,
             type: cur.type,
             contractor: cur.contractor,
+            salesEntriesNone: !!cur.salesEntriesNone,
+            purchaseEntriesNone: !!cur.purchaseEntriesNone,
             revenue: cur.revenue || 0,
             paidStatus: cur.paidStatus,
             purchase: (cur.type === '세금계산서' || cur.type === '사업소득' || cur.type === '세금계산서/사업소득') ? (cur.purchase || 0) : 0,

@@ -40,9 +40,9 @@ export function renderEstimateTable(api, options) {
             if (canSeeMonetary) {
                 const salesGross = item.aggregateSalesGross != null ? item.aggregateSalesGross : (item.revenue || 0);
                 const purchaseGross = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
-                const hasSales = Number(salesGross) > 0;
-                const hasPurchase = Number(purchaseGross) > 0;
-                const salesIssued = !hasSales || item.taxIssued === true;
+                const hasSales = item.salesEntriesNone === true ? false : (Number(salesGross) > 0);
+                const hasPurchase = item.purchaseEntriesNone === true ? false : (Number(purchaseGross) > 0);
+                const salesIssued = !hasSales || item.salesEntriesNone === true || item.taxIssued === true;
                 const purchaseIssued = !hasPurchase || api.derivePurchaseTaxIssuedForEstimateFilter(item) === true;
                 const allIssued = salesIssued && purchaseIssued;
                 const hasAnyInvoiceTarget = hasSales || hasPurchase;
@@ -61,10 +61,12 @@ export function renderEstimateTable(api, options) {
             const pay = item.aggregatePaymentGross != null ? item.aggregatePaymentGross : 0;
             const transfer = item.aggregateTransferGross != null ? item.aggregateTransferGross : 0;
             const biz = api.computeBizTaxFromGross(item.businessIncomeGross);
+            const hasSalesTarget = item.salesEntriesNone === true ? false : (Number(salesGross) > 0);
+            const hasPurchaseTarget = item.purchaseEntriesNone === true ? false : (Number(purchaseGross) > 0);
 
             // 수금액이 '-'(0)이면 미수로 취급: 미수금 필터에서 반드시 잡히게 유지
-            const payDone = pay > 0 && pay === salesGross;
-            const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
+            const payDone = !hasSalesTarget ? true : (pay > 0 && pay === salesGross);
+            const xferDone = !hasPurchaseTarget ? true : transfer === purchaseGross;
             const netDone = biz.gross <= 0 ? true : item.businessIncomePaidStatus === '지급';
             const cashflowAllDone = payDone && xferDone && netDone;
             const contractorCashflowDone = xferDone && netDone;

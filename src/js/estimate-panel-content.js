@@ -279,6 +279,10 @@ export function createRenderPanelContent(api) {
                             <div class="payment-list-title">
                                 <i class="fas fa-store"></i> 매출 내역 (상호명별)
                             </div>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray-700);margin-left:auto;">
+                                <input type="checkbox" ${item.salesEntriesNone ? 'checked' : ''} onchange="toggleNoSalesEntries(this.checked)">
+                                매출내역 없음
+                            </label>
                             <button class="btn-add-payment" onclick="addSalesRow('${item.code}')">
                                 <i class="fas fa-plus"></i> 매출 추가
                             </button>
@@ -352,6 +356,10 @@ export function createRenderPanelContent(api) {
                             <div class="payment-list-title">
                                 <i class="fas fa-building"></i> 매입 내역 (업체별)
                             </div>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray-700);margin-left:auto;">
+                                <input type="checkbox" ${item.purchaseEntriesNone ? 'checked' : ''} onchange="toggleNoPurchaseEntries(this.checked)">
+                                매입내역 없음
+                            </label>
                             <button type="button" class="btn-add-payment" onclick="addPurchaseRow('${item.code}')">
                                 <i class="fas fa-plus"></i> 매입 추가
                             </button>
