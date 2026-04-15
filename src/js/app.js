@@ -8614,6 +8614,7 @@ import { createProjectRegister } from './estimate-project-register.js';
         let currentManagingAccountUserId = '';
         let currentManagingExtraAllowedPages = [];
         let isCreatingAccount = false;
+        let isUserManageEditMode = false;
 
         function normalizeAccountType(type) {
             return type === 'external' ? 'external' : 'internal';
@@ -8752,6 +8753,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             const wrap = document.getElementById('userManagePageAccess');
             const preview = document.getElementById('userManagePageAccessPreview');
             if (!roleSelect || !wrap) return;
+            const canEdit = isCreatingAccount || isUserManageEditMode;
             const type = typeInput ? normalizeAccountType(typeInput.value) : 'internal';
             const role = roleSelect.value;
             const baseAllowed = getBaseAllowedPages(type, role);
@@ -8764,7 +8766,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return '<label class="user-access-row">' +
                     '<span class="user-access-row-label">' + escapeHtmlAttr(PAGE_ACCESS_LABELS[pageKey] || pageKey) + badgeHtml + '</span>' +
                     '<span class="user-access-toggle' + (isChecked ? ' is-active' : '') + (isBase ? ' is-disabled' : '') + '">' +
-                    '<input type="checkbox" class="user-access-toggle-input" ' + (isChecked ? 'checked ' : '') + (isBase ? 'disabled ' : '') + 'onchange="toggleUserExtraPageAccess(\'' + pageKey + '\', this.checked)">' +
+                    '<input type="checkbox" class="user-access-toggle-input" data-base="' + (isBase ? '1' : '0') + '" ' + (isChecked ? 'checked ' : '') + ((isBase || !canEdit) ? 'disabled ' : '') + 'onchange="toggleUserExtraPageAccess(\'' + pageKey + '\', this.checked)">' +
                     '<span class="user-access-toggle-track"><span class="user-access-toggle-thumb"></span></span>' +
                     '</span>' +
                     '</label>';
@@ -8776,6 +8778,7 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
 
         function toggleUserExtraPageAccess(pageKey, checked) {
+            if (!(isCreatingAccount || isUserManageEditMode)) return;
             if (!PAGE_ACCESS_ORDER.includes(pageKey)) return;
             const typeInput = document.querySelector('input[name="userManageType"]:checked');
             const roleSelect = document.getElementById('userManageRole');
@@ -8955,19 +8958,30 @@ import { createProjectRegister } from './estimate-project-register.js';
         function toggleAccountStatus(userId, btn) {
             const user = userAccounts.find(function (u) { return u.userId === userId; });
             if (!user || !btn) return;
-            const nextActive = !(user.active !== false);
+            if (btn.dataset.loading === '1') return;
+            const prevActive = user.active !== false;
+            const nextActive = !prevActive;
 
-            function applyToggleUI() {
-                user.active = nextActive;
+            function applyToggleUI(active) {
+                user.active = !!active;
                 const label = btn.querySelector('.master-state-switch-label');
-                btn.classList.toggle('is-active', nextActive);
-                btn.title = nextActive ? '비활성으로 전환' : '활성으로 전환';
-                if (label) label.textContent = nextActive ? '활성' : '비활성';
+                btn.classList.toggle('is-active', !!active);
+                btn.title = active ? '비활성으로 전환' : '활성으로 전환';
+                if (label) label.textContent = active ? '활성' : '비활성';
                 if (currentUserAccessProfile.userId === userId) {
                     applyRoleBasedNavigation();
                 }
                 persistUserAccounts();
             }
+
+            function setToggleLoading(loading) {
+                btn.dataset.loading = loading ? '1' : '0';
+                btn.disabled = !!loading;
+                btn.style.opacity = loading ? '0.7' : '';
+            }
+
+            applyToggleUI(nextActive);
+            setToggleLoading(true);
 
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                 bpsAdminApi('/api/admin', {
@@ -8976,49 +8990,91 @@ import { createProjectRegister } from './estimate-project-register.js';
                     active: nextActive,
                 })
                     .then(function (r) {
+                        setToggleLoading(false);
                         if (!r.ok) {
+                            applyToggleUI(prevActive);
                             showToast((r.body && r.body.error) || '상태 변경에 실패했습니다.');
                             return;
                         }
-                        applyToggleUI();
                     })
                     .catch(function (e) {
+                        setToggleLoading(false);
+                        applyToggleUI(prevActive);
                         showToast((e && e.message) || '상태 변경에 실패했습니다.');
                     });
                 return;
             }
 
-            applyToggleUI();
+            setToggleLoading(false);
         }
 
-        function ensureUserManageHeaderSaveButton() {
+        function ensureUserManageHeaderActionButtons() {
             const panelActions = document.getElementById('sharedPanelActions');
-            if (!panelActions) return null;
-            let btn = document.getElementById('btnUserManageSave');
-            if (!btn) {
-                btn = document.createElement('button');
-                btn.id = 'btnUserManageSave';
-                btn.className = 'btn btn-primary btn-sm';
-                btn.innerHTML = '<i class="fas fa-save"></i> 저장';
-                btn.onclick = saveUserManagePanel;
-                panelActions.appendChild(btn);
+            if (!panelActions) return {};
+            let btnEdit = document.getElementById('btnUserManageEdit');
+            let btnDelete = document.getElementById('btnUserManageDelete');
+            let btnSave = document.getElementById('btnUserManageSave');
+            if (!btnEdit) {
+                btnEdit = document.createElement('button');
+                btnEdit.id = 'btnUserManageEdit';
+                btnEdit.className = 'btn btn-secondary btn-sm';
+                btnEdit.innerHTML = '<i class="fas fa-pen"></i> 수정';
+                btnEdit.onclick = startUserManageEdit;
+                panelActions.appendChild(btnEdit);
             }
-            return btn;
+            if (!btnDelete) {
+                btnDelete = document.createElement('button');
+                btnDelete.id = 'btnUserManageDelete';
+                btnDelete.className = 'btn btn-secondary btn-sm';
+                btnDelete.innerHTML = '<i class="fas fa-trash"></i> 삭제';
+                btnDelete.onclick = deleteManagedUser;
+                panelActions.appendChild(btnDelete);
+            }
+            if (!btnSave) {
+                btnSave = document.createElement('button');
+                btnSave.id = 'btnUserManageSave';
+                btnSave.className = 'btn btn-primary btn-sm';
+                btnSave.innerHTML = '<i class="fas fa-save"></i> 저장';
+                btnSave.onclick = saveUserManagePanel;
+                panelActions.appendChild(btnSave);
+            }
+            return { btnEdit, btnDelete, btnSave };
+        }
+
+        function applyUserManageEditability() {
+            const canEdit = isCreatingAccount || isUserManageEditMode;
+            const panelBody = document.getElementById('sharedPanelBody');
+            if (!panelBody) return;
+            panelBody.querySelectorAll('.user-manage-editable').forEach(function (el) {
+                el.disabled = !canEdit;
+            });
+            renderUserManagePageAccess();
+        }
+
+        function startUserManageEdit() {
+            if (isCreatingAccount) return;
+            isUserManageEditMode = true;
+            setUserManageHeaderActions(true);
+            applyUserManageEditability();
         }
 
         function setUserManageHeaderActions(show) {
             const panelActions = document.getElementById('sharedPanelActions');
             const btnSave = document.getElementById('sharedPanelBtnSave');
             const btnCancel = document.getElementById('sharedPanelBtnCancel');
-            const userSave = ensureUserManageHeaderSaveButton();
+            const userActions = ensureUserManageHeaderActionButtons();
             if (!panelActions) return;
             if (show) {
                 panelActions.style.display = 'flex';
                 if (btnSave) btnSave.style.display = 'none';
                 if (btnCancel) btnCancel.style.display = 'none';
-                if (userSave) userSave.style.display = '';
+                if (userActions.btnEdit) userActions.btnEdit.style.display = (!isCreatingAccount && !isUserManageEditMode) ? '' : 'none';
+                if (userActions.btnDelete) userActions.btnDelete.style.display = (!isCreatingAccount && isUserManageEditMode) ? '' : 'none';
+                if (userActions.btnSave) userActions.btnSave.style.display = (isCreatingAccount || isUserManageEditMode) ? '' : 'none';
             } else {
-                if (userSave) userSave.style.display = 'none';
+                if (userActions.btnEdit) userActions.btnEdit.style.display = 'none';
+                if (userActions.btnDelete) userActions.btnDelete.style.display = 'none';
+                if (userActions.btnSave) userActions.btnSave.style.display = 'none';
             }
         }
 
@@ -9049,9 +9105,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             isPanelDirty = false;
 
             if (panelTitle) panelTitle.textContent = isCreatingAccount ? '계정 추가' : '계정 관리';
-            setUserManageHeaderActions(true);
             if (panelBottomSaveBar) panelBottomSaveBar.style.display = 'none';
             panel.classList.remove('project-detail-modal');
+            isUserManageEditMode = !!isCreatingAccount;
+            setUserManageHeaderActions(true);
 
             currentManagingAccountUserId = userId || '';
             if (!isCreatingAccount) {
@@ -9080,11 +9137,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                                 <label class="panel-form-label">계정 유형</label>
                                 <div class="user-manage-radio-group">
                                     <label class="user-manage-radio">
-                                        <input type="radio" name="userManageType" value="internal" ${typeValue === 'internal' ? 'checked' : ''} onchange="updateUserManagePanelByType()">
+                                        <input type="radio" class="user-manage-editable" name="userManageType" value="internal" ${typeValue === 'internal' ? 'checked' : ''} onchange="updateUserManagePanelByType()">
                                         <span>내부</span>
                                     </label>
                                     <label class="user-manage-radio">
-                                        <input type="radio" name="userManageType" value="external" ${typeValue === 'external' ? 'checked' : ''} onchange="updateUserManagePanelByType()">
+                                        <input type="radio" class="user-manage-editable" name="userManageType" value="external" ${typeValue === 'external' ? 'checked' : ''} onchange="updateUserManagePanelByType()">
                                         <span>외부</span>
                                     </label>
                                 </div>
@@ -9097,10 +9154,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                             <div class="panel-form-row">
                                 <label class="panel-form-label" id="userManageNameLabel">${typeValue === 'external' ? '소속 도급사(업체명)' : '이름'}</label>
                                 <div id="userManageNameInternalWrap" style="display: ${typeValue === 'internal' ? 'block' : 'none'};">
-                                    <input type="text" class="form-input" id="userManageName" value="${escapeHtmlAttr(typeValue === 'internal' ? (name || '') : '')}">
+                                    <input type="text" class="form-input user-manage-editable" id="userManageName" value="${escapeHtmlAttr(typeValue === 'internal' ? (name || '') : '')}">
                                 </div>
                                 <div id="userManageNameExternalWrap" style="display: ${typeValue === 'external' ? 'block' : 'none'};">
-                                    <select id="userManageNameContractor" class="form-select" title="업체정보관리에 등록된 도급사만 선택 가능합니다.">
+                                    <select id="userManageNameContractor" class="form-select user-manage-editable" title="업체정보관리에 등록된 도급사만 선택 가능합니다.">
                                         ${contractorSelectInner}
                                     </select>
                                     <p class="user-manage-card-desc" style="margin-top: 8px; margin-bottom: 0;">업체정보관리에 등록된 도급사만 선택할 수 있습니다.</p>
@@ -9108,7 +9165,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                             </div>
                             <div class="panel-form-row">
                                 <label class="panel-form-label">아이디</label>
-                                <input type="text" class="form-input" id="userManageUserId" value="${escapeHtmlAttr(userId || '')}">
+                                <input type="text" class="form-input user-manage-editable" id="userManageUserId" value="${escapeHtmlAttr(userId || '')}">
                             </div>
                         </div>
 
@@ -9116,7 +9173,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                             <div class="user-manage-card-title">역할</div>
                             <div class="panel-form-row">
                                 <label class="panel-form-label" for="userManageRole">역할</label>
-                                <select id="userManageRole" class="form-select"></select>
+                                <select id="userManageRole" class="form-select user-manage-editable"></select>
                             </div>
                             ${isCreatingAccount ? '' : `
                             <div class="panel-form-row">
@@ -9142,6 +9199,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (roleSelect) roleSelect.addEventListener('change', renderUserManagePageAccess);
             syncUserManageNameFieldByAccountType();
             renderUserManagePageAccess();
+            applyUserManageEditability();
             switchUserManageTab('basic');
 
             overlay.classList.add('active');
@@ -9149,6 +9207,10 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
 
         function saveUserManagePanel() {
+            if (!isCreatingAccount && !isUserManageEditMode) {
+                showToast('수정 버튼을 눌러 편집 모드로 전환해 주세요.');
+                return;
+            }
             const nameInput = document.getElementById('userManageName');
             const nameContractorSel = document.getElementById('userManageNameContractor');
             const userIdInput = document.getElementById('userManageUserId');
@@ -9324,6 +9386,49 @@ import { createProjectRegister } from './estimate-project-register.js';
             showToast('계정 설정이 저장되었습니다.');
             isCreatingAccount = false;
             closePanel(true);
+        }
+
+        function deleteManagedUser() {
+            if (isCreatingAccount) return;
+            const uid = String(currentManagingAccountUserId || '').trim().toLowerCase();
+            if (!uid) return;
+            if (uid === String(currentUserAccessProfile.userId || '').trim().toLowerCase()) {
+                alert('현재 로그인한 계정은 삭제할 수 없습니다.');
+                return;
+            }
+            const ok = confirm('「' + uid + '」 계정을 삭제하시겠습니까?\n삭제 후 복구할 수 없습니다.');
+            if (!ok) return;
+
+            function applyDeleteLocal() {
+                userAccounts = userAccounts.filter(function (u) {
+                    return String(u.userId || '').trim().toLowerCase() !== uid;
+                });
+                persistUserAccounts();
+                renderUsersTable();
+                renderTable({ preservePage: true });
+                showToast('계정을 삭제했습니다.');
+                closePanel(true);
+            }
+
+            if (window.__bpsSupabase && window.__bpsSupabase.auth) {
+                bpsAdminApi('/api/admin', { action: 'delete-user', displayUserId: uid })
+                    .then(function (r) {
+                        if (!r.ok) {
+                            alert((r.body && r.body.error) || '계정 삭제에 실패했습니다.');
+                            return;
+                        }
+                        applyDeleteLocal();
+                        syncUserAccountsFromServer().then(function () {
+                            renderUsersTable();
+                        });
+                    })
+                    .catch(function (e) {
+                        alert((e && e.message) || '계정 삭제에 실패했습니다.');
+                    });
+                return;
+            }
+
+            applyDeleteLocal();
         }
 
         function resetUserPassword(userId) {
@@ -11103,6 +11208,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             basicInfoEditMode = false;
             currentEditItem = null;
             isCreatingAccount = false;
+            isUserManageEditMode = false;
             pendingFinanceHydrationCode = null;
         }
 
@@ -11453,6 +11559,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 switchAdminSettingsTab,
                 openAddUserModal,
                 openUserManagePanelById,
+                startUserManageEdit,
+                deleteManagedUser,
                 switchUserManageTab,
                 toggleUserExtraPageAccess,
                 updateUserManagePanelByType,

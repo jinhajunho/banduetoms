@@ -214,9 +214,40 @@ export default {
                 return jsonResponse(200, { ok: true });
             }
 
+            if (action === 'delete-user') {
+                const displayUserId = String(body.displayUserId || '').trim().toLowerCase();
+                if (!displayUserId) {
+                    return jsonResponse(400, { ok: false, error: 'displayUserId is required' });
+                }
+                const { data: target, error: targetErr } = await supabaseAdmin
+                    .from('user_profiles')
+                    .select('auth_user_id, display_user_id')
+                    .eq('display_user_id', displayUserId)
+                    .maybeSingle();
+                if (targetErr) return jsonResponse(500, { ok: false, error: targetErr.message });
+                if (!target) return jsonResponse(404, { ok: false, error: 'User profile not found' });
+                if (String(target.auth_user_id || '') === String(admin.authUserId || '')) {
+                    return jsonResponse(403, { ok: false, error: '현재 로그인한 계정은 삭제할 수 없습니다.' });
+                }
+
+                const { error: delProfileErr } = await supabaseAdmin
+                    .from('user_profiles')
+                    .delete()
+                    .eq('display_user_id', displayUserId);
+                if (delProfileErr) return jsonResponse(500, { ok: false, error: delProfileErr.message });
+
+                const { error: delAuthErr } = await supabaseAdmin.auth.admin.deleteUser(target.auth_user_id);
+                if (delAuthErr) {
+                    // 프로필은 이미 삭제되어 서비스 접근은 막히므로 경고만 내려줍니다.
+                    return jsonResponse(200, { ok: true, warning: delAuthErr.message });
+                }
+
+                return jsonResponse(200, { ok: true });
+            }
+
             return jsonResponse(400, {
                 ok: false,
-                error: 'action must be list-users, create-user, update-profile, or reset-password',
+                error: 'action must be list-users, create-user, update-profile, reset-password, or delete-user',
             });
         } catch (e) {
             return jsonResponse(500, { ok: false, error: e?.message || String(e) });
