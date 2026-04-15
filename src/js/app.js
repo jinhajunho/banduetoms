@@ -457,9 +457,38 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (!Array.isArray(e.paymentRows)) e.paymentRows = [];
                 if (!Array.isArray(e.purchaseRows)) e.purchaseRows = [];
                 if (!Array.isArray(e.transferRows)) e.transferRows = [];
+                if (!Array.isArray(e.businessIncomeRows)) e.businessIncomeRows = [];
                 if (e.businessIncomeGross === undefined) e.businessIncomeGross = 0;
                 if (e.businessIncomeTransferDate === undefined) e.businessIncomeTransferDate = '';
+                if (e.businessIncomeName === undefined) e.businessIncomeName = '';
                 if (e.businessIncomePaidStatus === undefined) e.businessIncomePaidStatus = '미지급';
+                if (!e.businessIncomeRows.length) {
+                    const g = Math.max(0, Math.round(Number(e.businessIncomeGross || 0) || 0));
+                    const hasLegacyBiz = g > 0 || String(e.businessIncomeTransferDate || '').trim() !== '' || String(e.businessIncomeName || '').trim() !== '';
+                    if (hasLegacyBiz) {
+                        e.businessIncomeRows = [[
+                            String(e.businessIncomeTransferDate || '').trim(),
+                            String(e.businessIncomeName || '').trim(),
+                            g,
+                            String(e.businessIncomePaidStatus || '미지급') === '지급' ? '지급' : '미지급',
+                        ]];
+                    }
+                }
+                if (e.businessIncomeRows.length) {
+                    const bizAgg = e.businessIncomeRows.reduce(function (acc, r) {
+                        const gross = Math.max(0, Math.round(Number(r && r[2] != null ? r[2] : 0) || 0));
+                        const comp = computeBizTaxFromGross(gross);
+                        acc.gross += comp.gross;
+                        acc.net += comp.net;
+                        acc.allPaid = acc.allPaid && String(r && r[3] ? r[3] : '미지급') === '지급';
+                        return acc;
+                    }, { gross: 0, net: 0, allPaid: true });
+                    e.businessIncomeGross = bizAgg.gross;
+                    e.businessIncomeNetPay = bizAgg.net;
+                    e.businessIncomePaidStatus = bizAgg.gross > 0 && bizAgg.allPaid ? '지급' : '미지급';
+                    if (!e.businessIncomeTransferDate && e.businessIncomeRows[0] && e.businessIncomeRows[0][0]) e.businessIncomeTransferDate = String(e.businessIncomeRows[0][0]);
+                    if (!e.businessIncomeName && e.businessIncomeRows[0] && e.businessIncomeRows[0][1]) e.businessIncomeName = String(e.businessIncomeRows[0][1]);
+                }
                 if (e.showOnDashboardCalendar === undefined) e.showOnDashboardCalendar = true;
                 if (e.salesRows.length > 0) {
                     e.salesDates = deriveSalesDatesFromSalesRows(e.salesRows);
@@ -5576,10 +5605,25 @@ import { createProjectRegister } from './estimate-project-register.js';
             return s;
         }
 
+        function packBusinessIncomeRowsForCsv(item) {
+            const rows = Array.isArray(item && item.businessIncomeRows) ? item.businessIncomeRows : [];
+            if (!rows.length) return '';
+            return rows
+                .map(function (r) {
+                    const dt = String(r && r[0] ? r[0] : '').trim();
+                    const nm = String(r && r[1] ? r[1] : '').trim();
+                    const gross = Math.max(0, Math.round(Number(r && r[2] != null ? r[2] : 0) || 0));
+                    const net = computeBizTaxFromGross(gross).net;
+                    const paid = String(r && r[3] ? r[3] : '미지급') === '지급' ? '지급' : '미지급';
+                    return [dt, nm, String(net), paid].join('|');
+                })
+                .join(';');
+        }
+
         function downloadEstimateCSV() {
             let csv = '\uFEFF';
             csv +=
-                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태\n';
+                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,사업소득행들\n';
             estimates.forEach(function (item) {
                 const taxIssuedDisp = item.taxIssued ? '발행완료' : '미발행';
                 csv +=
@@ -5604,6 +5648,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                         csvEscape(Number(item.businessIncomeGross || 0)),
                         csvEscape(item.businessIncomeTransferDate || ''),
                         csvEscape(item.businessIncomePaidStatus || '미지급'),
+                        csvEscape(packBusinessIncomeRowsForCsv(item)),
                     ].join(',') + '\n';
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -5620,12 +5665,13 @@ import { createProjectRegister } from './estimate-project-register.js';
         function downloadEstimateImportTemplate() {
             let csv = '\uFEFF';
             csv +=
-                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,매출행들,수금행들,매입행들,이체행들\n' +
+                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,사업소득행들,매출행들,수금행들,매입행들,이체행들\n' +
                 csvEscape(
-                    '※ 한 프로젝트를 한 행에 입력합니다. 매출행들/수금행들/매입행들/이체행들 형식: 일자|상호명|vat포함|메모 를 ; 로 여러 건 연결. 고급 형식: 일자|상호명|vat별도|부가세|vat포함|메모. 날짜는 YYYY-MM-DD.'
+                    '※ 한 프로젝트를 한 행에 입력합니다. 사업소득행들 형식: 일자|성함/업체명|차인지급액|지급여부(지급/미지급) 를 ; 로 여러 건 연결. 매출행들/수금행들/매입행들/이체행들 형식: 일자|상호명|vat포함|메모 또는 일자|상호명|vat별도|부가세|vat포함|메모. 날짜는 YYYY-MM-DD.'
                 ) +
                 '\n' +
-                ',견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,12000000,미수,미발행,8000000,2026-01-15,2026-04-06,2026-04-07,0,,미지급,' +
+                ',견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,12000000,미수,미발행,8000000,2026-01-15,2026-04-06,2026-04-07,2900000,2026-04-12,미지급,' +
+                csvEscape('2026-04-12|김철수|1934300|지급;2026-04-25|(주)예시건설|966999|미지급') + ',' +
                 csvEscape('2026-04-06|(주)예시건설|12000000|1차 매출') + ',' +
                 csvEscape('2026-04-10|(주)예시건설|6000000|1차 수금;2026-04-20|(주)예시건설|6000000|2차 수금') + ',' +
                 csvEscape('2026-04-08|영진인프라|4800000|자재') + ',' +
@@ -5698,6 +5744,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                 businessincomepaidstatus: 'businessIncomePaidStatus',
                 사업소득지급상태: 'businessIncomePaidStatus',
                 소득지급: 'businessIncomePaidStatus',
+                businessincomename: 'businessIncomeName',
+                사업소득성함: 'businessIncomeName',
+                사업소득업체명: 'businessIncomeName',
+                businessincomerows: 'businessIncomeRows',
+                사업소득행들: 'businessIncomeRows',
                 rowdate: 'rowDate',
                 일자: 'rowDate',
                 rowname: 'rowName',
@@ -5794,6 +5845,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 hasSales: false,
                 hasPurchase: false,
                 businessIncomeTransferDate: '',
+                businessIncomeName: '',
+                businessIncomeRows: [],
                 businessIncomeGross: 0,
                 businessIncomeNetPay: 0,
                 businessIncomePaidStatus: '미지급',
@@ -5886,6 +5939,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                     return '사업소득이체일은 YYYY-MM-DD 형식이어야 합니다.';
                 }
                 item.businessIncomeTransferDate = bit;
+            }
+            if (rowMap.businessIncomeName != null && String(rowMap.businessIncomeName).trim() !== '') {
+                item.businessIncomeName = String(rowMap.businessIncomeName).trim();
             }
             if (rowMap.businessIncomePaidStatus != null && String(rowMap.businessIncomePaidStatus).trim() !== '') {
                 var bip = String(rowMap.businessIncomePaidStatus).trim();
@@ -6043,6 +6099,30 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return { ok: true, rows: outRows };
             }
 
+            function parseBusinessIncomePackedRows(raw, fallbackDate, fallbackName) {
+                const s = String(raw == null ? '' : raw).trim();
+                if (!s) return { ok: true, rows: [] };
+                const chunks = s
+                    .split(';')
+                    .map(function (x) { return String(x).trim(); })
+                    .filter(Boolean);
+                const outRows = [];
+                for (var bi = 0; bi < chunks.length; bi++) {
+                    var parts = chunks[bi].split('|').map(function (x) { return String(x).trim(); });
+                    if (parts.length < 3) return { ok: false, err: '사업소득행들 형식 오류: ' + chunks[bi] };
+                    var d = parts[0] || fallbackDate || new Date().toISOString().slice(0, 10);
+                    if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return { ok: false, err: '사업소득행들 날짜는 YYYY-MM-DD 형식이어야 합니다.' };
+                    var nm = parts[1] || fallbackName || '-';
+                    var net = parseEstimateImportNumber(parts[2]);
+                    if (Number.isNaN(net)) return { ok: false, err: '사업소득행들 차인지급액은 숫자여야 합니다.' };
+                    var gross = computeBizTaxFromGross(grossFromBizNet(Math.round(net || 0))).gross;
+                    var paid = parts[3] || '미지급';
+                    if (paid !== '지급' && paid !== '미지급') return { ok: false, err: '사업소득행들 지급여부는 지급 또는 미지급이어야 합니다.' };
+                    outRows.push([d, nm, gross, paid]);
+                }
+                return { ok: true, rows: outRows };
+            }
+
             for (var ri = 0; ri < dataRows.length; ri++) {
                 var line = ri + 2;
                 var cells = dataRows[ri];
@@ -6116,6 +6196,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                         previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: transferPacked.err });
                         continue;
                     }
+                    var bizPacked = parseBusinessIncomePackedRows(rowMap.businessIncomeRows, defaultDate, defaultName);
+                    if (!bizPacked.ok) {
+                        previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: bizPacked.err });
+                        continue;
+                    }
 
                     if (salesPacked.rows.length) {
                         base.salesRows = salesPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], base.taxIssued ? '발행' : '미발행', '-', r[5], '', { contractorBy: '', internalBy: '' }]; });
@@ -6128,6 +6213,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                     }
                     if (transferPacked.rows.length) {
                         base.transferRows = transferPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], r[5], null]; });
+                    }
+                    if (bizPacked.rows.length) {
+                        base.businessIncomeRows = bizPacked.rows;
+                        base.businessIncomeTransferDate = bizPacked.rows[0][0] || '';
+                        base.businessIncomeName = bizPacked.rows[0][1] || '';
                     }
                     if (!salesPacked.rows.length && !payPacked.rows.length && !purchasePacked.rows.length && !transferPacked.rows.length) {
                         buildFinanceRowsFromSummary(base);
@@ -6148,6 +6238,14 @@ import { createProjectRegister } from './estimate-project-register.js';
                             else if (paySum2 >= base.revenue) base.paidStatus = '전액';
                             else base.paidStatus = '부분';
                         }
+                    }
+                    if (bizPacked.rows.length) {
+                        var bizGrossSum2 = (base.businessIncomeRows || []).reduce(function (a, v) { return a + (Number(v && v[2]) || 0); }, 0);
+                        var bizNetSum2 = (base.businessIncomeRows || []).reduce(function (a, v) { return a + (computeBizTaxFromGross(Number(v && v[2]) || 0).net); }, 0);
+                        var bizAllPaid2 = (base.businessIncomeRows || []).every(function (v) { return String(v && v[3] || '미지급') === '지급'; });
+                        base.businessIncomeGross = bizGrossSum2;
+                        base.businessIncomeNetPay = bizNetSum2;
+                        base.businessIncomePaidStatus = bizGrossSum2 > 0 && bizAllPaid2 ? '지급' : '미지급';
                     }
 
                     previews.push({ line: line, codeDisp: base.code, building: (base.building || '-').slice(0, 40), err: '' });
