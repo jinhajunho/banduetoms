@@ -10,10 +10,10 @@ export function createRenderPanelContent(api) {
             ? String(item.contractor || profile.contractorName || '').trim()
             : '';
         const canViewSalesTab = !isExternalContractorView;
-        /* 구분(type)과 무관: 내부는 매출·매입·사업소득·수익분석 모두. 외부 도급사는 매출만 숨김 */
+        /* 구분(type)과 무관: 내부는 매출·매입·사업소득·수익분석. 외부는 매출·수익분석 숨김, 매입·사업소득만 */
         const canViewPurchaseTab = canViewSalesTab || isExternalContractorView;
         const canViewBusinessTab = canViewPurchaseTab;
-        const canViewProfitTab = canViewPurchaseTab;
+        const canViewProfitTab = canViewSalesTab;
         const allowedTabs = ['basic'];
         if (canViewSalesTab) allowedTabs.push('sales');
         if (canViewPurchaseTab) allowedTabs.push('purchase');
@@ -27,7 +27,26 @@ export function createRenderPanelContent(api) {
         }
         api.setActivePanelTabId(activePanelTabId);
         const codeLabel = item && item.code ? ` · ${item.code}` : '';
-        const bizVals = api.computeBizTaxFromGross(item.businessIncomeGross);
+        const bizRows = Array.isArray(item.businessIncomeRows) ? item.businessIncomeRows : [];
+        const seedBizRows = (!bizRows.length) && (Number(item.businessIncomeGross || 0) > 0 || (item.businessIncomeTransferDate || '') || (item.businessIncomePaidStatus || '') !== '');
+        const effectiveBizRows = bizRows.length
+            ? bizRows
+            : (seedBizRows
+                ? [[item.businessIncomeTransferDate || '', item.businessIncomeName || '', Number(item.businessIncomeGross || 0) || 0, item.businessIncomePaidStatus || '미지급']]
+                : []);
+        if (!Array.isArray(item.businessIncomeRows) || (item.businessIncomeRows || []).length !== effectiveBizRows.length) {
+            item.businessIncomeRows = effectiveBizRows;
+        }
+        const bizTotals = (effectiveBizRows || []).reduce((acc, r) => {
+            const gross = Math.max(0, Math.round(Number(r && r[2] != null ? r[2] : 0) || 0));
+            const c = api.computeBizTaxFromGross(gross);
+            acc.gross += c.gross;
+            acc.taxTotal += c.taxTotal;
+            acc.net += c.net;
+            acc.any = acc.any || c.gross > 0;
+            acc.allPaid = acc.allPaid && String(r && r[3] ? r[3] : '미지급') === '지급';
+            return acc;
+        }, { gross: 0, taxTotal: 0, net: 0, any: false, allPaid: true });
         const profitNetTotals = api.getProfitNetTotalsByCode(item.code, item.revenue, item.purchase, item.businessIncomeGross);
         const bizAmtEditable =
             api.getBusinessInfoEditMode() ||
@@ -409,55 +428,65 @@ export function createRenderPanelContent(api) {
                             <button type="button" class="btn-basic-info-cancel" onclick="cancelBusinessIncomeEdit()" style="${bizTitleEditing ? '' : 'display:none;'}">취소</button>
                         </span>
                     </div>
-                    <div class="detail-grid" style="max-width:520px;">
-                        <div class="detail-row">
-                            <div class="detail-label">이체일 <span style="font-weight:400;color:var(--gray-500);font-size:12px;">(선택)</span></div>
-                            <div class="detail-value">
-                                <input type="date" class="form-input" id="biz_transfer_date" value="${item.businessIncomeTransferDate || ''}" title="선택 입력" ${isExternalContractorView || (!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''}>
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-label">사업소득금액</div>
-                            <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_gross" placeholder="세전 금액" min="0" step="1" value="${bizVals.gross}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'disabled' : ''} ${!bizAmtEditable ? 'style="background:var(--gray-50);"' : ''}>
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-label">사업소득세 (3%)</div>
-                            <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_tax3" min="0" step="1" value="${bizVals.tax3}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-label">지방소득세 (0.3%)</div>
-                            <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_tax_local" min="0" step="1" value="${bizVals.taxLocal}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-label">세금합계 (3.3%)</div>
-                            <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_tax_total" min="0" step="1" value="${bizVals.taxTotal}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
-                            </div>
-                        </div>
-                        <div class="detail-row">
-                            <div class="detail-label">차인지급액</div>
-                            <div class="detail-value">
-                                <input type="number" class="form-input" id="biz_net" min="0" step="1" value="${bizVals.net}" oninput="syncBusinessIncomeDerived(event);" ${!bizAmtEditable ? 'readonly' : ''} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
-                            </div>
-                        </div>
-                        <div class="detail-row" style="align-items:start;">
-                            <div class="detail-label" style="padding-top:8px;">지급 여부</div>
-                            <div class="detail-value" style="padding-top:8px; display:flex; gap:20px; align-items:center;">
-                                <label style="display:inline-flex;align-items:center;gap:6px;cursor:${isExternalContractorView ? 'default' : 'pointer'};">
-                                    <input type="radio" name="biz_paid" value="지급" ${item.businessIncomePaidStatus === '지급' ? 'checked' : ''} ${isExternalContractorView || (!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''} onchange="markPanelDirtyIfChanged()">
-                                    <span>지급</span>
-                                </label>
-                                <label style="display:inline-flex;align-items:center;gap:6px;cursor:${isExternalContractorView ? 'default' : 'pointer'};">
-                                    <input type="radio" name="biz_paid" value="미지급" ${item.businessIncomePaidStatus !== '지급' ? 'checked' : ''} ${isExternalContractorView || (!api.getBusinessInfoEditMode() && !api.getIsEditMode() && !api.getIsNewEstimate()) ? 'disabled' : ''} onchange="markPanelDirtyIfChanged()">
-                                    <span>미지급</span>
-                                </label>
-                            </div>
+                    <div class="payment-actions" style="margin-bottom:10px; display:flex; gap:8px; align-items:center; justify-content:flex-end;">
+                        <button type="button" class="btn btn-sm" onclick="addBusinessIncomeRow('${item.code}')" ${!bizAmtEditable ? 'disabled' : ''}>사업소득 추가</button>
+                    </div>
+                    <div class="payment-table-wrap">
+                        <table class="payment-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 132px;">이체일</th>
+                                    <th style="width: 180px;">성함/업체명</th>
+                                    <th style="width: 130px;">사업소득금액(세전)</th>
+                                    <th style="width: 120px;">세금합계(3.3%)</th>
+                                    <th style="width: 130px;">차인지급액</th>
+                                    <th style="width: 120px;">지급 여부</th>
+                                    <th style="width: 56px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="bizList-${item.code}">
+                                ${(effectiveBizRows || []).map((r, idx) => {
+                                    const dt = String(r && r[0] ? r[0] : '');
+                                    const nm = String(r && r[1] ? r[1] : '');
+                                    const gross = Math.max(0, Math.round(Number(r && r[2] != null ? r[2] : 0) || 0));
+                                    const paid = String(r && r[3] ? r[3] : '미지급') === '지급' ? '지급' : '미지급';
+                                    const c = api.computeBizTaxFromGross(gross);
+                                    const dis = (!bizAmtEditable) ? 'disabled' : '';
+                                    const ro = (!bizAmtEditable) ? 'readonly' : '';
+                                    return `
+                                        <tr class="finance-row" data-biz-row="1">
+                                            <td>
+                                                <input type="date" class="form-input" value="${dt}" data-biz-field="date" ${dis}>
+                                            </td>
+                                            <td>
+                                                <input type="text" class="form-input" value="${api.escapeHtml(nm)}" data-biz-field="name" placeholder="성함/업체명" ${dis}>
+                                            </td>
+                                            <td>
+                                                <input type="number" class="form-input" value="${c.gross}" data-biz-field="gross" min="0" step="1" oninput="syncBusinessIncomeRowDerived(event);" ${dis}>
+                                            </td>
+                                            <td class="text-right">
+                                                <input type="number" class="form-input" value="${c.taxTotal}" data-biz-field="taxTotal" ${ro} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
+                                            </td>
+                                            <td class="text-right">
+                                                <input type="number" class="form-input" value="${c.net}" data-biz-field="net" ${ro} style="${!bizAmtEditable ? 'background:var(--gray-50);' : ''}">
+                                            </td>
+                                            <td>
+                                                <select class="form-select" data-biz-field="paid" ${dis} onchange="markPanelDirtyIfChanged()">
+                                                    <option value="미지급" ${paid === '미지급' ? 'selected' : ''}>미지급</option>
+                                                    <option value="지급" ${paid === '지급' ? 'selected' : ''}>지급</option>
+                                                </select>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-sm" title="삭제" onclick="removeBusinessIncomeRow('${item.code}', ${idx})" ${!bizAmtEditable ? 'disabled' : ''}>×</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                        <div class="payment-summary" style="margin-top:10px;">
+                            <span class="payment-summary-label">총 차인지급액</span>
+                            <span class="payment-summary-value" id="bizNetSummary-${item.code}">${(bizTotals.net || 0).toLocaleString()}원</span>
                         </div>
                     </div>
                 </div>

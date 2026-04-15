@@ -82,6 +82,8 @@ export async function saveEstimateChanges(api) {
             purchaseRows: cur.purchaseRows || [],
             transferRows: cur.transferRows || [],
             businessIncomeTransferDate: cur.businessIncomeTransferDate || '',
+            businessIncomeName: cur.businessIncomeName || '',
+            businessIncomeRows: cur.businessIncomeRows || [],
             businessIncomeGross: cur.businessIncomeGross || 0,
             businessIncomeNetPay: cur.businessIncomeNetPay || 0,
             businessIncomePaidStatus: cur.businessIncomePaidStatus || '미지급',

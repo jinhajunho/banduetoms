@@ -1675,7 +1675,35 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         function readBusinessIncomeFormIntoItem(target) {
             if (!target) return;
-            if (!isCurrentUserExternalContractor() && target.type !== '세금계산서' && target.type !== '사업소득' && target.type !== '세금계산서/사업소득') return;
+            const code = String(target.code || '').trim();
+            const tbody = code ? document.getElementById('bizList-' + code) : null;
+
+            // 다건 테이블이 있으면 그 기준으로 읽습니다.
+            if (tbody && tbody.rows && tbody.rows.length) {
+                const rows = [];
+                Array.from(tbody.rows).forEach(function (tr) {
+                    const get = function (field) {
+                        return tr.querySelector('[data-biz-field="' + field + '"]');
+                    };
+                    const dt = String(get('date') && get('date').value ? get('date').value : '').trim();
+                    const nm = String(get('name') && get('name').value ? get('name').value : '').trim();
+                    const gross = Math.max(0, Math.round(Number(get('gross') && get('gross').value != null ? get('gross').value : 0) || 0));
+                    const paidRaw = String(get('paid') && get('paid').value ? get('paid').value : '미지급').trim();
+                    const paid = paidRaw === '지급' ? '지급' : '미지급';
+                    // 구조: [이체일, 성함/업체명, 세전금액, 지급여부]
+                    rows.push([dt, nm, gross, paid]);
+                });
+                target.businessIncomeRows = rows;
+                const totals = computeBizTotalsFromRows(rows);
+                target.businessIncomeGross = totals.gross;
+                target.businessIncomeNetPay = totals.net;
+                target.businessIncomePaidStatus = totals.any ? (totals.allPaid ? '지급' : '미지급') : '미지급';
+                target.businessIncomeTransferDate = rows[0] && rows[0][0] ? rows[0][0] : (target.businessIncomeTransferDate || '');
+                target.businessIncomeName = rows[0] && rows[0][1] ? rows[0][1] : (target.businessIncomeName || '');
+                return;
+            }
+
+            // (하위 호환) 구버전 단일 입력 UI가 남아있을 수 있어 유지
             const d = document.getElementById('biz_transfer_date');
             const g = document.getElementById('biz_gross');
             const paid = document.querySelector('input[name="biz_paid"]:checked');
@@ -1687,6 +1715,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             target.businessIncomeGross = comp.gross;
             target.businessIncomeNetPay = comp.net;
+            target.businessIncomeRows = [[target.businessIncomeTransferDate || '', target.businessIncomeName || '', comp.gross, target.businessIncomePaidStatus || '미지급']];
         }
 
         function syncBusinessIncomeDerived(evt) {
@@ -1726,6 +1755,83 @@ import { createProjectRegister } from './estimate-project-register.js';
             markPanelDirtyIfChanged();
         }
 
+        function computeBizTotalsFromRows(rows) {
+            const list = Array.isArray(rows) ? rows : [];
+            return list.reduce(function (acc, r) {
+                const gross = Math.max(0, Math.round(Number(r && r[2] != null ? r[2] : 0) || 0));
+                const c = computeBizTaxFromGross(gross);
+                acc.gross += c.gross;
+                acc.net += c.net;
+                if (c.gross > 0) acc.any = true;
+                const paid = String(r && r[3] ? r[3] : '미지급') === '지급';
+                if (!paid) acc.allPaid = false;
+                return acc;
+            }, { gross: 0, net: 0, any: false, allPaid: true });
+        }
+
+        function syncBusinessIncomeRowDerived(evt) {
+            const ev = evt != null ? evt : window.event;
+            const el = ev && ev.target ? ev.target : null;
+            const tr = el && typeof el.closest === 'function' ? el.closest('tr') : null;
+            if (!tr) return;
+            const grossEl = tr.querySelector('[data-biz-field="gross"]');
+            const taxTotalEl = tr.querySelector('[data-biz-field="taxTotal"]');
+            const netEl = tr.querySelector('[data-biz-field="net"]');
+            if (!grossEl) return;
+            const gross = Math.max(0, Math.round(Number(grossEl.value || 0) || 0));
+            const c = computeBizTaxFromGross(gross);
+            if (taxTotalEl) taxTotalEl.value = String(c.taxTotal);
+            if (netEl) netEl.value = String(c.net);
+            // 하단 합계 업데이트
+            const tb = tr.parentElement;
+            const code = tb && tb.id && tb.id.indexOf('bizList-') === 0 ? tb.id.replace('bizList-', '') : '';
+            if (code) {
+                const rows = [];
+                Array.from(tb.rows || []).forEach(function (tr2) {
+                    const g2 = tr2.querySelector('[data-biz-field="gross"]');
+                    const p2 = tr2.querySelector('[data-biz-field="paid"]');
+                    const d2 = tr2.querySelector('[data-biz-field="date"]');
+                    const n2 = tr2.querySelector('[data-biz-field="name"]');
+                    rows.push([
+                        String(d2 && d2.value ? d2.value : ''),
+                        String(n2 && n2.value ? n2.value : ''),
+                        Math.max(0, Math.round(Number(g2 && g2.value != null ? g2.value : 0) || 0)),
+                        String(p2 && p2.value ? p2.value : '미지급') === '지급' ? '지급' : '미지급',
+                    ]);
+                });
+                const totals = computeBizTotalsFromRows(rows);
+                const sumEl = document.getElementById('bizNetSummary-' + code);
+                if (sumEl) sumEl.textContent = (totals.net || 0).toLocaleString() + '원';
+            }
+            markPanelDirtyIfChanged();
+        }
+
+        function addBusinessIncomeRow(code) {
+            if (!currentEditItem) return;
+            const c = String(code || currentEditItem.code || '').trim();
+            if (!c) return;
+            if (!Array.isArray(currentEditItem.businessIncomeRows)) currentEditItem.businessIncomeRows = [];
+            const today = new Date().toISOString().slice(0, 10);
+            currentEditItem.businessIncomeRows.push([today, '', 0, '미지급']);
+            activePanelTabId = 'business';
+            renderPanelContent(currentEditItem);
+            markPanelDirtyIfChanged();
+        }
+
+        function removeBusinessIncomeRow(code, idx) {
+            if (!currentEditItem) return;
+            const c = String(code || currentEditItem.code || '').trim();
+            if (!c) return;
+            const i = Math.max(0, parseInt(idx, 10) || 0);
+            const rows = Array.isArray(currentEditItem.businessIncomeRows) ? currentEditItem.businessIncomeRows : [];
+            if (i < 0 || i >= rows.length) return;
+            rows.splice(i, 1);
+            currentEditItem.businessIncomeRows = rows;
+            activePanelTabId = 'business';
+            renderPanelContent(currentEditItem);
+            markPanelDirtyIfChanged();
+        }
+
         function projectSalesPurchaseChipClass(isPurchaseSide, item, purchaseAmount) {
             // 매출 칩: 매출 행 기준 taxIssued(세금계산서 발행 여부)
             if (!isPurchaseSide) {
@@ -1756,16 +1862,21 @@ import { createProjectRegister } from './estimate-project-register.js';
             const purchaseGross = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
             const pay = item.aggregatePaymentGross != null ? item.aggregatePaymentGross : 0;
             const transfer = item.aggregateTransferGross != null ? item.aggregateTransferGross : 0;
-            const biz = computeBizTaxFromGross(item.businessIncomeGross);
+            const bizRows = Array.isArray(item.businessIncomeRows) ? item.businessIncomeRows : [];
+            const bizTotals = bizRows.length ? computeBizTotalsFromRows(bizRows) : null;
+            const bizGross = bizTotals ? bizTotals.gross : Math.max(0, Math.round(Number(item.businessIncomeGross || 0) || 0));
+            const bizNet = bizTotals ? bizTotals.net : computeBizTaxFromGross(bizGross).net;
             // 필터와 칩 색상 판정을 완전히 동일하게 맞추기 위해 "정확히 동일" 기준으로 완료 판정합니다.
             const payDone = salesGross <= 0 ? true : pay === salesGross;
             const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
             const payHtml = pay <= 0 ? tableAmountDash() : tableCashflowChip(pay, payDone);
             const xferHtml = transfer <= 0 ? tableAmountDash() : tableCashflowChip(transfer, xferDone);
             let netHtml;
-            if (biz.gross <= 0) netHtml = tableAmountDash();
-            else if (item.businessIncomePaidStatus === '지급') netHtml = '<span class="table-amount-chip table-amount-chip--issued">' + biz.net.toLocaleString() + '원</span>';
-            else netHtml = '<span class="table-amount-chip table-amount-chip--not-issued">' + biz.net.toLocaleString() + '원</span>';
+            if (bizGross <= 0) netHtml = tableAmountDash();
+            else {
+                const allPaid = bizTotals ? bizTotals.allPaid : (item.businessIncomePaidStatus === '지급');
+                netHtml = '<span class="table-amount-chip ' + (allPaid ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued') + '">' + bizNet.toLocaleString() + '원</span>';
+            }
             return '<div class="table-amount-pair table-cashflow-triple">' + payHtml + '<span class="table-amount-slash">/</span>' + xferHtml + '<span class="table-amount-slash">/</span>' + netHtml + '</div>';
         }
 
@@ -1773,13 +1884,18 @@ import { createProjectRegister } from './estimate-project-register.js';
         function renderCashflowTransferNetCell(item) {
             const purchaseGross = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
             const transfer = item.aggregateTransferGross != null ? item.aggregateTransferGross : 0;
-            const biz = computeBizTaxFromGross(item.businessIncomeGross);
+            const bizRows = Array.isArray(item.businessIncomeRows) ? item.businessIncomeRows : [];
+            const bizTotals = bizRows.length ? computeBizTotalsFromRows(bizRows) : null;
+            const bizGross = bizTotals ? bizTotals.gross : Math.max(0, Math.round(Number(item.businessIncomeGross || 0) || 0));
+            const bizNet = bizTotals ? bizTotals.net : computeBizTaxFromGross(bizGross).net;
             const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
             const xferHtml = transfer <= 0 ? tableAmountDash() : tableCashflowChip(transfer, xferDone);
             let netHtml;
-            if (biz.gross <= 0) netHtml = tableAmountDash();
-            else if (item.businessIncomePaidStatus === '지급') netHtml = '<span class="table-amount-chip table-amount-chip--issued">' + biz.net.toLocaleString() + '원</span>';
-            else netHtml = '<span class="table-amount-chip table-amount-chip--not-issued">' + biz.net.toLocaleString() + '원</span>';
+            if (bizGross <= 0) netHtml = tableAmountDash();
+            else {
+                const allPaid = bizTotals ? bizTotals.allPaid : (item.businessIncomePaidStatus === '지급');
+                netHtml = '<span class="table-amount-chip ' + (allPaid ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued') + '">' + bizNet.toLocaleString() + '원</span>';
+            }
             return '<div class="table-amount-pair table-cashflow-triple">' + xferHtml + '<span class="table-amount-slash">/</span>' + netHtml + '</div>';
         }
 
@@ -10745,6 +10861,11 @@ import { createProjectRegister } from './estimate-project-register.js';
             renderTable({ preservePage: true });
             showToast('사업소득이 저장되었습니다.');
         }
+
+        // 사업소득(다건) UI 액션/동기화
+        window.addBusinessIncomeRow = addBusinessIncomeRow;
+        window.removeBusinessIncomeRow = removeBusinessIncomeRow;
+        window.syncBusinessIncomeRowDerived = syncBusinessIncomeRowDerived;
 
         // 수정 취소
         function cancelEdit() {
