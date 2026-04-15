@@ -11,7 +11,8 @@ export function createRenderPanelContent(api) {
             : '';
         const canViewSalesTab = !isExternalContractorView;
         const isTaxOrBiz = item.type === '세금계산서' || item.type === '사업소득' || item.type === '세금계산서/사업소득';
-        const canViewPurchaseTab = item.type === '세금계산서' || item.type === '세금계산서/사업소득';
+        /* 내부: 매출과 동일하게 매입 탭. 외부 도급사: 매출은 숨기되 매입 탭만 노출 */
+        const canViewPurchaseTab = canViewSalesTab || isExternalContractorView;
         const canViewBusinessTab = isExternalContractorView || isTaxOrBiz;
         const canViewProfitTab = !isExternalContractorView && isTaxOrBiz;
         const allowedTabs = ['basic'];
