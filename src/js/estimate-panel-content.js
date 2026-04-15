@@ -292,7 +292,7 @@ export function createRenderPanelContent(api) {
                             <thead>
                                 <tr>
                                     <th style="width: 100px;">매출일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
-                                    <th style="width: 120px;">상호명</th>
+                                    <th style="width: 120px;">상호명 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
                                     <th style="width: 92px;">매출금액(vat별도)</th>
                                     <th style="width: 88px;">부가세(vat)</th>
                                     <th style="width: 100px;">매출금액(vat포함)</th>
@@ -327,7 +327,7 @@ export function createRenderPanelContent(api) {
                             <thead>
                                 <tr>
                                     <th style="width: 100px;">수금일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
-                                    <th>상호명</th>
+                                    <th>상호명 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
                                     <th style="width: 100px;">수금금액(vat별도)</th>
                                     <th style="width: 88px;">부가세(vat)</th>
                                     <th style="width: 100px;">수금금액(vat포함)</th>
@@ -369,7 +369,7 @@ export function createRenderPanelContent(api) {
                             <thead>
                                 <tr>
                                     <th style="width: 100px;">매입일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
-                                    <th style="width: 120px;">상호명</th>
+                                    <th style="width: 120px;">상호명 <span style="font-weight:400;color:var(--gray-500);">(업체정보)</span></th>
                                     <th style="width: 100px;">매입금액(vat별도)</th>
                                     <th style="width: 88px;">부가세(vat)</th>
                                     <th style="width: 100px;">매입금액(vat포함)</th>
@@ -404,7 +404,7 @@ export function createRenderPanelContent(api) {
                             <thead>
                                 <tr>
                                     <th style="width: 100px;">이체일자 <span style="font-weight:400;color:var(--gray-500);">(선택)</span></th>
-                                    <th style="width: 160px;">상호명</th>
+                                    <th style="width: 160px;">상호명 <span style="font-weight:400;color:var(--gray-500);">(업체정보)</span></th>
                                     <th style="width: 100px;">이체금액(vat별도)</th>
                                     <th style="width: 88px;">부가세(vat)</th>
                                     <th style="width: 100px;">이체금액(vat포함)</th>
@@ -529,6 +529,7 @@ export function createRenderPanelContent(api) {
                 </div>
             </div>
             ` : ''}
+            <datalist id="contractorListFinanceVendors">${api.getContractorDatalistOptionsHtml()}</datalist>
         `;
 
         // 버튼 표시/숨김

@@ -24,6 +24,8 @@ export function createEstimateFinanceModal(api) {
     const isExtContractor = typeof api.isCurrentUserExternalContractor === 'function'
         ? api.isCurrentUserExternalContractor.bind(api)
         : function () { return false; };
+    const findContractorByName =
+        typeof api.findContractorByName === 'function' ? api.findContractorByName.bind(api) : function () { return null; };
 
     let financeModalState = null;
 
@@ -213,6 +215,9 @@ export function createEstimateFinanceModal(api) {
         const fileCount = (row && row.dataset.rowFileId && window.savedRowFiles && window.savedRowFiles[row.dataset.rowFileId]) ? window.savedRowFiles[row.dataset.rowFileId].length : 0;
         const modalFileId = 'modal-file-' + Date.now();
         financeModalState = { type: type, code: code, row: row, modalFileId: modalFileId, rowFileId: row ? (row.dataset.rowFileId || '') : '' };
+        const fmNameListAttr = type === 'purchase' || type === 'transfer' ? ' list="contractorListFinanceVendors"' : '';
+        const fmNamePlaceholder =
+            type === 'sales' || type === 'payment' ? '상호명(선택)' : type === 'purchase' || type === 'transfer' ? '업체 검색/선택' : '상호명';
 
         const spMemoFields = (function () {
             if (type !== 'sales' && type !== 'purchase') {
@@ -256,7 +261,7 @@ export function createEstimateFinanceModal(api) {
                         </div>
                         <div style="padding:14px 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
                             <input id="fm_date" type="date" value="${values[0] || ''}" class="form-input" title="선택 입력">
-                            <input id="fm_name" type="text" value="${(values[1] || '').replace(/"/g, '&quot;')}" placeholder="상호명" class="form-input">
+                            <input id="fm_name" type="text" value="${(values[1] || '').replace(/"/g, '&quot;')}" placeholder="${fmNamePlaceholder}" class="form-input"${fmNameListAttr}>
                             <input id="fm_net" type="number" value="${String(values[2] || '').replace(/,/g, '')}" placeholder="vat별도" class="form-input">
                             <input id="fm_tax" type="number" value="${String(values[3] || '').replace(/,/g, '')}" placeholder="부가세" class="form-input" readonly>
                             <input id="fm_gross" type="number" value="${String(values[4] || '').replace(/,/g, '')}" placeholder="vat포함" class="form-input">
@@ -322,8 +327,13 @@ export function createEstimateFinanceModal(api) {
         const name = document.getElementById('fm_name').value.trim();
         const net = parseFloat(document.getElementById('fm_net').value || '0', 10) || 0;
         const gross = parseFloat(document.getElementById('fm_gross').value || '0', 10) || 0;
-        if (!name) {
+        if (!name && type !== 'sales' && type !== 'payment') {
             alert('상호명은 필수입니다. 금액(vat포함)은 비우거나 0으로 둘 수 있습니다. 일자는 생략할 수 있습니다.');
+            return;
+        }
+        if (name && (type === 'purchase' || type === 'transfer') && !findContractorByName(name)) {
+            alert('매입·이체 상호명은 업체정보관리에 등록된 업체만 선택할 수 있습니다.');
+            document.getElementById('fm_name').focus();
             return;
         }
         const parts = api.splitNetTaxFromGross(gross || Math.round(net * 1.1));

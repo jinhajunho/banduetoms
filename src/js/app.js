@@ -10208,6 +10208,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             stampFinanceRowMemoMetaAfterEdit: stampFinanceRowMemoMetaAfterEdit,
             mergeFinanceAttachmentsIntoValues9: mergeFinanceAttachmentsIntoValues9,
             isCurrentUserExternalContractor: isCurrentUserExternalContractor,
+            findContractorByName: findContractorByName,
         });
         const {
             paymentRowMenuHtml,
@@ -10239,11 +10240,27 @@ import { createProjectRegister } from './estimate-project-register.js';
         function saveRow(btn) {
             const row = btn.closest('tr');
             const inputs = row.querySelectorAll('.row-input');
-            
-            // 필수 입력 검증 (금액 number 칸은 비워도 저장 가능)
+            const tbodyEarly = row.closest('tbody');
+            const tidEarly = (tbodyEarly && tbodyEarly.id) || '';
+            let rowTypeEarly = row.getAttribute('data-row-type') || '';
+            if (!rowTypeEarly) {
+                rowTypeEarly =
+                    tidEarly.indexOf('salesList') === 0
+                        ? 'sales'
+                        : tidEarly.indexOf('purchaseList') === 0
+                          ? 'purchase'
+                          : tidEarly.indexOf('salesPayments') === 0
+                            ? 'payment'
+                            : tidEarly.indexOf('transferList') === 0
+                              ? 'transfer'
+                              : 'sales';
+            }
+
+            // 필수 입력 검증 (금액 number 칸은 비워도 저장 가능, 매출·수금 상호명은 선택)
             let hasEmptyField = false;
             inputs.forEach(input => {
                 if (input.tagName === 'INPUT' && input.type === 'number') return;
+                if (input.classList.contains('row-input-finance-name-optional')) return;
                 if (input.tagName === 'INPUT' && input.type !== 'file' && input.type !== 'date' && !input.value.trim()) {
                     hasEmptyField = true;
                     input.style.borderColor = 'var(--danger)';
@@ -10255,6 +10272,20 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (hasEmptyField) {
                 alert('필수 항목을 입력해주세요. (금액은 생략 가능)');
                 return;
+            }
+
+            if (rowTypeEarly === 'purchase' || rowTypeEarly === 'transfer') {
+                const vendorInp = row.querySelector('.row-input-finance-vendor-name');
+                if (vendorInp) {
+                    const vn = String(vendorInp.value || '').trim();
+                    if (vn && !findContractorByName(vn)) {
+                        alert('매입·이체 상호명은 업체정보관리에 등록된 업체만 입력할 수 있습니다.');
+                        vendorInp.style.borderColor = 'var(--danger)';
+                        vendorInp.focus();
+                        return;
+                    }
+                    vendorInp.style.borderColor = '';
+                }
             }
 
             // 저장 확인
@@ -10427,7 +10458,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     var memoVal = (values[7] != null ? values[7] : values[6]) || '';
                     row.innerHTML =
                         '<td><input type="date" class="row-input" value="' + (values[0] || new Date().toISOString().slice(0, 10)) + '"></td>' +
-                        '<td><input type="text" class="row-input" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="상호명"></td>' +
+                        '<td><input type="text" class="row-input row-input-finance-name-optional" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="상호명(선택)"></td>' +
                         '<td><input type="number" class="row-input row-input-sales-net" value="' + netStr + '" placeholder="vat별도"></td>' +
                         '<td><input type="number" readonly class="row-input-sales-vat-tax" tabindex="-1" value="' + String(vatStr).replace(/"/g, '&quot;') + '" placeholder="부가세" title="vat별도 × 10% 자동"></td>' +
                         '<td><input type="number" class="row-input row-input-sales-vat-gross" value="' + String(grossStr).replace(/"/g, '&quot;') + '" placeholder="vat포함" title="vat포함 입력 시 vat별도/부가세 자동 역산"></td>' +
@@ -10450,7 +10481,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     if (values.length > 0 && values.length < 6) values.unshift('');
                     row.innerHTML =
                         '<td><input type="date" class="row-input" value="' + (values[0] || new Date().toISOString().slice(0, 10)) + '"></td>' +
-                        '<td><input type="text" class="row-input" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="업체명"></td>' +
+                        '<td><input type="text" class="row-input row-input-finance-vendor-name" list="contractorListFinanceVendors" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="업체 검색/선택"></td>' +
                         '<td><input type="number" class="row-input" value="' + (String(values[2] || '').replace(/,/g, '')) + '" placeholder="금액"></td>' +
                         '<td><select class="row-input"><option value="미발행"' + (values[3] === '미발행' ? ' selected' : '') + '>미발행</option><option value="발행"' + (values[3] === '발행' ? ' selected' : '') + '>발행</option></select></td>' +
                         '<td>' + fileCellContent + '</td>' +
@@ -10464,7 +10495,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     var payMemoVal = (values[5] || '');
                     row.innerHTML =
                         '<td><input type="date" class="row-input" value="' + (values[0] || new Date().toISOString().slice(0, 10)) + '"></td>' +
-                        '<td><input type="text" class="row-input" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="상호명"></td>' +
+                        '<td><input type="text" class="row-input row-input-finance-name-optional" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="상호명(선택)"></td>' +
                         '<td><input type="number" class="row-input row-input-payment-net" value="' + payNetStr + '" placeholder="vat별도"></td>' +
                         '<td><input type="number" readonly class="row-input-payment-vat-tax" tabindex="-1" value="' + payTaxStr + '" placeholder="부가세"></td>' +
                         '<td><input type="number" class="row-input row-input-payment-gross" value="' + payGrossStr + '" placeholder="vat포함"></td>' +
@@ -10484,7 +10515,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     // transfer
                     row.innerHTML =
                         '<td><input type="date" class="row-input" value="' + (values[0] || new Date().toISOString().slice(0, 10)) + '"></td>' +
-                        '<td><input type="text" class="row-input" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="상호명"></td>' +
+                        '<td><input type="text" class="row-input row-input-finance-vendor-name" list="contractorListFinanceVendors" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="업체 검색/선택"></td>' +
                         '<td><input type="number" class="row-input" style="text-align:right;" value="' + (String(values[2] || '').replace(/,/g, '')) + '" placeholder="금액"></td>' +
                         '<td><input type="text" class="row-input" value="' + (values[3] || '').replace(/"/g, '&quot;') + '" placeholder="메모"></td>' +
                         '<td class="payment-action-cell"><button class="btn-save-row" onclick="saveEditedRow(this)" title="저장"><i class="fas fa-save"></i></button><button class="btn-cancel-row" onclick="cancelEditRow(this)" title="취소"><i class="fas fa-times"></i></button></td>';
@@ -10520,11 +10551,27 @@ import { createProjectRegister } from './estimate-project-register.js';
         function saveEditedRow(btn) {
             const row = btn.closest('tr');
             const inputs = row.querySelectorAll('.row-input');
-            
-            // 필수 입력 검증 (금액 number 칸은 비워도 저장 가능)
+            const tbodyEarly2 = row.closest('tbody');
+            const tidEarly2 = (tbodyEarly2 && tbodyEarly2.id) || '';
+            let rowTypeEarly2 = row.getAttribute('data-row-type') || '';
+            if (!rowTypeEarly2) {
+                rowTypeEarly2 =
+                    tidEarly2.indexOf('salesList') === 0
+                        ? 'sales'
+                        : tidEarly2.indexOf('purchaseList') === 0
+                          ? 'purchase'
+                          : tidEarly2.indexOf('salesPayments') === 0
+                            ? 'payment'
+                            : tidEarly2.indexOf('transferList') === 0
+                              ? 'transfer'
+                              : 'sales';
+            }
+
+            // 필수 입력 검증 (금액 number 칸은 비워도 저장 가능, 매출·수금 상호명은 선택)
             let hasEmptyField = false;
             inputs.forEach(input => {
                 if (input.tagName === 'INPUT' && input.type === 'number') return;
+                if (input.classList.contains('row-input-finance-name-optional')) return;
                 if (input.tagName === 'INPUT' && input.type !== 'file' && input.type !== 'date' && !input.value.trim()) {
                     hasEmptyField = true;
                     input.style.borderColor = 'var(--danger)';
@@ -10536,6 +10583,20 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (hasEmptyField) {
                 alert('필수 항목을 입력해주세요. (금액은 생략 가능)');
                 return;
+            }
+
+            if (rowTypeEarly2 === 'purchase' || rowTypeEarly2 === 'transfer') {
+                const vendorInp2 = row.querySelector('.row-input-finance-vendor-name');
+                if (vendorInp2) {
+                    const vn2 = String(vendorInp2.value || '').trim();
+                    if (vn2 && !findContractorByName(vn2)) {
+                        alert('매입·이체 상호명은 업체정보관리에 등록된 업체만 입력할 수 있습니다.');
+                        vendorInp2.style.borderColor = 'var(--danger)';
+                        vendorInp2.focus();
+                        return;
+                    }
+                    vendorInp2.style.borderColor = '';
+                }
             }
 
             // 저장 확인
