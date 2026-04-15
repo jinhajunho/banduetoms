@@ -5667,7 +5667,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             csv +=
                 '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,수금상태,세금계산서발행,등록일,시작일,완료일,사업소득행들,매출행들,수금행들,매입행들,이체행들\n' +
                 csvEscape(
-                    '※ 한 프로젝트를 한 행에 입력합니다. 매출액/매입액/사업소득 총합/지급상태는 행 데이터 기준으로 자동 계산됩니다. 사업소득행들 형식: 일자|성함/업체명|차인지급액|지급여부(지급/미지급) 를 ; 로 여러 건 연결. 매출행들/수금행들/매입행들/이체행들 형식: 일자|상호명|vat포함|메모 또는 일자|상호명|vat별도|부가세|vat포함|메모. 날짜는 YYYY-MM-DD.'
+                    '※ 한 프로젝트를 한 행에 입력합니다. 매출액/매입액/사업소득 총합/지급상태는 행 데이터 기준으로 자동 계산됩니다. 사업소득행들 형식: 일자|성함/업체명|차인지급액|지급여부(지급/미지급) 를 ; 로 여러 건 연결. 매출행들/매입행들 기본 형식: 일자|상호명|vat포함|발행여부(발행/미발행)|메모. 수금행들/이체행들 형식: 일자|상호명|vat포함|메모. 날짜는 YYYY-MM-DD.'
                 ) +
                 '\n' +
                 ',견적,B2B,코오롱,지원,코오롱 예시타워,외벽 보수 공사,홍길동,(주)예시건설,세금계산서,미수,미발행,2026-01-15,2026-04-06,2026-04-07,' +
@@ -6055,7 +6055,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return { ok: true, net: n, tax: t, gross: n + t };
             }
 
-            function parsePackedRows(raw, fallbackDate, fallbackName, defaultMemo) {
+            function parsePackedRows(raw, fallbackDate, fallbackName, defaultMemo, rowType) {
                 const s = String(raw == null ? '' : raw).trim();
                 if (!s) return { ok: true, rows: [] };
                 const chunks = s
@@ -6073,7 +6073,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                         return { ok: false, err: '테이블행 날짜는 YYYY-MM-DD 형식이어야 합니다.' };
                     }
                     var nm = parts[1] || fallbackName || '-';
-                    var net = 0, tax = 0, gross = 0, memo = '';
+                    var net = 0, tax = 0, gross = 0, memo = '', issued = '';
                     if (parts.length >= 6) {
                         // 일자|상호명|vat별도|부가세|vat포함|메모
                         var n = parseEstimateImportNumber(parts[2]);
@@ -6085,16 +6085,38 @@ import { createProjectRegister } from './estimate-project-register.js';
                         net = Math.round(n || 0);
                         tax = Math.round(t || 0);
                         gross = Math.round(g || (net + tax));
-                        memo = parts[5] || defaultMemo || 'CSV';
+                        // 매출/매입: 7컬럼이면 6번째를 발행여부로 해석
+                        if ((rowType === 'sales' || rowType === 'purchase') && parts.length >= 7) {
+                            var issuedRawHi = String(parts[5] || '').trim();
+                            if (issuedRawHi) {
+                                if (issuedRawHi === '발행완료') issuedRawHi = '발행';
+                                if (issuedRawHi !== '발행' && issuedRawHi !== '미발행') return { ok: false, err: '발행여부는 발행 또는 미발행이어야 합니다.' };
+                                issued = issuedRawHi;
+                            }
+                            memo = parts[6] || defaultMemo || 'CSV';
+                        } else {
+                            memo = parts[5] || defaultMemo || 'CSV';
+                        }
                     } else {
-                        // 일자|상호명|vat포함|메모
+                        // 기본: 일자|상호명|vat포함|메모
+                        // 매출/매입 확장: 일자|상호명|vat포함|발행여부|메모
                         var g2 = parseEstimateImportNumber(parts[2]);
                         if (Number.isNaN(g2)) return { ok: false, err: '테이블행 vat포함은 숫자여야 합니다.' };
                         var p2 = splitNetTaxFromGross(Math.round(g2 || 0));
                         net = p2.net; tax = p2.tax; gross = p2.gross;
-                        memo = (parts[3] || defaultMemo || 'CSV');
+                        if ((rowType === 'sales' || rowType === 'purchase') && parts.length >= 5) {
+                            var issuedRawLo = String(parts[3] || '').trim();
+                            if (issuedRawLo) {
+                                if (issuedRawLo === '발행완료') issuedRawLo = '발행';
+                                if (issuedRawLo !== '발행' && issuedRawLo !== '미발행') return { ok: false, err: '발행여부는 발행 또는 미발행이어야 합니다.' };
+                                issued = issuedRawLo;
+                            }
+                            memo = (parts[4] || defaultMemo || 'CSV');
+                        } else {
+                            memo = (parts[3] || defaultMemo || 'CSV');
+                        }
                     }
-                    outRows.push([d || fallbackDate || new Date().toISOString().slice(0, 10), nm, net, tax, gross, memo]);
+                    outRows.push([d || fallbackDate || new Date().toISOString().slice(0, 10), nm, net, tax, gross, memo, issued]);
                 }
                 return { ok: true, rows: outRows };
             }
@@ -6176,22 +6198,22 @@ import { createProjectRegister } from './estimate-project-register.js';
                     var defaultDate = base.date || new Date().toISOString().slice(0, 10);
                     var defaultName = String(base.contractor || base.project || '-');
 
-                    var salesPacked = parsePackedRows(rowMap.salesRows, defaultDate, defaultName, 'CSV');
+                    var salesPacked = parsePackedRows(rowMap.salesRows, defaultDate, defaultName, 'CSV', 'sales');
                     if (!salesPacked.ok) {
                         previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: salesPacked.err });
                         continue;
                     }
-                    var payPacked = parsePackedRows(rowMap.paymentRows, defaultDate, defaultName, 'CSV');
+                    var payPacked = parsePackedRows(rowMap.paymentRows, defaultDate, defaultName, 'CSV', 'payment');
                     if (!payPacked.ok) {
                         previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: payPacked.err });
                         continue;
                     }
-                    var purchasePacked = parsePackedRows(rowMap.purchaseRows, defaultDate, defaultName, 'CSV');
+                    var purchasePacked = parsePackedRows(rowMap.purchaseRows, defaultDate, defaultName, 'CSV', 'purchase');
                     if (!purchasePacked.ok) {
                         previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: purchasePacked.err });
                         continue;
                     }
-                    var transferPacked = parsePackedRows(rowMap.transferRows, defaultDate, defaultName, 'CSV');
+                    var transferPacked = parsePackedRows(rowMap.transferRows, defaultDate, defaultName, 'CSV', 'transfer');
                     if (!transferPacked.ok) {
                         previews.push({ line: line, codeDisp: base.code || '-', building: (base.building || buildingCell || '-').slice(0, 40), err: transferPacked.err });
                         continue;
@@ -6203,13 +6225,23 @@ import { createProjectRegister } from './estimate-project-register.js';
                     }
 
                     if (salesPacked.rows.length) {
-                        base.salesRows = salesPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], base.taxIssued ? '발행' : '미발행', '-', r[5], '', { contractorBy: '', internalBy: '' }]; });
+                        base.salesRows = salesPacked.rows.map(function (r) {
+                            var issued = String(r[6] || '').trim();
+                            if (issued === '발행완료') issued = '발행';
+                            if (issued !== '발행' && issued !== '미발행') issued = (base.taxIssued ? '발행' : '미발행');
+                            return [r[0], r[1], r[2], r[3], r[4], issued, '-', r[5], '', { contractorBy: '', internalBy: '' }];
+                        });
                     }
                     if (payPacked.rows.length) {
                         base.paymentRows = payPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], r[5], null]; });
                     }
                     if (purchasePacked.rows.length) {
-                        base.purchaseRows = purchasePacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], '미발행', '-', r[5], '', { contractorBy: '', internalBy: '' }]; });
+                        base.purchaseRows = purchasePacked.rows.map(function (r) {
+                            var issued = String(r[6] || '').trim();
+                            if (issued === '발행완료') issued = '발행';
+                            if (issued !== '발행' && issued !== '미발행') issued = '미발행';
+                            return [r[0], r[1], r[2], r[3], r[4], issued, '-', r[5], '', { contractorBy: '', internalBy: '' }];
+                        });
                     }
                     if (transferPacked.rows.length) {
                         base.transferRows = transferPacked.rows.map(function (r) { return [r[0], r[1], r[2], r[3], r[4], r[5], null]; });
