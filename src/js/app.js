@@ -667,11 +667,19 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
+        function parseGrossAmountLike(value) {
+            var n = Number(value);
+            if (!Number.isNaN(n)) return n;
+            var s = String(value == null ? '' : value).replace(/원/g, '').replace(/,/g, '').trim();
+            var p = parseFloat(s, 10);
+            return Number.isNaN(p) ? 0 : p;
+        }
+
         /** VAT포함 금액이 있는 매출 행만 대상으로, 전부 발행일 때만 true. 하나라도 미발행이면 false. 해당 행이 없으면 null(요약 유지). */
         function deriveSalesTaxIssuedFromSalesRows(salesRows) {
             var rows = Array.isArray(salesRows) ? salesRows : [];
             var substantive = rows.filter(function (r) {
-                return (Number(r && r[4]) || 0) > 0;
+                return parseGrossAmountLike(r && r[4]) > 0;
             });
             if (!substantive.length) return null;
             return substantive.every(function (r) {
@@ -1882,7 +1890,6 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return item.taxIssued ? 'table-amount-chip--issued' : 'table-amount-chip--not-issued';
             }
             // 매입 칩: 매입 행(values[5]) 발행/미발행만 반영 (매출 taxIssued와 무관)
-            if (item.type !== '세금계산서') return 'table-amount-chip--na';
             if (purchaseAmount <= 0) return 'table-amount-chip--na';
             const pIssued = item.purchaseTaxIssued === true
                 ? true
@@ -1914,7 +1921,12 @@ import { createProjectRegister } from './estimate-project-register.js';
             // 수금액이 '-'(0)이면 미수로 취급: 미수금 필터 기준과 동일하게 유지
             const payDone = pay > 0 && pay === salesGross;
             const xferDone = purchaseGross <= 0 ? true : transfer === purchaseGross;
-            const payHtml = pay <= 0 ? tableAmountDash() : tableCashflowChip(pay, payDone);
+            const hasSalesTarget = Number(salesGross) > 0;
+            const payHtml = pay <= 0
+                ? (hasSalesTarget
+                    ? '<span class="table-amount-chip table-amount-chip--not-issued">-</span>'
+                    : tableAmountDash())
+                : tableCashflowChip(pay, payDone);
             const xferHtml = transfer <= 0 ? tableAmountDash() : tableCashflowChip(transfer, xferDone);
             let netHtml;
             if (bizGross <= 0) netHtml = tableAmountDash();
@@ -1946,7 +1958,7 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         /** 견적 목록 세금계산서 필터(도급사): 매입 측 발행 여부 — projectSalesPurchaseChipClass(매입)과 동일 기준 */
         function derivePurchaseTaxIssuedForEstimateFilter(item) {
-            if (!item || item.type !== '세금계산서') return false;
+            if (!item) return false;
             const purchaseAmount = item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0);
             if (purchaseAmount <= 0) return false;
             if (item.purchaseTaxIssued === true) return true;

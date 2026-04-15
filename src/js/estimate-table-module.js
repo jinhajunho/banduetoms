@@ -8,9 +8,9 @@ export function renderEstimateTable(api, options) {
     const tbody = document.getElementById('tableBody');
     if (!tbody) return;
     const canSeeMonetary = api.canCurrentUserSeeEstimateMonetary();
-    const filterCategory1 = document.getElementById('filterCategory1').value;
-    const filterCategory2 = document.getElementById('filterCategory2').value;
-    const filterCategory3 = document.getElementById('filterCategory3').value;
+    const filterCategory1 = String(document.getElementById('filterCategory1').value || '').trim();
+    const filterCategory2 = String(document.getElementById('filterCategory2').value || '').trim();
+    const filterCategory3 = String(document.getElementById('filterCategory3').value || '').trim();
     const filterEstimateTypeEl = document.getElementById('filterEstimateType');
     const filterEstimateType = filterEstimateTypeEl ? filterEstimateTypeEl.value : '';
     const filterTax = document.getElementById('filterTax').value;
@@ -23,9 +23,9 @@ export function renderEstimateTable(api, options) {
         if (currentStatus !== 'all' && item.status !== currentStatus) return false;
         if (!api.itemMatchesEstimateDateFilter(item)) return false;
         if (filterEstimateType && (item.type || '') !== filterEstimateType) return false;
-        if (filterCategory1 && item.category1 !== filterCategory1) return false;
-        if (filterCategory2 && item.category2 !== filterCategory2) return false;
-        if (filterCategory3 && (item.category3 || '') !== filterCategory3) return false;
+        if (filterCategory1 && String(item.category1 || '').trim() !== filterCategory1) return false;
+        if (filterCategory2 && String(item.category2 || '').trim() !== filterCategory2) return false;
+        if (filterCategory3 && String(item.category3 || '').trim() !== filterCategory3) return false;
         if (filterTax) {
             if (canSeeMonetary) {
                 const salesGross = item.aggregateSalesGross != null ? item.aggregateSalesGross : (item.revenue || 0);
@@ -99,7 +99,9 @@ export function renderEstimateTable(api, options) {
             '보류': 'badge-hold'
         }[item.status];
 
-        const purchaseAmount = Number(item.purchase || 0);
+        const purchaseAmount = Number(
+            item.aggregatePurchaseGross != null ? item.aggregatePurchaseGross : (item.purchase || 0)
+        );
         const salesAmountChipClass = api.projectSalesPurchaseChipClass(false, item, purchaseAmount);
         const purchaseAmountChipClass = api.projectSalesPurchaseChipClass(true, item, purchaseAmount);
         const revenueCellHtml = canSeeMonetary
@@ -157,6 +159,21 @@ export function goEstimateListPage(api, p) {
 }
 
 export function bindEstimateListInteractions(api) {
+    // partial 마운트 타이밍/재바인딩 누락 대비: 상태 탭은 문서 위임으로도 처리
+    if (!window.__estimateStatusTabDelegationBound) {
+        window.__estimateStatusTabDelegationBound = true;
+        document.addEventListener('click', function (e) {
+            const tab = e.target && e.target.closest && e.target.closest('#page-estimate .tabs-left .tab');
+            if (!tab) return;
+            document.querySelectorAll('#page-estimate .tabs-left .tab').forEach(function (t) {
+                t.classList.remove('active');
+            });
+            tab.classList.add('active');
+            api.setCurrentStatus(tab.dataset.status || 'all');
+            api.renderTable();
+        });
+    }
+
     document.querySelectorAll('#page-estimate .tabs-left .tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
             document.querySelectorAll('#page-estimate .tabs-left .tab').forEach(function (t) {
@@ -195,6 +212,34 @@ export function bindEstimateListInteractions(api) {
 }
 
 export function initEstimateListFiltersModule(api) {
+    // partial 로드 타이밍/재마운트 이슈가 있어도 필터 이벤트가 반드시 먹도록 문서 위임 폴백을 둡니다.
+    if (!window.__estimateFilterDelegationBound) {
+        window.__estimateFilterDelegationBound = true;
+        document.addEventListener('change', function (e) {
+            const t = e && e.target;
+            if (!t || !t.id) return;
+            if (
+                t.id === 'filterCategory1' ||
+                t.id === 'filterCategory2' ||
+                t.id === 'filterCategory3' ||
+                t.id === 'filterEstimateType' ||
+                t.id === 'filterTax' ||
+                t.id === 'filterCashflow' ||
+                t.id === 'filterDateBasis' ||
+                t.id === 'filterDateFrom' ||
+                t.id === 'filterDateTo' ||
+                t.id === 'filterByMonth'
+            ) {
+                api.renderTable();
+            }
+        });
+        document.addEventListener('input', function (e) {
+            const t = e && e.target;
+            if (!t || !t.id) return;
+            if (t.id === 'filterSearch') api.renderTable();
+        });
+    }
+
     document.querySelectorAll('.estimate-filter-preset').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const p = btn.dataset.preset;
