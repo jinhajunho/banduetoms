@@ -10,11 +10,10 @@ export function createRenderPanelContent(api) {
             ? String(item.contractor || profile.contractorName || '').trim()
             : '';
         const canViewSalesTab = !isExternalContractorView;
-        const isTaxOrBiz = item.type === '세금계산서' || item.type === '사업소득' || item.type === '세금계산서/사업소득';
-        /* 내부: 매출과 동일하게 매입 탭. 외부 도급사: 매출은 숨기되 매입 탭만 노출 */
+        /* 구분(type)과 무관: 내부는 매출·매입·사업소득·수익분석 모두. 외부 도급사는 매출만 숨김 */
         const canViewPurchaseTab = canViewSalesTab || isExternalContractorView;
-        const canViewBusinessTab = isExternalContractorView || isTaxOrBiz;
-        const canViewProfitTab = !isExternalContractorView && isTaxOrBiz;
+        const canViewBusinessTab = canViewPurchaseTab;
+        const canViewProfitTab = canViewPurchaseTab;
         const allowedTabs = ['basic'];
         if (canViewSalesTab) allowedTabs.push('sales');
         if (canViewPurchaseTab) allowedTabs.push('purchase');
