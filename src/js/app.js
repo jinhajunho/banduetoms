@@ -6227,8 +6227,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                         var paySum2 = (base.paymentRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
                         var purSum2 = (base.purchaseRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
                         var trSum2 = (base.transferRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
-                        if (!base.revenue && salesSum2) base.revenue = salesSum2;
-                        if (!base.purchase && purSum2) base.purchase = purSum2;
+                        // 행이 있으면 요약 금액은 항상 행 합계를 기준으로 맞춥니다.
+                        if ((base.salesRows || []).length) base.revenue = salesSum2;
+                        if ((base.purchaseRows || []).length) base.purchase = purSum2;
                         base.aggregateSalesGross = salesSum2 || base.revenue || 0;
                         base.aggregatePaymentGross = paySum2;
                         base.aggregatePurchaseGross = purSum2 || base.purchase || 0;
@@ -6334,8 +6335,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                     const paySum = (it.paymentRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
                     const purSum = (it.purchaseRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
                     const trSum = (it.transferRows || []).reduce(function (a, v) { return a + (Number(v && v[4]) || 0); }, 0);
-                    if (!it.revenue && salesSum) it.revenue = salesSum;
-                    if (!it.purchase && purSum) it.purchase = purSum;
+                    // 행이 있으면 요약 금액은 항상 행 합계를 반영합니다.
+                    if ((it.salesRows || []).length) it.revenue = salesSum;
+                    if ((it.purchaseRows || []).length) it.purchase = purSum;
                     it.aggregateSalesGross = salesSum || it.revenue || 0;
                     it.aggregatePaymentGross = paySum;
                     it.aggregatePurchaseGross = purSum || it.purchase || 0;
