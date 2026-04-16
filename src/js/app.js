@@ -2418,6 +2418,19 @@ import { createProjectRegister } from './estimate-project-register.js';
             const basisEl = document.getElementById('filterDateBasis');
             const basis = basisEl ? basisEl.value : 'date';
             const range = getEstimateFilterDateRange();
+            // 기준필터의 월/기간 직접은 "매출내역-매출일자" 기준:
+            // 여러 매출일자 중 1개라도 범위에 걸리면 목록에 포함
+            if (range) {
+                const salesRaw = (item && Array.isArray(item.salesDates) && item.salesDates.length)
+                    ? item.salesDates
+                    : deriveSalesDatesFromSalesRows((item && item.salesRows) || []);
+                const salesDates = salesRaw
+                    .map(function (x) { return String(x || '').trim().slice(0, 10); })
+                    .filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); });
+                if (!salesDates.length) return false;
+                if (!salesDates.some(function (d) { return d >= range.from && d <= range.to; })) return false;
+            }
+
             if (basis === 'all') return true;
             if (basis === '견적' || basis === '진행' || basis === '완료' || basis === '보류') {
                 return String(item && item.status ? item.status : '') === basis;
