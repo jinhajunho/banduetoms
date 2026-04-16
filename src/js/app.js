@@ -8200,16 +8200,18 @@ import { createProjectRegister } from './estimate-project-register.js';
                 }
             }
 
-            // 전체기간 분류별(대분류/중분류)
+            // 전체기간 분류별(대분류/중분류/소분류)
             const categoryOverallByKey = {};
             dataRows.forEach(function (srcRow) {
                 const c1 = (srcRow.category1 || '').trim() || '-';
                 const c2 = (srcRow.category2 || '').trim() || '-';
-                const key = c1 + '||' + c2;
+                const c3 = (srcRow.category3 || '').trim() || '-';
+                const key = c1 + '||' + c2 + '||' + c3;
                 if (!categoryOverallByKey[key]) {
                     categoryOverallByKey[key] = {
                         category1: c1,
                         category2: c2,
+                        category3: c3,
                         count: 0,
                         revenue: 0,
                         purchase: 0,
@@ -8235,7 +8237,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                     dataRows.forEach(function (item) {
                         const c1 = (item.category1 || '').trim() || '-';
                         const c2 = (item.category2 || '').trim() || '-';
-                        if (c1 !== s.category1 || c2 !== s.category2) return;
+                        const c3 = (item.category3 || '').trim() || '-';
+                        if (c1 !== s.category1 || c2 !== s.category2 || c3 !== s.category3) return;
                         const m = String(item && item.month ? item.month : '').slice(0, 7);
                         if (/^\d{4}-\d{2}$/.test(m) && (!latest || m > latest)) latest = m;
                     });
@@ -8249,7 +8252,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 const bLatest = String(b && b.latestMonth ? b.latestMonth : '');
                 if (bLatest !== aLatest) return bLatest.localeCompare(aLatest);
                 if (a.category1 !== b.category1) return a.category1.localeCompare(b.category1);
-                return a.category2.localeCompare(b.category2);
+                if (a.category2 !== b.category2) return a.category2.localeCompare(b.category2);
+                return String(a.category3 || '').localeCompare(String(b.category3 || ''));
             });
 
             function performanceMarginPct(revenue, purchase) {
@@ -8273,6 +8277,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                         <tr>
                             <td>${row.category1}</td>
                             <td>${row.category2}</td>
+                            <td>${row.category3}</td>
                             <td class="text-right">${row.count}건</td>
                             <td class="text-right">${row.revenue.toLocaleString()}원</td>
                             <td class="text-right">${row.purchase.toLocaleString()}원</td>
@@ -8293,7 +8298,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     const subAvgRounded = subUnitCount > 0 ? Math.round(subUnitRevSum / subUnitCount) : 0;
                     html += `
                         <tr class="total-row">
-                            <td colspan="2"><strong>${c1} 소계</strong></td>
+                            <td colspan="3"><strong>${c1} 소계</strong></td>
                             <td class="text-right">${subCount}건</td>
                             <td class="text-right">${subRev.toLocaleString()}원</td>
                             <td class="text-right">${subPur.toLocaleString()}원</td>
@@ -8308,13 +8313,13 @@ import { createProjectRegister } from './estimate-project-register.js';
             const categoryOverallBody = document.getElementById('performanceCategoryOverallTableBody');
             if (categoryOverallBody) {
                 if (categoryOverallArr.length === 0) {
-                    categoryOverallBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
+                    categoryOverallBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
                 } else {
                     categoryOverallBody.innerHTML = buildCategoryOverallRowsWithSubtotals(categoryOverallArr);
                 }
             }
 
-            // 분류별 탭: 월과 무관한 요약(대분류 > 중분류)
+            // 분류별 탭: 월과 무관한 요약(대분류 > 중분류 > 소분류)
             const categoryMonthlyByKey = {};
             const monthlySgaMap = {};
             sgaData.forEach(function(item) {
@@ -8448,7 +8453,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             const categoryMonthlyBody = document.getElementById('performanceCategoryMonthlyTableBody');
             if (categoryMonthlyBody) {
                 if (categoryOverallArr.length === 0) {
-                    categoryMonthlyBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
+                    categoryMonthlyBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
                 } else {
                     categoryMonthlyBody.innerHTML = buildCategoryOverallRowsWithSubtotals(categoryOverallArr);
                 }
