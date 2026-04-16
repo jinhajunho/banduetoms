@@ -8314,7 +8314,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 }
             }
 
-            // 월별 분류별(대분류/중분류, 매출발행일 기준 월)
+            // 분류별 탭: 월과 무관한 요약(대분류 > 중분류)
             const categoryMonthlyByKey = {};
             const monthlySgaMap = {};
             sgaData.forEach(function(item) {
@@ -8447,10 +8447,10 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             const categoryMonthlyBody = document.getElementById('performanceCategoryMonthlyTableBody');
             if (categoryMonthlyBody) {
-                if (categoryMonthlyArr.length === 0) {
-                    categoryMonthlyBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
+                if (categoryOverallArr.length === 0) {
+                    categoryMonthlyBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--gray-500);">데이터가 없습니다</td></tr>';
                 } else {
-                    categoryMonthlyBody.innerHTML = buildCategoryMonthlyRowsWithSubtotals(categoryMonthlyArr);
+                    categoryMonthlyBody.innerHTML = buildCategoryOverallRowsWithSubtotals(categoryOverallArr);
                 }
             }
         }
