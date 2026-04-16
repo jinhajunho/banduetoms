@@ -5688,10 +5688,44 @@ import { createProjectRegister } from './estimate-project-register.js';
                 .join(';');
         }
 
+        function parseCsvMoneyLike(raw) {
+            const n = Number(String(raw == null ? '' : raw).replace(/,/g, '').trim());
+            return Number.isFinite(n) ? n : 0;
+        }
+
+        function packSalesOrPurchaseRowsForCsv(rows) {
+            const list = Array.isArray(rows) ? rows : [];
+            if (!list.length) return '';
+            return list
+                .map(function (r) {
+                    const dt = String(r && r[0] ? r[0] : '').trim();
+                    const nm = String(r && r[1] ? r[1] : '').trim();
+                    const gross = Math.max(0, Math.round(parseCsvMoneyLike(r && r[4])));
+                    const tax = String(r && r[5] ? r[5] : '미발행').trim() === '발행' ? '발행' : '미발행';
+                    const memo = String(r && (r[7] != null ? r[7] : r[6] || '')).trim();
+                    return [dt, nm, String(gross), tax, memo].join('|');
+                })
+                .join(';');
+        }
+
+        function packPaymentOrTransferRowsForCsv(rows) {
+            const list = Array.isArray(rows) ? rows : [];
+            if (!list.length) return '';
+            return list
+                .map(function (r) {
+                    const dt = String(r && r[0] ? r[0] : '').trim();
+                    const nm = String(r && r[1] ? r[1] : '').trim();
+                    const gross = Math.max(0, Math.round(parseCsvMoneyLike(r && r[4])));
+                    const memo = String(r && r[5] ? r[5] : '').trim();
+                    return [dt, nm, String(gross), memo].join('|');
+                })
+                .join(';');
+        }
+
         function downloadEstimateCSV() {
             let csv = '\uFEFF';
             csv +=
-                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,사업소득행들\n';
+                '코드,상태,대분류,중분류,소분류,건물명,공사명,담당자,도급사,과세유형,매출액,수금상태,세금계산서발행,매입액,등록일,시작일,완료일,사업소득총액,사업소득이체일,사업소득지급상태,사업소득행들,매출행들,수금행들,매입행들,이체행들\n';
             estimates.forEach(function (item) {
                 const taxIssuedDisp = item.taxIssued ? '발행완료' : '미발행';
                 csv +=
@@ -5717,6 +5751,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                         csvEscape(item.businessIncomeTransferDate || ''),
                         csvEscape(item.businessIncomePaidStatus || '미지급'),
                         csvEscape(packBusinessIncomeRowsForCsv(item)),
+                        csvEscape(packSalesOrPurchaseRowsForCsv(item && item.salesRows)),
+                        csvEscape(packPaymentOrTransferRowsForCsv(item && item.paymentRows)),
+                        csvEscape(packSalesOrPurchaseRowsForCsv(item && item.purchaseRows)),
+                        csvEscape(packPaymentOrTransferRowsForCsv(item && item.transferRows)),
                     ].join(',') + '\n';
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
