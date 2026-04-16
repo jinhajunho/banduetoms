@@ -472,7 +472,8 @@ export function createDashboard(api) {
             eventBar.className = 'event-bar ' + (event.status === '완료' ? 'completed' : 'progress');
             const eventTitle = (event.building ? event.building + ' - ' : '') + event.project;
             eventBar.innerHTML = '<span class="event-title">' + eventTitle + '</span>';
-            eventBar.onclick = function () {
+            eventBar.onclick = function (ev) {
+                ev.stopPropagation();
                 showDashboardEventModal(event);
             };
             eventsContainer.appendChild(eventBar);
@@ -483,11 +484,29 @@ export function createDashboard(api) {
             moreBtn.type = 'button';
             moreBtn.className = 'calendar-more-btn';
             moreBtn.textContent = '+' + (dayEvents.length - 4) + '개 더보기';
-            moreBtn.onclick = function () {
+            moreBtn.onclick = function (ev) {
+                ev.stopPropagation();
                 showDashboardDayEventsModal(dateStr, dayEvents);
             };
             dayDiv.appendChild(moreBtn);
         }
+
+        // 날짜 칸 빈 영역(숫자·여백 등) 클릭 → 해당 일에 캘린더 일정 등록 모달
+        dayDiv.addEventListener('click', function (ev) {
+            if (ev.target.closest && ev.target.closest('.event-bar')) return;
+            if (ev.target.closest && ev.target.closest('.calendar-more-btn')) return;
+            openDashboardManualTaskModal(
+                {
+                    status: '진행',
+                    title: '',
+                    body: '',
+                    assignee: '',
+                    startDate: dateStr,
+                    endDate: dateStr,
+                },
+                { viewMode: false }
+            );
+        });
     }
 
     function renderDashboardCalendar() {
