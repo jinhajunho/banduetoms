@@ -7717,6 +7717,12 @@ import { createProjectRegister } from './estimate-project-register.js';
             return isNaN(n) ? 0 : n;
         }
 
+        function grossToNetRounded(v) {
+            const gross = Math.max(0, Math.round(Number(v) || 0));
+            const parts = splitNetTaxFromGross(gross);
+            return Math.max(0, Math.round(Number(parts && parts.net) || 0));
+        }
+
         function getPerformanceFallbackDate(item) {
             const salesDates = getPerformanceSalesDateList(item);
             if (salesDates.length) {
@@ -7735,7 +7741,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             salesRows.forEach(function (r) {
                 const d = String(r && r[0] ? r[0] : '').trim().slice(0, 10);
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-                const revenue = Math.max(0, Math.round(parsePerformanceAmount(r && r[4])));
+                // 경영실적은 VAT별도(세전) 기준
+                const revenue = Math.max(0, Math.round(parsePerformanceAmount(r && r[2])));
                 if (revenue <= 0) return;
                 rows.push({
                     date: d,
@@ -7751,7 +7758,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             purchaseRows.forEach(function (r) {
                 const d = String(r && r[0] ? r[0] : '').trim().slice(0, 10);
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-                const purchase = Math.max(0, Math.round(parsePerformanceAmount(r && r[4])));
+                // 경영실적은 VAT별도(세전) 기준
+                const purchase = Math.max(0, Math.round(parsePerformanceAmount(r && r[2])));
                 if (purchase <= 0) return;
                 rows.push({
                     date: d,
@@ -7784,7 +7792,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!rows.length) {
                 const d = getPerformanceFallbackDate(item);
                 if (d) {
-                    const revenue = Math.max(0, Math.round(Number(item && item.revenue || 0)));
+                    const revenue = grossToNetRounded(item && item.revenue);
                     const purchase = Math.max(0, Math.round(getItemPurchaseTotal(item)));
                     if (revenue > 0 || purchase > 0) {
                         rows.push({
@@ -7969,18 +7977,19 @@ import { createProjectRegister } from './estimate-project-register.js';
         }
 
         function getItemPurchaseTotal(item) {
-            const purchase = Number(item.purchase || 0);
+            const purchaseGross = Number(item.purchase || 0);
+            const purchaseNet = grossToNetRounded(purchaseGross);
             const bizGross = Number(item.businessIncomeGross || 0);
             const itemType = item.type || '';
 
             // 사업소득은 businessIncomeGross를 매입으로 보되,
-            // (초기 시드 데이터처럼) businessIncomeGross가 비어있으면 purchase 값을 fallback으로 사용
+            // (초기 시드 데이터처럼) businessIncomeGross가 비어있으면 purchase(vat포함)→세전값으로 fallback
             if (itemType === '사업소득') {
-                return bizGross > 0 ? bizGross : purchase;
+                return bizGross > 0 ? bizGross : purchaseNet;
             }
 
-            // 세금계산서(또는 기타)는 purchase에 bizGross가 있으면 추가 반영
-            return purchase + (bizGross > 0 ? bizGross : 0);
+            // 세금계산서(또는 기타)는 purchase 세전값 + 사업소득(세전) 반영
+            return purchaseNet + (bizGross > 0 ? bizGross : 0);
         }
 
         function isPerformanceAvgUnitExcluded(item) {
@@ -8060,7 +8069,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             const kpiProfitLabel = document.getElementById('kpiProfitLabel');
             const kpiMarginLabel = document.getElementById('kpiMarginLabel');
-            if (kpiProfitLabel) kpiProfitLabel.textContent = sgaInEffect ? '순수익(판관비 포함)' : '순수익';
+            if (kpiProfitLabel) kpiProfitLabel.textContent = sgaInEffect ? '순수익(vat별도, 판관비 포함)' : '순수익(vat별도)';
             if (kpiMarginLabel) kpiMarginLabel.textContent = sgaInEffect ? '수익률(판관비 포함)' : '수익률';
             const sgaHeader = document.getElementById('performanceSgaHeader');
             if (sgaHeader) sgaHeader.style.display = sgaInEffect ? '' : 'none';
