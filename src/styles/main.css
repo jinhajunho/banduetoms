@@ -134,8 +134,9 @@
         /* 사이드바 */
         .sidebar {
             width: 260px;
-            background: white;
-            border-right: 1px solid var(--gray-200);
+            background: linear-gradient(175deg, #fbfcfe 0%, #ffffff 42%, #f4f7fb 100%);
+            border-right: 1px solid rgba(15, 23, 42, 0.06);
+            box-shadow: 4px 0 24px rgba(15, 23, 42, 0.04);
             display: flex;
             flex-direction: column;
             transition: all 0.3s ease;
@@ -154,26 +155,28 @@
         }
 
         .sidebar.collapsed .logo {
-            padding: 16px 0;
+            padding: 14px 8px;
             min-height: 72px;
+            margin: 10px 8px 0;
         }
 
         .sidebar.collapsed .nav-item {
             justify-content: center;
-            padding: 12px;
+            padding: 10px 8px;
+            margin: 3px 8px;
         }
 
         .sidebar.collapsed .nav-item i {
             margin-right: 0;
         }
 
-        .sidebar.collapsed .user-section {
-            padding: 12px;
-        }
-
         .logo {
-            padding: 24px 20px;
-            border-bottom: 1px solid var(--gray-200);
+            padding: 22px 18px;
+            margin: 12px 12px 0;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(15, 23, 42, 0.05);
+            background: rgba(255, 255, 255, 0.72);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
             font-weight: 700;
             font-size: 26px;
             color: var(--gray-900);
@@ -181,12 +184,15 @@
             align-items: center;
             justify-content: center;
             text-decoration: none;
-            min-height: 96px;
+            min-height: 88px;
             line-height: 1;
+            transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
         }
 
         .logo:hover {
-            background: var(--gray-50);
+            background: rgba(255, 255, 255, 0.95);
+            border-color: rgba(59, 130, 246, 0.12);
+            box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.06), 0 8px 20px rgba(15, 23, 42, 0.06);
         }
 
         .logo-icon {
@@ -269,7 +275,9 @@
 
         .nav-menu {
             flex: 1;
-            padding: 16px 0;
+            padding: 14px 6px 12px;
+            overflow-x: hidden;
+            overflow-y: auto;
         }
 
         /* 로그인 직후 프로필·권한 반영 전: 사이드 링크가 한꺼번에 보였다 숨겨지는 플래시 방지 */
@@ -285,31 +293,62 @@
         .nav-item {
             display: flex;
             align-items: center;
-            padding: 12px 20px;
+            padding: 10px 14px;
+            margin: 3px 8px;
+            border-radius: var(--radius-md);
             color: var(--gray-600);
             text-decoration: none;
-            transition: all 0.2s;
+            font-weight: var(--font-weight-ui-regular);
+            transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease;
             cursor: pointer;
         }
 
         .nav-item:hover {
-            background: var(--gray-50);
-            color: var(--primary);
+            background: rgba(59, 130, 246, 0.09);
+            color: var(--primary-dark);
         }
 
         .nav-item.active {
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
+            font-weight: var(--font-weight-ui-strong);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.28);
+        }
+
+        .nav-item.active:hover {
+            color: white;
+            background: linear-gradient(135deg, #4f8ef7 0%, var(--primary-dark) 100%);
+            box-shadow: 0 8px 22px rgba(37, 99, 235, 0.32);
         }
 
         .nav-item i {
-            width: 20px;
+            width: 22px;
             margin-right: 12px;
+            font-size: 15px;
+            opacity: 0.92;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .nav-item:hover i {
+            opacity: 1;
+        }
+
+        .nav-item.active i {
+            opacity: 1;
         }
 
         .user-section {
-            padding: 20px;
-            border-top: 1px solid var(--gray-200);
+            padding: 14px;
+            margin: 8px 10px 14px;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            background: rgba(255, 255, 255, 0.65);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .sidebar.collapsed .user-section {
+            margin: 8px 6px 12px;
+            padding: 10px 8px;
         }
 
         .user-info {
@@ -333,17 +372,19 @@
 
         .logout-btn {
             width: 100%;
-            padding: 8px;
+            padding: 9px 10px;
             background: var(--gray-100);
-            border: none;
-            border-radius: 6px;
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-sm);
             color: var(--gray-700);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         .logout-btn:hover {
             background: var(--gray-200);
+            border-color: var(--gray-300);
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
         }
 
         /* 메인 콘텐츠 */
@@ -6369,27 +6410,36 @@
         }
 
         body.dark-mode .sidebar {
-            background: var(--gray-100) !important;
-            border-right: 1px solid var(--gray-200) !important;
+            background: linear-gradient(175deg, #1c1d21 0%, #15161a 50%, #121318 100%) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+            box-shadow: 4px 0 28px rgba(0, 0, 0, 0.35) !important;
         }
 
         body.dark-mode .sidebar .site-logo--sidebar {
             filter: brightness(0) invert(1);
         }
 
-        body.dark-mode .logo,
-        body.dark-mode .user-section {
-            background: var(--gray-100) !important;
-            border-color: var(--gray-200) !important;
-            color: var(--gray-900) !important;
+        body.dark-mode .logo {
+            background: rgba(40, 42, 48, 0.85) !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            color: var(--dm-text) !important;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset !important;
         }
 
         body.dark-mode .logo:hover {
-            background: #252525 !important;
+            background: rgba(50, 52, 58, 0.95) !important;
+            border-color: rgba(114, 169, 245, 0.22) !important;
+        }
+
+        body.dark-mode .user-section {
+            background: rgba(36, 38, 44, 0.92) !important;
+            border: 1px solid rgba(255, 255, 255, 0.07) !important;
+            color: var(--dm-text) !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
         }
 
         body.dark-mode .nav-item {
-            color: var(--gray-600) !important;
+            color: var(--dm-muted) !important;
         }
 
         body.dark-mode .nav-item i {
@@ -6398,13 +6448,19 @@
         }
 
         body.dark-mode .nav-item:hover {
-            background: #2a2a2a !important;
-            color: var(--gray-900) !important;
+            background: rgba(114, 169, 245, 0.12) !important;
+            color: var(--dm-text) !important;
         }
 
         body.dark-mode .nav-item.active {
-            background: #437cc6 !important;
+            background: linear-gradient(135deg, #3d6fb8 0%, #2f5a9a 100%) !important;
             color: #ffffff !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35) !important;
+        }
+
+        body.dark-mode .nav-item.active:hover {
+            color: #ffffff !important;
+            background: linear-gradient(135deg, #4a7ec4 0%, #325f9e 100%) !important;
         }
 
         body.dark-mode .nav-item.active i {
