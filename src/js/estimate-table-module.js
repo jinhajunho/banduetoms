@@ -227,6 +227,38 @@ export function bindEstimateListInteractions(api) {
 }
 
 export function initEstimateListFiltersModule(api) {
+    function handleEstimateDatePresetButtonClick(btn) {
+        if (!btn) return;
+        const p = btn.dataset.preset;
+        if (!p) return;
+        const hidden = document.getElementById('filterDatePreset');
+        const current = hidden ? hidden.value : 'all';
+        const monthPanel = document.getElementById('estimateFilterMonthWrap');
+
+        if (p === 'byMonth') {
+            const panelOpen = monthPanel && window.getComputedStyle(monthPanel).display !== 'none';
+            if (current === 'byMonth' && panelOpen) {
+                const mbOff = document.getElementById('filterByMonth');
+                if (mbOff) mbOff.value = '';
+                api.updateEstimateByMonthPresetButtonLabel();
+                api.setEstimateDatePreset('all');
+                api.renderTable();
+                return;
+            }
+            if (current === 'byMonth' && !panelOpen) {
+                if (monthPanel) monthPanel.style.display = 'flex';
+                api.customMonthPickerOnOpen();
+                return;
+            }
+            api.setEstimateDatePreset('byMonth');
+            api.renderTable();
+            return;
+        }
+
+        api.setEstimateDatePreset(p);
+        api.renderTable();
+    }
+
     // partial 로드 타이밍/재마운트 이슈가 있어도 필터 이벤트가 반드시 먹도록 문서 위임 폴백을 둡니다.
     if (!window.__estimateFilterDelegationBound) {
         window.__estimateFilterDelegationBound = true;
@@ -253,40 +285,22 @@ export function initEstimateListFiltersModule(api) {
             if (!t || !t.id) return;
             if (t.id === 'filterSearch') api.renderTable();
         });
-    }
-
-    document.querySelectorAll('.estimate-filter-preset').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            const p = btn.dataset.preset;
-            if (!p) return;
-            const hidden = document.getElementById('filterDatePreset');
-            const current = hidden ? hidden.value : 'all';
-            const monthPanel = document.getElementById('estimateFilterMonthWrap');
-
-            if (p === 'byMonth') {
-                const panelOpen = monthPanel && window.getComputedStyle(monthPanel).display !== 'none';
-                if (current === 'byMonth' && panelOpen) {
-                    const mbOff = document.getElementById('filterByMonth');
-                    if (mbOff) mbOff.value = '';
-                    api.updateEstimateByMonthPresetButtonLabel();
-                    api.setEstimateDatePreset('all');
-                    api.renderTable();
-                    return;
-                }
-                if (current === 'byMonth' && !panelOpen) {
-                    if (monthPanel) monthPanel.style.display = 'flex';
-                    api.customMonthPickerOnOpen();
-                    return;
-                }
-                api.setEstimateDatePreset('byMonth');
-                api.renderTable();
+        document.addEventListener('click', function (e) {
+            const presetBtn = e.target && e.target.closest
+                ? e.target.closest('#page-estimate .estimate-filter-preset')
+                : null;
+            if (presetBtn) {
+                handleEstimateDatePresetButtonClick(presetBtn);
                 return;
             }
-
-            api.setEstimateDatePreset(p);
-            api.renderTable();
+            const rangeBtn = e.target && e.target.closest
+                ? e.target.closest('#page-estimate #toggleEstimateCustomRange')
+                : null;
+            if (rangeBtn) {
+                api.toggleEstimateCustomRange(e);
+            }
         });
-    });
+    }
     document.addEventListener('click', function (e) {
         if (e.target.closest('.estimate-filter-popover-anchor')) return;
         if (e.target.closest('#estimateDatePickerPanel')) return;
@@ -304,8 +318,6 @@ export function initEstimateListFiltersModule(api) {
     const dt = document.getElementById('filterDateTo');
     if (df) df.addEventListener('change', api.renderTable);
     if (dt) dt.addEventListener('change', api.renderTable);
-    const tcr = document.getElementById('toggleEstimateCustomRange');
-    if (tcr) tcr.addEventListener('click', api.toggleEstimateCustomRange);
 
     const resetBtn = document.getElementById('filterResetBtn');
     if (resetBtn) {
