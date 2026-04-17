@@ -10562,6 +10562,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     if (netInp) {
                         netInp.addEventListener('input', function () { syncSalesVatGrossFromNet(this); });
                         netInp.addEventListener('change', function () { syncSalesVatGrossFromNet(this); });
+                        syncSalesVatGrossFromNet(netInp);
                     }
                     if (grossInp) {
                         grossInp.addEventListener('input', function () { syncSalesVatFromGross(this); });
@@ -10603,6 +10604,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     if (payNetInp) {
                         payNetInp.addEventListener('input', function () { syncPaymentVatFromNet(this); });
                         payNetInp.addEventListener('change', function () { syncPaymentVatFromNet(this); });
+                        syncPaymentVatFromNet(payNetInp);
                     }
                     if (payGrossInp) {
                         payGrossInp.addEventListener('input', function () { syncPaymentVatFromGross(this); });

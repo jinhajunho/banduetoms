@@ -262,6 +262,7 @@ export function createEstimateFinanceModal(api) {
                         <div style="padding:14px 16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
                             <input id="fm_date" type="date" value="${values[0] || ''}" class="form-input" title="선택 입력">
                             <input id="fm_name" type="text" value="${(values[1] || '').replace(/"/g, '&quot;')}" placeholder="${fmNamePlaceholder}" class="form-input"${fmNameListAttr}>
+                            <div style="grid-column:1 / -1;font-size:12px;line-height:1.5;color:#475569;margin:0;padding:8px 10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">별도(vat별도) 금액을 넣으면 부가세(10%)·포함 금액이 자동으로 맞춰집니다. 현금영수증 등 부가세가 없을 때는 <strong style="font-weight:600;color:#334155;">부가세 칸에 0</strong>을 입력해 주세요.</div>
                             <input id="fm_net" type="number" value="${String(values[2] || '').replace(/,/g, '')}" placeholder="vat별도" class="form-input">
                             <input id="fm_tax" type="number" value="${String(values[3] || '').replace(/,/g, '')}" placeholder="부가세(비우면 10% 자동)" class="form-input" title="직접 수정·삭제 가능. 현금영수증 등 부가세 없으면 0 또는 비움">
                             <input id="fm_gross" type="number" value="${String(values[4] || '').replace(/,/g, '')}" placeholder="vat포함" class="form-input">
@@ -292,25 +293,31 @@ export function createEstimateFinanceModal(api) {
         const net = document.getElementById('fm_net');
         const tax = document.getElementById('fm_tax');
         const gross = document.getElementById('fm_gross');
-        if (net) net.addEventListener('input', function () {
-            const n = parseFloat(String(net.value || '').replace(/,/g, '').trim(), 10) || 0;
+        function applyFmNetDerived() {
             const taxEl = document.getElementById('fm_tax');
             const grossEl = document.getElementById('fm_gross');
+            const netEl = document.getElementById('fm_net');
+            if (!netEl || !taxEl || !grossEl) return;
+            const n = parseFloat(String(netEl.value || '').replace(/,/g, '').trim(), 10) || 0;
             if (!n) {
-                if (taxEl) taxEl.value = '';
-                if (grossEl) grossEl.value = '';
+                taxEl.value = '';
+                grossEl.value = '';
                 return;
             }
-            const tStr = taxEl && taxEl.value != null ? String(taxEl.value).trim() : '';
+            const tStr = taxEl.value != null ? String(taxEl.value).trim() : '';
             if (tStr === '') {
                 const t = Math.round(n * 0.1);
-                if (taxEl) taxEl.value = String(t);
-                if (grossEl) grossEl.value = String(Math.round(n + t));
+                taxEl.value = String(t);
+                grossEl.value = String(Math.round(n + t));
             } else {
                 const t = parseFloat(tStr.replace(/,/g, ''), 10) || 0;
-                if (grossEl) grossEl.value = String(Math.round(n + t));
+                grossEl.value = String(Math.round(n + t));
             }
-        });
+        }
+        if (net) {
+            net.addEventListener('input', applyFmNetDerived);
+            net.addEventListener('change', applyFmNetDerived);
+        }
         if (tax) tax.addEventListener('input', function () {
             const n = parseFloat(String(net && net.value != null ? net.value : '').replace(/,/g, '').trim(), 10) || 0;
             const t = parseFloat(String(tax.value || '').replace(/,/g, '').trim(), 10) || 0;
@@ -322,6 +329,7 @@ export function createEstimateFinanceModal(api) {
             document.getElementById('fm_net').value = p.net ? String(p.net) : '';
             document.getElementById('fm_tax').value = p.tax ? String(p.tax) : '';
         });
+        applyFmNetDerived();
         if ((type === 'sales' || type === 'purchase') && row && row.dataset.rowFileId && window.savedRowFiles && window.savedRowFiles[row.dataset.rowFileId]) {
             if (!window.uploadedFiles) window.uploadedFiles = {};
             window.uploadedFiles[modalFileId] = JSON.parse(JSON.stringify(window.savedRowFiles[row.dataset.rowFileId]));
