@@ -9294,6 +9294,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (panelTitle) panelTitle.textContent = isCreatingAccount ? '계정 추가' : '계정 관리';
             if (panelBottomSaveBar) panelBottomSaveBar.style.display = 'none';
             panel.classList.remove('project-detail-modal');
+            resetProjectDetailModalWidth();
             isUserManageEditMode = !!isCreatingAccount;
             setUserManageHeaderActions(true);
 
@@ -9847,18 +9848,29 @@ import { createProjectRegister } from './estimate-project-register.js';
             ) {
                 ensurePanelFinanceTables(currentEditItem);
             }
+            scheduleFitProjectDetailModalWidth();
         }
 
         /** vat별도 입력 시: 부가세 칸이 비어 있으면 10%·포함 자동, 값이 있으면(0 포함) 포함 = 별도+부가세 */
-        function syncSalesVatGrossFromNet(netInput) {
+        function syncSalesVatGrossFromNet(netInput, evType) {
+            const kind = evType || 'change';
             const tr = netInput.closest('tr');
             const taxInp = tr && tr.querySelector('input.row-input-sales-vat-tax');
             const grossInp = tr && tr.querySelector('input.row-input-sales-vat-gross');
             const raw = String(netInput.value || '').replace(/,/g, '').trim();
+            if (raw === '') {
+                if (kind === 'change') {
+                    if (taxInp) taxInp.value = '';
+                    if (grossInp) grossInp.value = '';
+                }
+                return;
+            }
             const net = parseFloat(raw, 10);
             if (isNaN(net) || net === 0) {
-                if (taxInp) taxInp.value = '';
-                if (grossInp) grossInp.value = '';
+                if (kind === 'change') {
+                    if (taxInp) taxInp.value = '';
+                    if (grossInp) grossInp.value = '';
+                }
                 return;
             }
             const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
@@ -9867,7 +9879,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (taxInp) taxInp.value = String(tax);
                 if (grossInp) grossInp.value = String(Math.round(net + tax));
             } else {
-                const t = parseFloat(tStr.replace(/,/g, ''), 10) || 0;
+                const t = parseFloat(String(tStr).replace(/,/g, ''), 10) || 0;
                 if (grossInp) grossInp.value = String(Math.round(net + t));
             }
         }
@@ -9947,14 +9959,25 @@ import { createProjectRegister } from './estimate-project-register.js';
             return { net: net, tax: tax, gross: Math.round(gross) };
         }
 
-        function syncPaymentVatFromNet(netInput) {
+        function syncPaymentVatFromNet(netInput, evType) {
+            const kind = evType || 'change';
             const tr = netInput.closest('tr');
             const taxInp = tr && tr.querySelector('input.row-input-payment-vat-tax');
             const grossInp = tr && tr.querySelector('input.row-input-payment-gross');
-            const net = parseFloat(String(netInput.value || '').replace(/,/g, '').trim(), 10);
+            const raw = String(netInput.value || '').replace(/,/g, '').trim();
+            if (raw === '') {
+                if (kind === 'change') {
+                    if (taxInp) taxInp.value = '';
+                    if (grossInp) grossInp.value = '';
+                }
+                return;
+            }
+            const net = parseFloat(raw, 10);
             if (isNaN(net) || net === 0) {
-                if (taxInp) taxInp.value = '';
-                if (grossInp) grossInp.value = '';
+                if (kind === 'change') {
+                    if (taxInp) taxInp.value = '';
+                    if (grossInp) grossInp.value = '';
+                }
                 return;
             }
             const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
@@ -9963,7 +9986,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 if (taxInp) taxInp.value = String(tax);
                 if (grossInp) grossInp.value = String(Math.round(net + tax));
             } else {
-                const t = parseFloat(tStr.replace(/,/g, ''), 10) || 0;
+                const t = parseFloat(String(tStr).replace(/,/g, ''), 10) || 0;
                 if (grossInp) grossInp.value = String(Math.round(net + t));
             }
         }
@@ -10283,6 +10306,91 @@ import { createProjectRegister } from './estimate-project-register.js';
             values[ix] = { by: uid, kind: 'internal' };
         }
 
+        /** 프로젝트 상세 모달: 활성 탭의 금융 표 메모 너비를 재서 #sharedCenterPanel 가로 폭 맞춤(가로 스크롤 최소화) */
+        let projectDetailModalFitRaf = null;
+        function scheduleFitProjectDetailModalWidth() {
+            if (projectDetailModalFitRaf != null) cancelAnimationFrame(projectDetailModalFitRaf);
+            projectDetailModalFitRaf = requestAnimationFrame(function () {
+                projectDetailModalFitRaf = null;
+                requestAnimationFrame(fitProjectDetailModalWidth);
+            });
+        }
+        function resetProjectDetailModalWidth() {
+            const panel = document.getElementById('sharedCenterPanel');
+            if (!panel) return;
+            panel.style.width = '';
+            panel.style.maxWidth = '';
+        }
+        function fitProjectDetailModalWidth() {
+            const panel = document.getElementById('sharedCenterPanel');
+            if (!panel || !panel.classList.contains('project-detail-modal') || !panel.classList.contains('active')) {
+                return;
+            }
+            const active = panel.querySelector('.new-estimate-tab-pane.active');
+            if (!active) return;
+            const wraps = active.querySelectorAll('.payment-table-wrap');
+            if (wraps.length === 0) {
+                panel.style.width = '';
+                panel.style.maxWidth = '';
+                return;
+            }
+            var maxNeed = 0;
+            wraps.forEach(function (wrap) {
+                const table = wrap.querySelector('table.payment-table');
+                if (!table) return;
+                const tbody = table.querySelector('tbody[id]');
+                if (!tbody || !tbody.id) return;
+                var memoN = 0;
+                const tid = tbody.id;
+                if (tid.indexOf('salesList-') === 0 || tid.indexOf('purchaseList-') === 0) memoN = 8;
+                else if (tid.indexOf('salesPayments-') === 0 || tid.indexOf('transferList-') === 0) memoN = 6;
+                else return;
+                const els = table.querySelectorAll(
+                    'thead tr th:nth-child(' + memoN + '), tbody tr td:nth-child(' + memoN + ')'
+                );
+                if (!els.length) return;
+                const snap = new Map();
+                for (var i = 0; i < els.length; i++) {
+                    snap.set(els[i], els[i].style.cssText);
+                }
+                snap.set(table, table.style.cssText);
+                try {
+                    for (var j = 0; j < els.length; j++) {
+                        els[j].style.whiteSpace = 'nowrap';
+                        els[j].style.maxWidth = 'none';
+                        els[j].style.minWidth = 'auto';
+                        els[j].style.width = 'max-content';
+                    }
+                    table.style.tableLayout = 'auto';
+                    table.style.width = 'max-content';
+                    var sw = wrap.scrollWidth;
+                    if (sw > maxNeed) maxNeed = sw;
+                } finally {
+                    for (var k = 0; k < els.length; k++) {
+                        els[k].style.cssText = snap.get(els[k]) || '';
+                    }
+                    table.style.cssText = snap.get(table) || '';
+                }
+            });
+            if (maxNeed <= 0) {
+                panel.style.width = '';
+                panel.style.maxWidth = '';
+                return;
+            }
+            const vw = window.innerWidth || document.documentElement.clientWidth || 1200;
+            const cap = Math.min(1680, Math.floor(vw * 0.98));
+            const slack = 96;
+            const minW = 560;
+            const target = Math.min(cap, Math.max(minW, maxNeed + slack));
+            panel.style.width = target + 'px';
+            panel.style.maxWidth = 'none';
+        }
+        let projectDetailModalResizeTimer = null;
+        window.addEventListener('resize', function () {
+            clearTimeout(projectDetailModalResizeTimer);
+            projectDetailModalResizeTimer = setTimeout(scheduleFitProjectDetailModalWidth, 120);
+        });
+
         const estimateFinanceModal = createEstimateFinanceModal({
             splitNetTaxFromGross: splitNetTaxFromGross,
             migrateSalesRowValuesIfOld: migrateSalesRowValuesIfOld,
@@ -10302,6 +10410,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             mergeFinanceAttachmentsIntoValues9: mergeFinanceAttachmentsIntoValues9,
             isCurrentUserExternalContractor: isCurrentUserExternalContractor,
             findContractorByName: findContractorByName,
+            scheduleFitProjectDetailModalWidth: scheduleFitProjectDetailModalWidth,
         });
         const {
             paymentRowMenuHtml,
@@ -10560,9 +10669,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                     var netInp = row.querySelector('.row-input-sales-net');
                     var grossInp = row.querySelector('.row-input-sales-vat-gross');
                     if (netInp) {
-                        netInp.addEventListener('input', function () { syncSalesVatGrossFromNet(this); });
-                        netInp.addEventListener('change', function () { syncSalesVatGrossFromNet(this); });
-                        syncSalesVatGrossFromNet(netInp);
+                        netInp.addEventListener('input', function (e) { syncSalesVatGrossFromNet(this, e.type); });
+                        netInp.addEventListener('change', function (e) { syncSalesVatGrossFromNet(this, e.type); });
+                        syncSalesVatGrossFromNet(netInp, 'change');
                     }
                     if (grossInp) {
                         grossInp.addEventListener('input', function () { syncSalesVatFromGross(this); });
@@ -10602,9 +10711,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                     var payNetInp = row.querySelector('.row-input-payment-net');
                     var payGrossInp = row.querySelector('.row-input-payment-gross');
                     if (payNetInp) {
-                        payNetInp.addEventListener('input', function () { syncPaymentVatFromNet(this); });
-                        payNetInp.addEventListener('change', function () { syncPaymentVatFromNet(this); });
-                        syncPaymentVatFromNet(payNetInp);
+                        payNetInp.addEventListener('input', function (e) { syncPaymentVatFromNet(this, e.type); });
+                        payNetInp.addEventListener('change', function (e) { syncPaymentVatFromNet(this, e.type); });
+                        syncPaymentVatFromNet(payNetInp, 'change');
                     }
                     if (payGrossInp) {
                         payGrossInp.addEventListener('input', function () { syncPaymentVatFromGross(this); });
@@ -10812,6 +10921,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             } else {
                 row.innerHTML = '<td>' + (values[0] || '') + '</td><td>' + (values[1] || '') + '</td><td style="font-weight:600;">' + (values[2] || '') + '</td><td>' + (values[3] || '') + '</td>' + actionHtml;
             }
+            scheduleFitProjectDetailModalWidth();
             alert('수정 내용이 저장되었습니다.');
         }
 
@@ -10889,6 +10999,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 } catch (_e2) {
                     /* ignore */
                 }
+                scheduleFitProjectDetailModalWidth();
                 alert('삭제되었습니다.');
             }
         }
@@ -11513,6 +11624,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('sharedPanelOverlay').classList.remove('active');
             document.getElementById('sharedCenterPanel').classList.remove('active');
             document.getElementById('sharedCenterPanel').classList.remove('project-detail-modal');
+            resetProjectDetailModalWidth();
             const bottomSaveBarEl = document.getElementById('sharedPanelBottomBar');
             if (bottomSaveBarEl) bottomSaveBarEl.style.display = 'none';
             setSaveLoading(false);
@@ -11560,6 +11672,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             pendingFinanceHydrationCode = null;
             renderFinanceTablesFromItem(item);
             recalcFinanceSummaries(item.code);
+            scheduleFitProjectDetailModalWidth();
         }
 
         function schedulePanelFinanceHydrationForView() {

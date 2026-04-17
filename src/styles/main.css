@@ -3283,14 +3283,14 @@
             right: 0;
         }
 
-        /* 프로젝트 상세: 메모·저장 버튼에 맞춘 좌우 폭 */
+        /* 프로젝트 상세: 메모·저장 버튼에 맞춘 좌우 폭 (매출/매입 메모 가로 여유) */
         .slide-panel.project-detail-modal {
             right: auto;
             left: 50%;
             top: 50%;
             transform: translate(-50%, -50%);
-            width: 95vw;
-            max-width: 1120px;
+            width: min(98vw, 1680px);
+            max-width: 1680px;
             height: 88vh;
             max-height: min(900px, calc(100vh - 48px));
             border-radius: var(--radius-lg);
@@ -3331,6 +3331,31 @@
 
         .slide-panel.project-detail-modal .payment-list {
             padding: 14px !important;
+        }
+
+        /* 프로젝트 상세: 가로 스크롤 없음 — 폭은 JS(fitProjectDetailModalWidth)가 메모 너비에 맞춤 */
+        .slide-panel.project-detail-modal .payment-table-wrap {
+            overflow-x: visible;
+        }
+
+        /* 매출·매입: 메모 = 8번째 열 — 패널 폭은 JS가 조정, 열은 비율만 */
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="salesList-"]) th:nth-child(8),
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="salesList-"]) td:nth-child(8),
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(8),
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(8) {
+            min-width: 0;
+            max-width: none !important;
+            width: 34%;
+        }
+
+        /* 수금·이체: 메모 = 6번째 열 */
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="salesPayments-"]) th:nth-child(6),
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="salesPayments-"]) td:nth-child(6),
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="transferList-"]) th:nth-child(6),
+        .slide-panel.project-detail-modal .payment-table:has(tbody[id^="transferList-"]) td:nth-child(6) {
+            min-width: 0;
+            max-width: none !important;
+            width: 36%;
         }
 
         /* 경비 등록·상세: 프로젝트 상세와 같은 중앙 모달 (단일 탭·세로 스크롤) */
@@ -5524,10 +5549,13 @@
             text-align: center;
         }
 
-        /* 매출 3–5: vat별도 / 부가세 / vat포함 — 헤더/본문/입력 모두 중앙 */
+        /* 매출·매입 3–5: vat별도 / 부가세 / vat포함 — 헤더/본문/입력 모두 중앙 (동일 8열 구조) */
         .payment-table:has(tbody[id^="salesList-"]) th:nth-child(3),
         .payment-table:has(tbody[id^="salesList-"]) th:nth-child(4),
-        .payment-table:has(tbody[id^="salesList-"]) th:nth-child(5) {
+        .payment-table:has(tbody[id^="salesList-"]) th:nth-child(5),
+        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(3),
+        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(4),
+        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(5) {
             width: 92px;
             min-width: 92px;
             max-width: 92px;
@@ -5536,7 +5564,10 @@
         }
         .payment-table:has(tbody[id^="salesList-"]) td:nth-child(3),
         .payment-table:has(tbody[id^="salesList-"]) td:nth-child(4),
-        .payment-table:has(tbody[id^="salesList-"]) td:nth-child(5) {
+        .payment-table:has(tbody[id^="salesList-"]) td:nth-child(5),
+        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(3),
+        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(4),
+        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(5) {
             width: 92px;
             min-width: 92px;
             max-width: 92px;
@@ -5555,20 +5586,11 @@
             cursor: default;
         }
 
-        /* 매입 3: 매입금액 */
-        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(3),
-        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(3) {
-            width: 110px;
-            min-width: 110px;
-            max-width: 110px;
-            white-space: nowrap;
-        }
-
-        /* 매출 6: 세금계산서 / 매입 4: 세금계산서 */
+        /* 매출 6: 세금계산서 / 매입 6: 세금계산서 */
         .payment-table:has(tbody[id^="salesList-"]) th:nth-child(6),
         .payment-table:has(tbody[id^="salesList-"]) td:nth-child(6),
-        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(4),
-        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(4) {
+        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(6),
+        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(6) {
             width: 76px;
             min-width: 76px;
             max-width: 76px;
@@ -5576,11 +5598,11 @@
             text-align: center;
         }
 
-        /* 매출 7: 첨부 / 매입 5: 첨부 */
+        /* 매출 7: 첨부 / 매입 7: 첨부 */
         .payment-table:has(tbody[id^="salesList-"]) th:nth-child(7),
         .payment-table:has(tbody[id^="salesList-"]) td:nth-child(7),
-        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(5),
-        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(5) {
+        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(7),
+        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(7) {
             width: 140px;
             min-width: 140px;
             max-width: 160px;
@@ -5588,11 +5610,11 @@
             text-align: center;
         }
 
-        /* 매출 8: 메모 / 매입 6: 메모 */
+        /* 매출 8: 메모 / 매입 8: 메모 */
         .payment-table:has(tbody[id^="salesList-"]) th:nth-child(8),
         .payment-table:has(tbody[id^="salesList-"]) td:nth-child(8),
-        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(6),
-        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(6) {
+        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(8),
+        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(8) {
             width: 180px;
             min-width: 180px;
             max-width: 180px;
@@ -5601,7 +5623,7 @@
         }
 
         .payment-table:has(tbody[id^="salesList-"]) th:nth-child(8),
-        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(6) {
+        .payment-table:has(tbody[id^="purchaseList-"]) th:nth-child(8) {
             text-align: left;
         }
 
@@ -5609,7 +5631,7 @@
         .payment-table:has(tbody[id^="salesList-"]) td:nth-child(2),
         .payment-table:has(tbody[id^="salesList-"]) td:nth-child(8),
         .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(2),
-        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(6) {
+        .payment-table:has(tbody[id^="purchaseList-"]) td:nth-child(8) {
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: break-word;

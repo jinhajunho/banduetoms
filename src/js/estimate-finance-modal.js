@@ -26,6 +26,10 @@ export function createEstimateFinanceModal(api) {
         : function () { return false; };
     const findContractorByName =
         typeof api.findContractorByName === 'function' ? api.findContractorByName.bind(api) : function () { return null; };
+    const scheduleFitProjectDetailModalWidth =
+        typeof api.scheduleFitProjectDetailModalWidth === 'function'
+            ? api.scheduleFitProjectDetailModalWidth.bind(api)
+            : function () {};
 
     let financeModalState = null;
 
@@ -293,25 +297,37 @@ export function createEstimateFinanceModal(api) {
         const net = document.getElementById('fm_net');
         const tax = document.getElementById('fm_tax');
         const gross = document.getElementById('fm_gross');
-        function applyFmNetDerived() {
+        function applyFmNetDerived(ev) {
             const taxEl = document.getElementById('fm_tax');
             const grossEl = document.getElementById('fm_gross');
             const netEl = document.getElementById('fm_net');
             if (!netEl || !taxEl || !grossEl) return;
-            const n = parseFloat(String(netEl.value || '').replace(/,/g, '').trim(), 10) || 0;
-            if (!n) {
-                taxEl.value = '';
-                grossEl.value = '';
+            const raw = String(netEl.value || '').replace(/,/g, '').trim();
+            const kind = ev && ev.type ? ev.type : '';
+            if (raw === '') {
+                if (kind === 'change') {
+                    taxEl.value = '';
+                    grossEl.value = '';
+                }
+                return;
+            }
+            const n = parseFloat(raw, 10);
+            if (isNaN(n) || n === 0) {
+                if (kind === 'change') {
+                    taxEl.value = '';
+                    grossEl.value = '';
+                }
                 return;
             }
             const tStr = taxEl.value != null ? String(taxEl.value).trim() : '';
             if (tStr === '') {
-                const t = Math.round(n * 0.1);
-                taxEl.value = String(t);
-                grossEl.value = String(Math.round(n + t));
+                const v = Math.round(n * 0.1);
+                taxEl.value = String(v);
+                grossEl.value = String(Math.round(n + v));
             } else {
-                const t = parseFloat(tStr.replace(/,/g, ''), 10) || 0;
-                grossEl.value = String(Math.round(n + t));
+                const t = parseFloat(String(tStr).replace(/,/g, ''), 10);
+                const tNum = isNaN(t) ? 0 : t;
+                grossEl.value = String(Math.round(n + tNum));
             }
         }
         if (net) {
@@ -321,13 +337,15 @@ export function createEstimateFinanceModal(api) {
         if (tax) tax.addEventListener('input', function () {
             const n = parseFloat(String(net && net.value != null ? net.value : '').replace(/,/g, '').trim(), 10) || 0;
             const t = parseFloat(String(tax.value || '').replace(/,/g, '').trim(), 10) || 0;
-            if (gross) gross.value = n || t ? String(Math.round(n + t)) : '';
+            if (gross) gross.value = (n || t) ? String(Math.round(n + t)) : '';
         });
         if (gross) gross.addEventListener('input', function () {
-            const g = parseFloat(gross.value || '0', 10) || 0;
+            const g = parseFloat(String(gross.value || '').replace(/,/g, '').trim(), 10) || 0;
             const p = api.splitNetTaxFromGross(g);
-            document.getElementById('fm_net').value = p.net ? String(p.net) : '';
-            document.getElementById('fm_tax').value = p.tax ? String(p.tax) : '';
+            const netEl = document.getElementById('fm_net');
+            const taxEl = document.getElementById('fm_tax');
+            if (netEl) netEl.value = String(p.net);
+            if (taxEl) taxEl.value = String(p.tax);
         });
         applyFmNetDerived();
         if ((type === 'sales' || type === 'purchase') && row && row.dataset.rowFileId && window.savedRowFiles && window.savedRowFiles[row.dataset.rowFileId]) {
@@ -419,6 +437,7 @@ export function createEstimateFinanceModal(api) {
         renderFinanceRow(targetRow, type, values, rowFileId);
         api.recalcFinanceSummaries(code);
         api.markPanelDirtyIfChanged();
+        scheduleFitProjectDetailModalWidth();
         closeFinanceRowModal();
         api.persistEstimateToServerByCode(code).then(function (r) {
             if (!r.ok) {
@@ -442,6 +461,7 @@ export function createEstimateFinanceModal(api) {
         financeModalState.row.remove();
         api.recalcFinanceSummaries(code);
         api.markPanelDirtyIfChanged();
+        scheduleFitProjectDetailModalWidth();
         closeFinanceRowModal();
         api.persistEstimateToServerByCode(code).then(function (r) {
             if (!r.ok) {
