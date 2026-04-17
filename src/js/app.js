@@ -3452,14 +3452,22 @@ import { createProjectRegister } from './estimate-project-register.js';
                     ' <span class="contractor-chip-rep-badge">대표</span></span></span>'
                 );
             }
-            const names = getMergedProjectContractorNames(item);
             const rep = String(item.contractor || '').trim();
-            if (!names.length) {
+            const names = getMergedProjectContractorNames(item);
+            const orderedNames =
+                rep && names.indexOf(rep) >= 0
+                    ? [rep].concat(
+                          names.filter(function (n) {
+                              return n !== rep;
+                          })
+                      )
+                    : names;
+            if (!orderedNames.length) {
                 return '<span style="color: var(--gray-500);">-</span>';
             }
             return (
                 '<span class="contractor-chip-list">' +
-                names
+                orderedNames
                     .map(function (n) {
                         const isRep = !!rep && n === rep;
                         return (
@@ -3482,7 +3490,15 @@ import { createProjectRegister } from './estimate-project-register.js';
             ensureContractorExtraNames(item);
             const merged = getMergedProjectContractorNames(item);
             const rep = String(item.contractor || '').trim();
-            const titleStr = merged.join(', ');
+            const orderedMerged =
+                rep && merged.indexOf(rep) >= 0
+                    ? [rep].concat(
+                          merged.filter(function (n) {
+                              return n !== rep;
+                          })
+                      )
+                    : merged;
+            const titleStr = orderedMerged.join(', ');
             const primary = rep || merged[0] || '';
             if (!primary && merged.length === 0) return '-';
             const showMore = merged.length > 1;
