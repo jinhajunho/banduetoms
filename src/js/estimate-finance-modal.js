@@ -263,7 +263,7 @@ export function createEstimateFinanceModal(api) {
                             <input id="fm_date" type="date" value="${values[0] || ''}" class="form-input" title="선택 입력">
                             <input id="fm_name" type="text" value="${(values[1] || '').replace(/"/g, '&quot;')}" placeholder="${fmNamePlaceholder}" class="form-input"${fmNameListAttr}>
                             <input id="fm_net" type="number" value="${String(values[2] || '').replace(/,/g, '')}" placeholder="vat별도" class="form-input">
-                            <input id="fm_tax" type="number" value="${String(values[3] || '').replace(/,/g, '')}" placeholder="부가세" class="form-input" readonly>
+                            <input id="fm_tax" type="number" value="${String(values[3] || '').replace(/,/g, '')}" placeholder="부가세(비우면 10% 자동)" class="form-input" title="직접 수정·삭제 가능. 현금영수증 등 부가세 없으면 0 또는 비움">
                             <input id="fm_gross" type="number" value="${String(values[4] || '').replace(/,/g, '')}" placeholder="vat포함" class="form-input">
                             ${type === 'sales' || type === 'purchase'
                 ? '<select id="fm_taxbill" class="form-select"><option value="미발행"' + (values[5] === '미발행' ? ' selected' : '') + '>미발행</option><option value="발행"' + (values[5] === '발행' ? ' selected' : '') + '>발행</option></select>'
@@ -290,11 +290,31 @@ export function createEstimateFinanceModal(api) {
                 </div>`;
 
         const net = document.getElementById('fm_net');
+        const tax = document.getElementById('fm_tax');
         const gross = document.getElementById('fm_gross');
         if (net) net.addEventListener('input', function () {
-            const n = parseFloat(net.value || '0', 10) || 0;
-            document.getElementById('fm_tax').value = n ? String(Math.round(n * 0.1)) : '';
-            gross.value = n ? String(Math.round(n * 1.1)) : '';
+            const n = parseFloat(String(net.value || '').replace(/,/g, '').trim(), 10) || 0;
+            const taxEl = document.getElementById('fm_tax');
+            const grossEl = document.getElementById('fm_gross');
+            if (!n) {
+                if (taxEl) taxEl.value = '';
+                if (grossEl) grossEl.value = '';
+                return;
+            }
+            const tStr = taxEl && taxEl.value != null ? String(taxEl.value).trim() : '';
+            if (tStr === '') {
+                const t = Math.round(n * 0.1);
+                if (taxEl) taxEl.value = String(t);
+                if (grossEl) grossEl.value = String(Math.round(n + t));
+            } else {
+                const t = parseFloat(tStr.replace(/,/g, ''), 10) || 0;
+                if (grossEl) grossEl.value = String(Math.round(n + t));
+            }
+        });
+        if (tax) tax.addEventListener('input', function () {
+            const n = parseFloat(String(net && net.value != null ? net.value : '').replace(/,/g, '').trim(), 10) || 0;
+            const t = parseFloat(String(tax.value || '').replace(/,/g, '').trim(), 10) || 0;
+            if (gross) gross.value = n || t ? String(Math.round(n + t)) : '';
         });
         if (gross) gross.addEventListener('input', function () {
             const g = parseFloat(gross.value || '0', 10) || 0;
@@ -325,8 +345,16 @@ export function createEstimateFinanceModal(api) {
         const prevSnap = (row && row.dataset.rowValues) ? JSON.parse(row.dataset.rowValues) : null;
         const date = document.getElementById('fm_date').value;
         const name = document.getElementById('fm_name').value.trim();
-        const net = parseFloat(document.getElementById('fm_net').value || '0', 10) || 0;
-        const gross = parseFloat(document.getElementById('fm_gross').value || '0', 10) || 0;
+        function parseFmMoney(id) {
+            const el = document.getElementById(id);
+            const v = el && el.value != null ? String(el.value).trim().replace(/,/g, '') : '';
+            if (v === '') return 0;
+            const n = parseFloat(v, 10);
+            return isNaN(n) ? 0 : n;
+        }
+        const netN = Math.round(parseFmMoney('fm_net'));
+        const taxN = Math.round(parseFmMoney('fm_tax'));
+        const grossN = Math.round(parseFmMoney('fm_gross'));
         if (!name && type !== 'sales' && type !== 'payment') {
             alert('상호명은 필수입니다. 금액(vat포함)은 비우거나 0으로 둘 수 있습니다. 일자는 생략할 수 있습니다.');
             return;
@@ -336,7 +364,6 @@ export function createEstimateFinanceModal(api) {
             document.getElementById('fm_name').focus();
             return;
         }
-        const parts = api.splitNetTaxFromGross(gross || Math.round(net * 1.1));
         let values;
         if (type === 'sales' || type === 'purchase') {
             const taxbill = document.getElementById('fm_taxbill').value;
@@ -352,11 +379,11 @@ export function createEstimateFinanceModal(api) {
                 cMemo = fc ? fc.value.trim() : (prevSnap ? String(prevSnap[7] || '') : '');
                 iMemo = fi ? fi.value.trim() : '';
             }
-            values = [date, name, parts.net.toLocaleString(), parts.tax.toLocaleString(), parts.gross.toLocaleString(), taxbill, '-', cMemo, iMemo, null];
+            values = [date, name, netN.toLocaleString(), taxN.toLocaleString(), grossN.toLocaleString(), taxbill, '-', cMemo, iMemo, null];
         } else {
             const fm = document.getElementById('fm_memo');
             const memo = fm ? fm.value.trim() : '';
-            values = [date, name, parts.net.toLocaleString(), parts.tax.toLocaleString(), parts.gross.toLocaleString(), memo, null];
+            values = [date, name, netN.toLocaleString(), taxN.toLocaleString(), grossN.toLocaleString(), memo, null];
         }
         ensureMeta(values, type);
         stampMeta(values, type, prevSnap);

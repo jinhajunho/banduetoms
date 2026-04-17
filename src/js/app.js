@@ -9878,22 +9878,36 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
         }
 
-        /** vat별도 입력 시 부가세(10%)·vat포함 자동 (부가세 = 별도×0.1, 포함 = 별도×1.1) */
+        /** vat별도 입력 시: 부가세 칸이 비어 있으면 10%·포함 자동, 값이 있으면(0 포함) 포함 = 별도+부가세 */
         function syncSalesVatGrossFromNet(netInput) {
             const tr = netInput.closest('tr');
             const taxInp = tr && tr.querySelector('input.row-input-sales-vat-tax');
             const grossInp = tr && tr.querySelector('input.row-input-sales-vat-gross');
             const raw = String(netInput.value || '').replace(/,/g, '').trim();
             const net = parseFloat(raw, 10);
-            if (!isNaN(net) && net !== 0) {
-                const tax = Math.round(net * 0.1);
-                const gross = Math.round(net * 1.1);
-                if (taxInp) taxInp.value = String(tax);
-                if (grossInp) grossInp.value = String(gross);
-            } else {
+            if (isNaN(net) || net === 0) {
                 if (taxInp) taxInp.value = '';
                 if (grossInp) grossInp.value = '';
+                return;
             }
+            const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
+            if (tStr === '') {
+                const tax = Math.round(net * 0.1);
+                if (taxInp) taxInp.value = String(tax);
+                if (grossInp) grossInp.value = String(Math.round(net + tax));
+            } else {
+                const t = parseFloat(tStr.replace(/,/g, ''), 10) || 0;
+                if (grossInp) grossInp.value = String(Math.round(net + t));
+            }
+        }
+
+        function syncSalesVatGrossFromTax(taxInput) {
+            const tr = taxInput.closest('tr');
+            const netInp = tr && tr.querySelector('input.row-input-sales-net');
+            const grossInp = tr && tr.querySelector('input.row-input-sales-vat-gross');
+            const net = parseFloat(String(netInp && netInp.value != null ? netInp.value : '').replace(/,/g, '').trim(), 10) || 0;
+            const t = parseFloat(String(taxInput.value || '').replace(/,/g, '').trim(), 10) || 0;
+            if (grossInp) grossInp.value = net || t ? String(Math.round(net + t)) : '';
         }
 
         function syncSalesVatFromGross(grossInput) {
@@ -9926,7 +9940,17 @@ import { createProjectRegister } from './estimate-project-register.js';
         /** vat별도 기준으로 부가세·vat포함 재계산 */
         function normalizeSalesVatIncluded(values) {
             if (!values || values.length < 5) return;
-            const grossNum = parseFloat(String(values[4]).replace(/,/g, ''), 10);
+            const netNum = parseFloat(String(values[2] || '').replace(/,/g, ''), 10) || 0;
+            const taxNum = parseFloat(String(values[3] || '').replace(/,/g, ''), 10) || 0;
+            const grossNum = parseFloat(String(values[4] || '').replace(/,/g, ''), 10) || 0;
+            const sum = Math.round(netNum + taxNum);
+            const g = Math.round(grossNum);
+            if (!isNaN(grossNum) && grossNum > 0 && Math.abs(sum - g) <= 1) {
+                values[2] = Math.round(netNum).toLocaleString();
+                values[3] = Math.round(taxNum).toLocaleString();
+                values[4] = Math.round(grossNum).toLocaleString();
+                return;
+            }
             if (!isNaN(grossNum) && grossNum > 0) {
                 const parts = splitNetTaxFromGross(grossNum);
                 values[2] = parts.net.toLocaleString();
@@ -9934,9 +9958,13 @@ import { createProjectRegister } from './estimate-project-register.js';
                 values[4] = parts.gross.toLocaleString();
                 return;
             }
-            const netNum = parseFloat(String(values[2]).replace(/,/g, ''), 10) || 0;
-            values[3] = netNum > 0 ? Math.round(netNum * 0.1).toLocaleString() : '';
-            values[4] = netNum > 0 ? Math.round(netNum * 1.1).toLocaleString() : '';
+            if (netNum > 0) {
+                values[3] = Math.round(netNum * 0.1).toLocaleString();
+                values[4] = Math.round(netNum * 1.1).toLocaleString();
+            } else {
+                values[3] = '';
+                values[4] = '';
+            }
         }
 
         /** vat포함 입력 기준으로 vat별도/부가세 분해 */
@@ -9953,15 +9981,29 @@ import { createProjectRegister } from './estimate-project-register.js';
             const taxInp = tr && tr.querySelector('input.row-input-payment-vat-tax');
             const grossInp = tr && tr.querySelector('input.row-input-payment-gross');
             const net = parseFloat(String(netInput.value || '').replace(/,/g, '').trim(), 10);
-            if (!isNaN(net) && net !== 0) {
-                const tax = Math.round(net * 0.1);
-                const gross = Math.round(net * 1.1);
-                if (taxInp) taxInp.value = String(tax);
-                if (grossInp) grossInp.value = String(gross);
-            } else {
+            if (isNaN(net) || net === 0) {
                 if (taxInp) taxInp.value = '';
                 if (grossInp) grossInp.value = '';
+                return;
             }
+            const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
+            if (tStr === '') {
+                const tax = Math.round(net * 0.1);
+                if (taxInp) taxInp.value = String(tax);
+                if (grossInp) grossInp.value = String(Math.round(net + tax));
+            } else {
+                const t = parseFloat(tStr.replace(/,/g, ''), 10) || 0;
+                if (grossInp) grossInp.value = String(Math.round(net + t));
+            }
+        }
+
+        function syncPaymentVatGrossFromTax(taxInput) {
+            const tr = taxInput.closest('tr');
+            const netInp = tr && tr.querySelector('input.row-input-payment-net');
+            const grossInp = tr && tr.querySelector('input.row-input-payment-gross');
+            const net = parseFloat(String(netInp && netInp.value != null ? netInp.value : '').replace(/,/g, '').trim(), 10) || 0;
+            const t = parseFloat(String(taxInput.value || '').replace(/,/g, '').trim(), 10) || 0;
+            if (grossInp) grossInp.value = net || t ? String(Math.round(net + t)) : '';
         }
 
         function syncPaymentVatFromGross(grossInput) {
@@ -9992,17 +10034,32 @@ import { createProjectRegister } from './estimate-project-register.js';
 
         function normalizePaymentVatValues(values) {
             if (!values || values.length < 5) return;
-            const gross = parseFloat(String(values[4] || '').replace(/,/g, ''), 10);
-            if (!isNaN(gross) && gross > 0) {
-                const parts = splitNetTaxFromGross(gross);
+            const netNum = parseFloat(String(values[2] || '').replace(/,/g, ''), 10) || 0;
+            const taxNum = parseFloat(String(values[3] || '').replace(/,/g, ''), 10) || 0;
+            const grossNum = parseFloat(String(values[4] || '').replace(/,/g, ''), 10) || 0;
+            const sum = Math.round(netNum + taxNum);
+            const g = Math.round(grossNum);
+            if (!isNaN(grossNum) && grossNum > 0 && Math.abs(sum - g) <= 1) {
+                values[2] = Math.round(netNum).toLocaleString();
+                values[3] = Math.round(taxNum).toLocaleString();
+                values[4] = Math.round(grossNum).toLocaleString();
+                return;
+            }
+            if (!isNaN(grossNum) && grossNum > 0) {
+                const parts = splitNetTaxFromGross(grossNum);
                 values[2] = parts.net.toLocaleString();
                 values[3] = parts.tax.toLocaleString();
                 values[4] = parts.gross.toLocaleString();
                 return;
             }
-            const net = parseFloat(String(values[2] || '').replace(/,/g, ''), 10) || 0;
-            values[3] = net > 0 ? Math.round(net * 0.1).toLocaleString() : '';
-            values[4] = net > 0 ? Math.round(net * 1.1).toLocaleString() : '';
+            const net = netNum;
+            if (net > 0) {
+                values[3] = Math.round(net * 0.1).toLocaleString();
+                values[4] = Math.round(net * 1.1).toLocaleString();
+            } else {
+                values[3] = '';
+                values[4] = '';
+            }
         }
 
         /** 금융 행 메모: 매출/매입 메타 인덱스 9, 수금/이체 6 */
@@ -10513,19 +10570,17 @@ import { createProjectRegister } from './estimate-project-register.js';
                 }
                 if (type === 'sales') {
                     migrateSalesRowValuesIfOld(values);
+                    normalizeSalesVatIncluded(values);
                     var netStr = String(values[2] || '').replace(/,/g, '');
-                    var netNum = parseFloat(netStr, 10) || 0;
                     var vatStr = String(values[3] || '').replace(/,/g, '');
                     var grossStr = String(values[4] || '').replace(/,/g, '');
-                    if (!vatStr && netNum > 0) vatStr = String(Math.round(netNum * 0.1));
-                    if (!grossStr && netNum > 0) grossStr = String(Math.round(netNum * 1.1));
                     var taxVal = (values[5] === '미발행' || values[5] === '발행') ? values[5] : '미발행';
                     var memoVal = (values[7] != null ? values[7] : values[6]) || '';
                     row.innerHTML =
                         '<td><input type="date" class="row-input" value="' + (values[0] || new Date().toISOString().slice(0, 10)) + '"></td>' +
                         '<td><input type="text" class="row-input row-input-finance-name-optional" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="상호명(선택)"></td>' +
                         '<td><input type="number" class="row-input row-input-sales-net" value="' + netStr + '" placeholder="vat별도"></td>' +
-                        '<td><input type="number" readonly class="row-input-sales-vat-tax" tabindex="-1" value="' + String(vatStr).replace(/"/g, '&quot;') + '" placeholder="부가세" title="vat별도 × 10% 자동"></td>' +
+                        '<td><input type="number" class="row-input row-input-sales-vat-tax" value="' + String(vatStr).replace(/"/g, '&quot;') + '" placeholder="부가세" title="직접 수정 가능. 비우면 별도×10% 자동. 현금영수증 등은 0 또는 비움"></td>' +
                         '<td><input type="number" class="row-input row-input-sales-vat-gross" value="' + String(grossStr).replace(/"/g, '&quot;') + '" placeholder="vat포함" title="vat포함 입력 시 vat별도/부가세 자동 역산"></td>' +
                         '<td><select class="row-input"><option value="미발행"' + (taxVal === '미발행' ? ' selected' : '') + '>미발행</option><option value="발행"' + (taxVal === '발행' ? ' selected' : '') + '>발행</option></select></td>' +
                         '<td>' + fileCellContent + '</td>' +
@@ -10541,6 +10596,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                         grossInp.addEventListener('input', function () { syncSalesVatFromGross(this); });
                         grossInp.addEventListener('change', function () { syncSalesVatFromGross(this); });
                     }
+                    var salesTaxInp = row.querySelector('.row-input-sales-vat-tax');
+                    if (salesTaxInp) {
+                        salesTaxInp.addEventListener('input', function () { syncSalesVatGrossFromTax(this); });
+                        salesTaxInp.addEventListener('change', function () { syncSalesVatGrossFromTax(this); });
+                    }
                 } else if (type === 'purchase') {
                     // 구 데이터 호환: 날짜 컬럼이 없던 값 배열이면 앞에 빈 값 추가
                     if (values.length > 0 && values.length < 6) values.unshift('');
@@ -10554,6 +10614,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                         '<td class="payment-action-cell"><button class="btn-save-row" onclick="saveEditedRow(this)" title="저장"><i class="fas fa-save"></i></button><button class="btn-cancel-row" onclick="cancelEditRow(this)" title="취소"><i class="fas fa-times"></i></button></td>';
                 } else if (type === 'payment') {
                     migratePaymentRowValuesIfOld(values);
+                    normalizePaymentVatValues(values);
                     var payNetStr = String(values[2] || '').replace(/,/g, '');
                     var payTaxStr = String(values[3] || '').replace(/,/g, '');
                     var payGrossStr = String(values[4] || '').replace(/,/g, '');
@@ -10562,7 +10623,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                         '<td><input type="date" class="row-input" value="' + (values[0] || new Date().toISOString().slice(0, 10)) + '"></td>' +
                         '<td><input type="text" class="row-input row-input-finance-name-optional" value="' + (values[1] || '').replace(/"/g, '&quot;') + '" placeholder="상호명(선택)"></td>' +
                         '<td><input type="number" class="row-input row-input-payment-net" value="' + payNetStr + '" placeholder="vat별도"></td>' +
-                        '<td><input type="number" readonly class="row-input-payment-vat-tax" tabindex="-1" value="' + payTaxStr + '" placeholder="부가세"></td>' +
+                        '<td><input type="number" class="row-input row-input-payment-vat-tax" value="' + payTaxStr + '" placeholder="부가세" title="직접 수정 가능. 비우면 별도×10% 자동"></td>' +
                         '<td><input type="number" class="row-input row-input-payment-gross" value="' + payGrossStr + '" placeholder="vat포함"></td>' +
                         '<td><input type="text" class="row-input" value="' + String(payMemoVal).replace(/"/g, '&quot;') + '" placeholder="메모"></td>' +
                         '<td class="payment-action-cell"><button class="btn-save-row" onclick="saveEditedRow(this)" title="저장"><i class="fas fa-save"></i></button><button class="btn-cancel-row" onclick="cancelEditRow(this)" title="취소"><i class="fas fa-times"></i></button></td>';
@@ -10575,6 +10636,11 @@ import { createProjectRegister } from './estimate-project-register.js';
                     if (payGrossInp) {
                         payGrossInp.addEventListener('input', function () { syncPaymentVatFromGross(this); });
                         payGrossInp.addEventListener('change', function () { syncPaymentVatFromGross(this); });
+                    }
+                    var payTaxInp = row.querySelector('.row-input-payment-vat-tax');
+                    if (payTaxInp) {
+                        payTaxInp.addEventListener('input', function () { syncPaymentVatGrossFromTax(this); });
+                        payTaxInp.addEventListener('change', function () { syncPaymentVatGrossFromTax(this); });
                     }
                 } else {
                     // transfer
