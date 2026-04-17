@@ -1793,6 +1793,21 @@
             overflow-y: visible;
         }
 
+        /*
+         * 필터가 DOM에서 테이블보다 앞에 있어, 형제인 테이블(특히 thead sticky)이
+         * 월 선택·기간 직접 패널(absolute)을 위에 덮어 그리는 경우가 있음.
+         * 필터 블록 전체의 쌓임 맥락을 테이블보다 위로 올림.
+         */
+        #page-estimate .filter-section {
+            position: relative;
+            z-index: 40;
+        }
+
+        #page-estimate .table-section {
+            position: relative;
+            z-index: 0;
+        }
+
         .estimate-table-pagination {
             display: flex;
             flex-direction: column;

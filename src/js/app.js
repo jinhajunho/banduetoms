@@ -7756,13 +7756,6 @@ import { createProjectRegister } from './estimate-project-register.js';
             };
         }
 
-        function getPerformanceSalesDateList(item) {
-            const raw = (item.salesDates && item.salesDates.length) ? item.salesDates : [];
-            return raw.map(function (x) { return String(x).trim().slice(0, 10); }).filter(function (d) {
-                return /^\d{4}-\d{2}-\d{2}/.test(d);
-            });
-        }
-
         function parsePerformanceAmount(v) {
             const n = parseFloat(String(v == null ? '' : v).replace(/원/g, '').replace(/,/g, '').trim(), 10);
             return isNaN(n) ? 0 : n;
@@ -7772,15 +7765,6 @@ import { createProjectRegister } from './estimate-project-register.js';
             const gross = Math.max(0, Math.round(Number(v) || 0));
             const parts = splitNetTaxFromGross(gross);
             return Math.max(0, Math.round(Number(parts && parts.net) || 0));
-        }
-
-        function getPerformanceFallbackDate(item) {
-            const salesDates = getPerformanceSalesDateList(item);
-            if (salesDates.length) {
-                return salesDates.reduce(function (a, b) { return a < b ? a : b; });
-            }
-            const d = item && item.date ? String(item.date).trim().slice(0, 10) : '';
-            return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '';
         }
 
         function getPerformanceDateRowsFromEstimate(item) {
@@ -7839,27 +7823,14 @@ import { createProjectRegister } from './estimate-project-register.js';
                 });
             });
 
-            // 하위호환: 행 데이터가 없는 과거 데이터는 요약값을 기준일 1건으로 보강
-            if (!rows.length) {
-                const d = getPerformanceFallbackDate(item);
-                if (d) {
-                    const revenue = grossToNetRounded(item && item.revenue);
-                    const purchase = Math.max(0, Math.round(getItemPurchaseTotal(item)));
-                    if (revenue > 0 || purchase > 0) {
-                        rows.push({
-                            date: d,
-                            month: d.slice(0, 7),
-                            category1: (item.category1 || '').trim() || '-',
-                            category2: (item.category2 || '').trim() || '-',
-                            category3: (item.category3 || '').trim() || '-',
-                            revenue: revenue,
-                            purchase: purchase,
-                        });
-                    }
-                }
-            }
-
             return rows;
+        }
+
+        /** 경영실적: 매출일·매입일·사업소득 이체일이 있는 행에서만 나온 날짜 목록 */
+        function getPerformanceStrictDatesFromItem(item) {
+            return getPerformanceDateRowsFromEstimate(item)
+                .map(function (r) { return String(r && r.date ? r.date : '').trim().slice(0, 10); })
+                .filter(function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d); });
         }
 
         function performanceDateMatchesPeriod(dateStr) {
@@ -7884,16 +7855,16 @@ import { createProjectRegister } from './estimate-project-register.js';
             return true;
         }
 
-        /** 월별 집계 버킷: 매출발행일 중 가장 이른 날의 연-월 */
+        /** 월별 집계 버킷: 실적 행(매출·매입·사업소득) 날짜 중 가장 이른 날의 연-월 */
         function getPerformanceItemMonthKey(item) {
-            const dates = getPerformanceSalesDateList(item);
+            const dates = getPerformanceStrictDatesFromItem(item);
             if (!dates.length) return '';
             const minD = dates.reduce(function (a, b) { return a < b ? a : b; });
             return minD.slice(0, 7);
         }
 
         function itemMatchesPerformancePeriod(item) {
-            const dates = getPerformanceSalesDateList(item);
+            const dates = getPerformanceStrictDatesFromItem(item);
             if (!dates.length) return false;
 
             if (performancePeriodMode === 'all') {
