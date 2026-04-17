@@ -11570,9 +11570,9 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             let content = '';
             if (isImage && !isPdf) {
-                content = '<img src="' + fd.replace(/"/g, '&quot;') + '" alt="' + String(fileName || '').replace(/"/g, '&quot;') + '" style="max-width: 100%; max-height: 70vh; border-radius: 8px;">';
+                content = '<img src="' + fd.replace(/"/g, '&quot;') + '" alt="' + String(fileName || '').replace(/"/g, '&quot;') + '" style="max-width: 100%; max-height: 82vh; border-radius: 8px;">';
             } else if (isPdf) {
-                content = '<iframe src="' + fd.replace(/"/g, '&quot;') + '" style="width: 800px; height: 70vh; border: none; border-radius: 8px;"></iframe>';
+                content = '<iframe src="' + fd.replace(/"/g, '&quot;') + '" style="width: min(1200px, 92vw); height: 82vh; border: none; border-radius: 8px;"></iframe>';
             } else {
                 content = `<div style="padding: 40px; text-align: center;">
                     <i class="fas fa-file" style="font-size: 48px; color: var(--gray-400);"></i>
@@ -11581,7 +11581,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             
             modal.innerHTML = `
-                <div class="image-modal-content" style="max-width: 90vw; max-height: 90vh;">
+                <div class="image-modal-content" style="max-width: 96vw; max-height: 96vh;">
                     <div class="image-modal-header" style="padding: 16px 20px; background: white; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
                         <div style="font-size: 16px; font-weight: 600; color: var(--gray-900);">
                             <i class="fas fa-file-invoice"></i> ${fileName}
@@ -11590,7 +11590,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    <div style="padding: 20px; background: var(--gray-50); display: flex; align-items: center; justify-content: center; overflow: auto;">
+                    <div style="padding: 12px; background: var(--gray-50); display: flex; align-items: center; justify-content: center; overflow: auto;">
                         ${content}
                     </div>
                 </div>
