@@ -65,6 +65,7 @@ export function createEstimateFinanceModal(api) {
         if ((row.getAttribute('data-row-type') || '') === 'unpaid') return;
         const t = event && event.target;
         if (t && t.closest && t.closest('.file-link')) return;
+        if (t && t.closest && t.closest('.finance-vendor-doc-trigger')) return;
         const tbody = row.closest('tbody');
         if (!tbody) return;
         const code = tbody.id
@@ -118,6 +119,12 @@ export function createEstimateFinanceModal(api) {
             const fileCell = (rowFileId && window.savedRowFiles && window.savedRowFiles[rowFileId] && window.savedRowFiles[rowFileId].length > 0)
                 ? '<span class="file-link" onclick="event.stopPropagation(); viewSavedRowFiles(\'' + rowFileId + '\')" style="color: var(--primary); cursor: pointer;"><i class="fas fa-eye"></i> (' + window.savedRowFiles[rowFileId].length + ')</span>'
                 : '-';
+            const vendorName = String(values[1] || '').trim();
+            const linkedContractor = vendorName ? findContractorByName(vendorName) : null;
+            const vendorCellHtml =
+                type === 'purchase' && linkedContractor && linkedContractor.id != null
+                    ? '<button type="button" class="file-link finance-vendor-doc-trigger" onclick="event.stopPropagation(); viewContractorAllAttachments(' + linkedContractor.id + ')" style="color: var(--primary); cursor: pointer; background: none; border: none; padding: 0; margin: 0; font: inherit; text-decoration: underline; text-underline-offset: 2px;">' + vendorName + '</button>'
+                    : (values[1] || '');
             const taxbillText = (values[5] || '');
             const taxbillHtml = taxbillText === '발행'
                 ? '<span class="badge badge-issued">발행</span>'
@@ -126,7 +133,7 @@ export function createEstimateFinanceModal(api) {
                     : taxbillText);
             row.innerHTML =
                 '<td>' + (values[0] || '') + '</td>' +
-                '<td>' + (values[1] || '') + '</td>' +
+                '<td>' + vendorCellHtml + '</td>' +
                 '<td style="font-weight:600;">' + won(values[2]) + '</td>' +
                 '<td style="font-weight:600;">' + won(values[3]) + '</td>' +
                 '<td style="font-weight:600;">' + won(values[4]) + '</td>' +
