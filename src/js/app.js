@@ -492,6 +492,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                     if (!e.businessIncomeName && e.businessIncomeRows[0] && e.businessIncomeRows[0][1]) e.businessIncomeName = String(e.businessIncomeRows[0][1]);
                 }
                 if (e.showOnDashboardCalendar === undefined) e.showOnDashboardCalendar = true;
+                if (!Array.isArray(e.contractorExtraNames)) e.contractorExtraNames = [];
                 if (e.salesRows.length > 0) {
                     e.salesDates = deriveSalesDatesFromSalesRows(e.salesRows);
                 } else if (!Array.isArray(e.salesDates)) {
@@ -3201,6 +3202,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 derivePurchaseTaxIssuedForEstimateFilter: derivePurchaseTaxIssuedForEstimateFilter,
                 escapeHtmlAttr: escapeHtmlAttr,
                 updateEstimatePaginationUI: updateEstimatePaginationUI,
+                getEstimateTableContractorCellHtml: getEstimateTableContractorCellHtml,
             }, options);
         }
 
@@ -3341,6 +3343,158 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return { ok: false, value: '' };
             }
             return { ok: true, value: value };
+        }
+
+        function ensureContractorExtraNames(item) {
+            if (!item) return;
+            if (!Array.isArray(item.contractorExtraNames)) item.contractorExtraNames = [];
+        }
+
+        function getPurchaseVendorNamesFromRows(rows) {
+            const seen = new Set();
+            const out = [];
+            if (!Array.isArray(rows)) return out;
+            rows.forEach(function (r) {
+                const n = String(r && r[1] != null ? r[1] : '').trim();
+                if (!n || seen.has(n)) return;
+                seen.add(n);
+                out.push(n);
+            });
+            return out.sort(function (a, b) {
+                return a.localeCompare(b, 'ko');
+            });
+        }
+
+        /** 매입 상호명 ∪ 기본정보에서 연결한 등록 업체명 ∪ 대표 도급사 */
+        function getMergedProjectContractorNames(item) {
+            ensureContractorExtraNames(item);
+            const set = new Set();
+            getPurchaseVendorNamesFromRows(item && item.purchaseRows ? item.purchaseRows : []).forEach(function (n) {
+                set.add(n);
+            });
+            (item.contractorExtraNames || []).forEach(function (n) {
+                const t = String(n || '').trim();
+                if (t) set.add(t);
+            });
+            const rep = String(item && item.contractor != null ? item.contractor : '').trim();
+            if (rep) set.add(rep);
+            return Array.from(set).sort(function (a, b) {
+                return a.localeCompare(b, 'ko');
+            });
+        }
+
+        function validateRepresentativeContractorById(inputId, item) {
+            const input = document.getElementById(inputId);
+            if (!input) return { ok: true, value: '' };
+            const value = String(input.value || '').trim();
+            if (!value) {
+                alert('대표 도급사를 선택해주세요.');
+                if (typeof input.focus === 'function') input.focus();
+                return { ok: false, value: '' };
+            }
+            const merged = getMergedProjectContractorNames(item);
+            if (merged.indexOf(value) === -1) {
+                alert('목록에 없는 도급사입니다. 매입 상호 또는 「도급사」등록으로 먼저 연결해 주세요.');
+                if (typeof input.focus === 'function') input.focus();
+                return { ok: false, value: '' };
+            }
+            const purchaseNames = getPurchaseVendorNamesFromRows(item && item.purchaseRows ? item.purchaseRows : []);
+            if (!findContractorByName(value) && purchaseNames.indexOf(value) === -1) {
+                const legacyRep = String(item && item.contractor != null ? item.contractor : '').trim();
+                if (legacyRep !== value) {
+                    alert('대표는 매입 상호에 있거나 업체정보관리에 등록된 업체만 선택할 수 있습니다.');
+                    if (typeof input.focus === 'function') input.focus();
+                    return { ok: false, value: '' };
+                }
+            }
+            return { ok: true, value: value };
+        }
+
+        function getRepresentativeContractorSelectHtml(item) {
+            ensureContractorExtraNames(item);
+            const names = getMergedProjectContractorNames(item);
+            const selected = String(item.contractor || '').trim();
+            let html = '<select class="form-select form-select-inline edit-input" id="edit_contractor_rep">';
+            html += '<option value="">대표 도급사 선택</option>';
+            names.forEach(function (name) {
+                html +=
+                    '<option value="' +
+                    escapeHtml(name) +
+                    '"' +
+                    (name === selected ? ' selected' : '') +
+                    '>' +
+                    escapeHtml(name) +
+                    '</option>';
+            });
+            if (selected && names.indexOf(selected) === -1) {
+                html +=
+                    '<option value="' +
+                    escapeHtml(selected) +
+                    '" selected>' +
+                    escapeHtml(selected) +
+                    ' (기존)</option>';
+            }
+            html += '</select>';
+            return html;
+        }
+
+        function getContractorChipsHtml(item, options) {
+            const opt = options || {};
+            if (opt.external) {
+                const name = String(opt.lockedName || '').trim();
+                if (!name) return '<span style="color: var(--gray-500);">-</span>';
+                return (
+                    '<span class="contractor-chip-list">' +
+                    '<span class="contractor-chip contractor-chip--rep" title="' +
+                    escapeHtmlAttr(name + ' (대표)') +
+                    '">' +
+                    escapeHtml(name) +
+                    ' <span class="contractor-chip-rep-badge">대표</span></span></span>'
+                );
+            }
+            const names = getMergedProjectContractorNames(item);
+            const rep = String(item.contractor || '').trim();
+            if (!names.length) {
+                return '<span style="color: var(--gray-500);">-</span>';
+            }
+            return (
+                '<span class="contractor-chip-list">' +
+                names
+                    .map(function (n) {
+                        const isRep = !!rep && n === rep;
+                        return (
+                            '<span class="contractor-chip' +
+                            (isRep ? ' contractor-chip--rep' : '') +
+                            '" title="' +
+                            escapeHtmlAttr(n + (isRep ? ' (대표)' : '')) +
+                            '">' +
+                            escapeHtml(n) +
+                            (isRep ? ' <span class="contractor-chip-rep-badge">대표</span>' : '') +
+                            '</span>'
+                        );
+                    })
+                    .join('') +
+                '</span>'
+            );
+        }
+
+        function getEstimateTableContractorCellHtml(item) {
+            ensureContractorExtraNames(item);
+            const merged = getMergedProjectContractorNames(item);
+            const rep = String(item.contractor || '').trim();
+            const titleStr = merged.join(', ');
+            const primary = rep || merged[0] || '';
+            if (!primary && merged.length === 0) return '-';
+            const showMore = merged.length > 1;
+            const titleAttr = titleStr ? ' title="' + escapeHtmlAttr(titleStr) + '"' : '';
+            return (
+                '<span class="table-contractor-cell"' +
+                titleAttr +
+                '>' +
+                escapeHtml(primary) +
+                (showMore ? escapeHtml(' …') : '') +
+                '</span>'
+            );
         }
 
         function getContractorSelectOptionsHtml(selectedName) {
@@ -11447,6 +11601,66 @@ import { createProjectRegister } from './estimate-project-register.js';
             renderPanelContent(currentEditItem);
         }
 
+        function openProjectContractorExtraModal() {
+            if (!currentEditItem || isCurrentUserExternalContractor()) return;
+            const dl = document.getElementById('projectContractorExtraList');
+            const input = document.getElementById('projectContractorExtraName');
+            const modal = document.getElementById('projectContractorExtraModal');
+            if (!modal || !input) return;
+            if (dl) dl.innerHTML = getContractorDatalistOptionsHtml();
+            input.value = '';
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            setTimeout(function () {
+                try {
+                    input.focus();
+                } catch (_e) {
+                    /* ignore */
+                }
+            }, 0);
+        }
+
+        function closeProjectContractorExtraModal() {
+            const modal = document.getElementById('projectContractorExtraModal');
+            if (!modal) return;
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        function confirmProjectContractorExtraModal() {
+            if (!currentEditItem || isCurrentUserExternalContractor()) return;
+            const input = document.getElementById('projectContractorExtraName');
+            const name = input ? String(input.value || '').trim() : '';
+            if (!name) {
+                alert('업체명을 입력하거나 목록에서 선택해 주세요.');
+                return;
+            }
+            if (!findContractorByName(name)) {
+                alert('업체정보관리에 등록된 도급사만 연결할 수 있습니다.');
+                return;
+            }
+            ensureContractorExtraNames(currentEditItem);
+            const merged = getMergedProjectContractorNames(currentEditItem);
+            if (merged.indexOf(name) !== -1) {
+                alert('이미 프로젝트 도급사 목록에 포함된 업체입니다.');
+                return;
+            }
+            currentEditItem.contractorExtraNames.push(name);
+            isPanelDirty = true;
+            closeProjectContractorExtraModal();
+            renderPanelContent(currentEditItem);
+            setTimeout(function () {
+                const repSelect = document.getElementById('edit_contractor_rep');
+                if (repSelect && typeof repSelect.focus === 'function') {
+                    try {
+                        repSelect.focus();
+                    } catch (_e) {
+                        /* ignore */
+                    }
+                }
+            }, 0);
+        }
+
         // 기본정보 탭만 저장
         async function saveBasicInfoEdit() {
             if (!currentEditItem) return;
@@ -11490,7 +11704,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 }
                 currentEditItem.contractor = cn;
             } else {
-                const contractorCheck = validateContractorSelectionById('edit_contractor');
+                const contractorCheck = validateRepresentativeContractorById('edit_contractor_rep', currentEditItem);
                 if (!contractorCheck.ok) return;
                 currentEditItem.contractor = contractorCheck.value;
             }
@@ -11585,6 +11799,7 @@ import { createProjectRegister } from './estimate-project-register.js';
                 isCurrentUserExternalContractor: isCurrentUserExternalContractor,
                 getCurrentUserAccessProfile: function () { return currentUserAccessProfile; },
                 validateContractorSelectionById: validateContractorSelectionById,
+                validateRepresentativeContractorById: validateRepresentativeContractorById,
                 readBusinessIncomeFormIntoItem: readBusinessIncomeFormIntoItem,
                 derivePurchaseTaxIssuedFromRows: derivePurchaseTaxIssuedFromRows,
                 deriveSalesDatesFromSalesRows: deriveSalesDatesFromSalesRows,
@@ -11710,7 +11925,9 @@ import { createProjectRegister } from './estimate-project-register.js';
             getCategory3SelectOptionsHtml: getCategory3SelectOptionsHtml,
             escapeHtml: escapeHtml,
             getContractorDatalistOptionsHtml: getContractorDatalistOptionsHtml,
-            getContractorDocsHtml: getContractorDocsHtml,
+            ensureContractorExtraNames: ensureContractorExtraNames,
+            getRepresentativeContractorSelectHtml: getRepresentativeContractorSelectHtml,
+            getContractorChipsHtml: getContractorChipsHtml,
             resetPanelDirtyState: resetPanelDirtyState,
             renderFinanceTablesFromItem: renderFinanceTablesFromItem,
             recalcFinanceSummaries: recalcFinanceSummaries,
@@ -11917,6 +12134,9 @@ import { createProjectRegister } from './estimate-project-register.js';
                 startBasicInfoEdit,
                 cancelBasicInfoEdit,
                 saveBasicInfoEdit,
+                openProjectContractorExtraModal,
+                closeProjectContractorExtraModal,
+                confirmProjectContractorExtraModal,
                 startBusinessIncomeEdit,
                 cancelBusinessIncomeEdit,
                 saveBusinessIncomeEdit,

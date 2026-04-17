@@ -4781,6 +4781,75 @@
             max-width: 100%;
         }
 
+        /* 기본정보 — 도급사 칩·대표 선택 */
+        .basic-info-label--stacked {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .contractor-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .contractor-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 8px;
+            background: var(--gray-100);
+            border: 1px solid var(--gray-200);
+            font-size: 13px;
+            color: var(--gray-800);
+        }
+
+        .contractor-chip--rep {
+            background: rgba(37, 99, 235, 0.08);
+            border-color: rgba(37, 99, 235, 0.35);
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .contractor-chip-rep-badge {
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 4px;
+            opacity: 0.9;
+        }
+
+        .contractor-edit-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px 12px;
+        }
+
+        .contractor-chip-list-wrap {
+            flex: 1;
+            min-width: 0;
+        }
+
+        body.dark-mode .contractor-chip {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: var(--gray-200);
+        }
+
+        body.dark-mode .contractor-chip--rep {
+            background: rgba(59, 130, 246, 0.16);
+            border-color: rgba(96, 165, 250, 0.5);
+            color: #93c5fd;
+        }
+
+        .table-contractor-cell {
+            display: inline;
+            cursor: default;
+        }
+
         /* 기본정보 탭만 선택적으로 편집 가능 */
         #tab-basic .edit-input {
             display: none;

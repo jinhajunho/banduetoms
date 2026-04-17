@@ -82,7 +82,8 @@ export function renderEstimateTable(api, options) {
             const salesNames = collectRowNames(item.salesRows, 1);
             const purchaseNames = collectRowNames(item.purchaseRows, 1);
             const businessNames = collectRowNames(item.businessIncomeRows, 1);
-            const searchText = `${item.code || ''} ${item.building} ${item.project} ${item.manager} ${item.contractor || ''} ${item.category3 || ''} ${salesNames} ${purchaseNames} ${businessNames}`.toLowerCase();
+            const extraContractorTxt = Array.isArray(item.contractorExtraNames) ? item.contractorExtraNames.join(' ') : '';
+            const searchText = `${item.code || ''} ${item.building} ${item.project} ${item.manager} ${item.contractor || ''} ${extraContractorTxt} ${item.category3 || ''} ${salesNames} ${purchaseNames} ${businessNames}`.toLowerCase();
             if (!searchText.includes(filterSearch)) return false;
         }
         return true;
@@ -152,7 +153,7 @@ export function renderEstimateTable(api, options) {
                     ${amountPairHtml}
                 </td>
                 <td>${cashflowCellHtml}</td>
-                <td>${item.contractor || '-'}</td>
+                <td>${api.getEstimateTableContractorCellHtml(item)}</td>
             </tr>
         `;
     }).join('');

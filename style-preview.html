@@ -44,6 +44,123 @@
             background: var(--dm-bg) !important;
             border-color: rgba(255, 255, 255, 0.08) !important;
         }
+        /* 매입 상호명 → 업체 서류 (프리뷰·실앱 공통 후보 클래스) */
+        .style-preview-page .finance-vendor-doc-trigger {
+            background: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            font-weight: 600;
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            text-align: left;
+        }
+        .style-preview-page .finance-vendor-doc-trigger:hover {
+            color: var(--primary-dark, #2563eb);
+        }
+        .style-preview-page .vendor-docs-modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .style-preview-page .vendor-docs-slot {
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 12px;
+            background: var(--gray-50, #f8fafc);
+        }
+        .style-preview-page .vendor-docs-slot h4 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+        .style-preview-page .preview-vendor-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px 16px;
+        }
+        .style-preview-page .preview-vendor-actions .file-link {
+            border: none;
+            background: none;
+            padding: 0;
+            cursor: pointer;
+            font: inherit;
+        }
+        .style-preview-page .preview-vendor-actions a.file-link {
+            text-decoration: none;
+            color: var(--primary);
+        }
+        .style-preview-page .preview-vendor-actions a.file-link:hover {
+            text-decoration: underline;
+        }
+        .style-preview-page .preview-vendor-inline-view {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--gray-200);
+            display: none;
+        }
+        .style-preview-page .preview-vendor-inline-view.preview-vendor-inline-view--open {
+            display: block;
+        }
+        .style-preview-page .preview-vendor-inline-view img {
+            max-width: 100%;
+            max-height: 280px;
+            object-fit: contain;
+            border-radius: 6px;
+            border: 1px solid var(--gray-200);
+            background: #fff;
+        }
+        .style-preview-page .vendor-docs-empty {
+            font-size: 13px;
+            color: var(--gray-500);
+            margin: 0;
+        }
+        body.dark-mode .style-preview-page .vendor-docs-slot {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        /* 담당/계약 — 도급사 칩·라벨 영역 */
+        .style-preview-page .basic-info-label--stacked {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .style-preview-page .preview-contractor-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .style-preview-page .preview-contractor-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 8px;
+            background: var(--gray-100, #f3f4f6);
+            border: 1px solid var(--gray-200);
+            font-size: 13px;
+            color: var(--gray-800);
+        }
+        .style-preview-page .preview-contractor-chip--rep {
+            background: rgba(37, 99, 235, 0.08);
+            border-color: rgba(37, 99, 235, 0.35);
+            font-weight: 600;
+            color: var(--primary);
+        }
+        body.dark-mode .style-preview-page .preview-contractor-chip {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: var(--gray-200);
+        }
+        body.dark-mode .style-preview-page .preview-contractor-chip--rep {
+            background: rgba(59, 130, 246, 0.15);
+        }
     </style>
 </head>
 <body>
@@ -92,6 +209,58 @@
             <p class="preview-muted" style="margin:-12px 0 20px;">실제 서비스 레이아웃과 동일합니다(좌측 <code>.sidebar</code> + 우측 <code>.main-content</code>). 아래는 스타일 샘플 블록입니다.</p>
 
             <div class="preview-grid">
+                <section class="preview-card" style="grid-column: 1 / -1;">
+                    <h3 class="card-title">기본정보 — 담당/계약 (신규 스펙 프리뷰)</h3>
+                    <p class="preview-muted" style="margin-top:0;">
+                        매입 상호명 + 도급사 등록 목록을 <strong>합쳐 중복 없이</strong> 도급사 행에 나열합니다. 대표 도급사는 그 합친 목록에서 선택합니다.
+                        아래 매입 표는 샘플(영진인프라, 데모건설)이며, 등록 모달로 이름을 추가하면 목록이 갱신됩니다.
+                    </p>
+                    <div class="basic-info-grid" style="margin-top: 12px; max-width: 720px;">
+                        <div class="basic-info-card">
+                            <div class="basic-info-card-title">
+                                <i class="fas fa-user-tie"></i> 담당/계약
+                            </div>
+                            <div class="basic-info-row">
+                                <div class="basic-info-label">담당자</div>
+                                <div class="basic-info-value">
+                                    <span class="detail-list-value">방준호</span>
+                                </div>
+                            </div>
+                            <div class="basic-info-row">
+                                <div class="basic-info-label">구분</div>
+                                <div class="basic-info-value">
+                                    <span class="detail-list-value">세금계산서</span>
+                                </div>
+                            </div>
+                            <div class="basic-info-row">
+                                <div class="basic-info-label">대표 도급사</div>
+                                <div class="basic-info-value">
+                                    <select id="previewRepContractor" class="form-select form-select-inline" title="매입·등록 도급사 통합 목록(중복 없음)">
+                                        <option value="">선택…</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="basic-info-row" style="align-items: flex-start;">
+                                <div class="basic-info-label basic-info-label--stacked">
+                                    <span>도급사</span>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="previewOpenContractorRegModal" style="white-space: nowrap;">
+                                        <i class="fas fa-plus"></i> 등록
+                                    </button>
+                                </div>
+                                <div class="basic-info-value">
+                                    <div id="previewContractorChipList" class="preview-contractor-chip-list" aria-live="polite"></div>
+                                    <p class="preview-muted" style="margin: 8px 0 0;">
+                                        첨부서류 링크는 제거·<strong>매입 상호 클릭 모달</strong>로 이동한다는 전제의 UI입니다.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="preview-muted" style="margin-bottom: 0;">
+                        <strong>가짜 매입 상호(고정):</strong> <span id="previewPurchaseHint">영진인프라, 데모건설</span>
+                    </p>
+                </section>
+
                 <section class="preview-card">
                     <h3 class="card-title">탭 스타일</h3>
                     <div class="tabs">
@@ -145,6 +314,100 @@
                         </div>
                     </div>
                 </section>
+
+                <section class="preview-card" style="grid-column: 1 / -1;">
+                    <h3 class="card-title">매입 내역 — 상호명 클릭 → 업체 서류 모달 (프리뷰)</h3>
+                    <p class="preview-muted">모달 안에는 <strong>보기 / 다운로드</strong>만 두고, 보기를 눌렀을 때만 미리보기가 펼쳐집니다. 실서비스는 <code>viewContractorImage</code> 등과 동일한 흐름으로 연결하면 됩니다.</p>
+                    <div class="payment-list" style="margin-top: 12px;">
+                        <div class="payment-list-header">
+                            <div class="payment-list-title"><i class="fas fa-building"></i> 매입 내역 (업체별)</div>
+                        </div>
+                        <div class="payment-table-wrap">
+                            <table class="payment-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 100px;">매입일자</th>
+                                        <th style="width: 120px;">상호명</th>
+                                        <th style="width: 100px;">매입금액(별도)</th>
+                                        <th style="width: 88px;">부가세</th>
+                                        <th style="width: 100px;">매입(vat포함)</th>
+                                        <th style="width: 88px;">세금계산서</th>
+                                        <th style="width: 88px;">첨부</th>
+                                        <th style="width: 120px;">메모</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="purchaseList-preview">
+                                    <tr data-row-type="purchase" data-saved="true">
+                                        <td>2025-04-01</td>
+                                        <td>
+                                            <button type="button" class="finance-vendor-doc-trigger" data-vendor="영진인프라" title="사업자등록증·통장사본 보기">영진인프라</button>
+                                        </td>
+                                        <td style="font-weight:600;">400,000원</td>
+                                        <td style="font-weight:600;">40,000원</td>
+                                        <td style="font-weight:600;">440,000원</td>
+                                        <td><span class="badge badge-not-issued">미발행</span></td>
+                                        <td>—</td>
+                                        <td>도급사 / 안양 / 내부</td>
+                                    </tr>
+                                    <tr data-row-type="purchase" data-saved="true">
+                                        <td>2025-04-02</td>
+                                        <td>
+                                            <button type="button" class="finance-vendor-doc-trigger" data-vendor="데모건설" title="사업자등록증·통장사본 보기">데모건설</button>
+                                        </td>
+                                        <td style="font-weight:600;">1,200,000원</td>
+                                        <td style="font-weight:600;">120,000원</td>
+                                        <td style="font-weight:600;">1,320,000원</td>
+                                        <td><span class="badge badge-issued">발행</span></td>
+                                        <td>—</td>
+                                        <td>샘플 메모</td>
+                                    </tr>
+                                    <tr data-row-type="purchase" data-saved="true">
+                                        <td>2025-04-03</td>
+                                        <td>
+                                            <button type="button" class="finance-vendor-doc-trigger" data-vendor="서류없음테스트" title="사업자등록증·통장사본 보기">서류없음테스트</button>
+                                        </td>
+                                        <td style="font-weight:600;">100,000원</td>
+                                        <td style="font-weight:600;">10,000원</td>
+                                        <td style="font-weight:600;">110,000원</td>
+                                        <td><span class="badge badge-not-issued">미발행</span></td>
+                                        <td>—</td>
+                                        <td>첨부 없음 케이스</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="previewVendorDocsModal" class="modal event-modal" aria-hidden="true" onclick="if(event.target===this)closePreviewVendorDocsModal()">
+        <div class="modal-content" style="max-width: 640px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="previewVendorDocsTitle">업체 서류</div>
+                <button type="button" class="modal-close" onclick="closePreviewVendorDocsModal()" aria-label="닫기">&times;</button>
+            </div>
+            <div class="vendor-docs-modal-body" id="previewVendorDocsBody"></div>
+        </div>
+    </div>
+
+    <div id="previewContractorRegModal" class="modal event-modal" aria-hidden="true" onclick="if(event.target===this)closePreviewContractorRegModal()">
+        <div class="modal-content" style="max-width: 420px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">도급사 등록</div>
+                <button type="button" class="modal-close" onclick="closePreviewContractorRegModal()" aria-label="닫기">&times;</button>
+            </div>
+            <div style="padding: 0 16px 16px;">
+                <p class="preview-muted" style="margin: 0 0 12px;">
+                    실서비스에서는 업체정보관리와 동일한 저장 API·첨부 필드를 둘 수 있습니다. 프리뷰는 업체명만 목록에 합칩니다.
+                </p>
+                <label class="basic-info-label" style="display:block; margin-bottom:6px;">업체명</label>
+                <input type="text" id="previewNewContractorName" class="form-input" placeholder="등록할 업체명" autocomplete="off" />
+                <div class="preview-row" style="margin-top: 16px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="closePreviewContractorRegModal()">취소</button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="savePreviewContractorReg()">저장</button>
+                </div>
             </div>
         </div>
     </div>
@@ -157,6 +420,223 @@
         document.getElementById('toggleDark')?.addEventListener('click', function () {
             document.body.classList.toggle('dark-mode');
         });
+
+        (function previewVendorDocs() {
+            var svg = function (label, color) {
+                return (
+                    'data:image/svg+xml,' +
+                    encodeURIComponent(
+                        '<svg xmlns="http://www.w3.org/2000/svg" width="480" height="200" viewBox="0 0 480 200"><rect fill="#f1f5f9" width="480" height="200"/>' +
+                            '<text x="240" y="100" text-anchor="middle" fill="' +
+                            color +
+                            '" font-family="sans-serif" font-size="18">' +
+                            label +
+                            '</text></svg>'
+                    )
+                );
+            };
+            var MOCK = {
+                영진인프라: { license: svg('사업자등록증 샘플', '#2563eb'), bank: svg('통장사본 샘플', '#059669') },
+                데모건설: { license: svg('사업자등록증 샘플', '#2563eb'), bank: null },
+                서류없음테스트: { license: null, bank: null }
+            };
+
+            function closePreviewVendorDocsModal() {
+                var m = document.getElementById('previewVendorDocsModal');
+                if (m) {
+                    m.classList.remove('active');
+                    m.setAttribute('aria-hidden', 'true');
+                }
+                window.__previewVendorDocsMock = null;
+            }
+
+            function openPreviewVendorDocsModal(name) {
+                var row = MOCK[name];
+                var title = document.getElementById('previewVendorDocsTitle');
+                var body = document.getElementById('previewVendorDocsBody');
+                var modal = document.getElementById('previewVendorDocsModal');
+                if (!title || !body || !modal) return;
+
+                title.textContent = '업체 서류 — ' + name;
+                window.__previewVendorDocsMock = row || {};
+
+                function slot(heading, docKey, fileLabel) {
+                    var src = row && row[docKey];
+                    if (src) {
+                        return (
+                            '<div class="vendor-docs-slot" data-doc-slot="' +
+                            docKey +
+                            '">' +
+                            '<h4>' +
+                            heading +
+                            '</h4>' +
+                            '<div class="preview-vendor-actions">' +
+                            '<button type="button" class="file-link preview-doc-view-btn" data-doc="' +
+                            docKey +
+                            '"><i class="fas fa-image"></i> 보기</button>' +
+                            '<a class="file-link preview-doc-download-link" href="' +
+                            src +
+                            '" download="' +
+                            fileLabel +
+                            '_' +
+                            name.replace(/[\\/:*?"<>|]/g, '_') +
+                            '.svg" ><i class="fas fa-download"></i> 다운로드</a>' +
+                            '</div>' +
+                            '<div class="preview-vendor-inline-view">' +
+                            '<img alt="" />' +
+                            '</div>' +
+                            '</div>'
+                        );
+                    }
+                    return (
+                        '<div class="vendor-docs-slot">' +
+                        '<h4>' +
+                        heading +
+                        '</h4>' +
+                        '<p class="vendor-docs-empty">등록된 파일이 없습니다.</p>' +
+                        '</div>'
+                    );
+                }
+
+                body.innerHTML = slot('사업자등록증', 'license', '사업자등록증') + slot('통장사본', 'bank', '통장사본');
+                modal.classList.add('active');
+                modal.setAttribute('aria-hidden', 'false');
+            }
+
+            document.getElementById('previewVendorDocsBody')?.addEventListener('click', function (e) {
+                var btn = e.target && e.target.closest ? e.target.closest('.preview-doc-view-btn') : null;
+                if (!btn) return;
+                e.preventDefault();
+                var docKey = btn.getAttribute('data-doc');
+                var mock = window.__previewVendorDocsMock;
+                var src = mock && mock[docKey];
+                var slotEl = btn.closest('.vendor-docs-slot');
+                if (!slotEl || !src) return;
+                var view = slotEl.querySelector('.preview-vendor-inline-view');
+                var img = view && view.querySelector('img');
+                if (!view || !img) return;
+                var expanded = view.classList.contains('preview-vendor-inline-view--open');
+                if (expanded) {
+                    view.classList.remove('preview-vendor-inline-view--open');
+                    img.removeAttribute('src');
+                    btn.innerHTML = '<i class="fas fa-image"></i> 보기';
+                } else {
+                    img.src = src;
+                    img.alt = docKey === 'license' ? '사업자등록증' : '통장사본';
+                    view.classList.add('preview-vendor-inline-view--open');
+                    btn.innerHTML = '<i class="fas fa-eye-slash"></i> 접기';
+                }
+            });
+
+            document.getElementById('purchaseList-preview')?.addEventListener('click', function (e) {
+                var btn = e.target && e.target.closest ? e.target.closest('.finance-vendor-doc-trigger') : null;
+                if (!btn) return;
+                e.preventDefault();
+                e.stopPropagation();
+                var v = btn.getAttribute('data-vendor');
+                if (v) openPreviewVendorDocsModal(v);
+            });
+
+            window.closePreviewVendorDocsModal = closePreviewVendorDocsModal;
+        })();
+
+        (function previewBasicContractors() {
+            var purchaseNames = ['영진인프라', '데모건설', '서류없음테스트'];
+            var registeredExtra = ['바른시공', '영진인프라'];
+
+            function mergedUnique() {
+                var seen = Object.create(null);
+                var out = [];
+                purchaseNames.concat(registeredExtra).forEach(function (n) {
+                    var t = String(n || '').trim();
+                    if (!t || seen[t]) return;
+                    seen[t] = true;
+                    out.push(t);
+                });
+                out.sort(function (a, b) {
+                    return a.localeCompare(b, 'ko');
+                });
+                return out;
+            }
+
+            var sel = document.getElementById('previewRepContractor');
+            var chipHost = document.getElementById('previewContractorChipList');
+
+            function renderSelectAndChips(preferValue) {
+                var names = mergedUnique();
+                var prefer = preferValue != null && String(preferValue).trim() !== '' ? String(preferValue).trim() : '';
+                var prev =
+                    prefer && names.indexOf(prefer) >= 0
+                        ? prefer
+                        : sel && sel.value && names.indexOf(sel.value) >= 0
+                          ? sel.value
+                          : '';
+                if (sel) {
+                    sel.innerHTML = '<option value="">선택…</option>';
+                    names.forEach(function (n) {
+                        var o = document.createElement('option');
+                        o.value = n;
+                        o.textContent = n;
+                        sel.appendChild(o);
+                    });
+                    if (prev) sel.value = prev;
+                    else if (names.length) sel.value = names[0];
+                }
+                if (chipHost) {
+                    chipHost.innerHTML = '';
+                    var rep = sel && sel.value ? sel.value : '';
+                    names.forEach(function (n) {
+                        var sp = document.createElement('span');
+                        sp.className = 'preview-contractor-chip' + (n === rep ? ' preview-contractor-chip--rep' : '');
+                        sp.setAttribute('data-name', n);
+                        sp.textContent = n === rep ? n + ' (대표)' : n;
+                        chipHost.appendChild(sp);
+                    });
+                }
+            }
+
+            function openPreviewContractorRegModal() {
+                var m = document.getElementById('previewContractorRegModal');
+                var inp = document.getElementById('previewNewContractorName');
+                if (inp) inp.value = '';
+                if (m) {
+                    m.classList.add('active');
+                    m.setAttribute('aria-hidden', 'false');
+                    if (inp) setTimeout(function () { inp.focus(); }, 10);
+                }
+            }
+
+            window.closePreviewContractorRegModal = function () {
+                var m = document.getElementById('previewContractorRegModal');
+                if (m) {
+                    m.classList.remove('active');
+                    m.setAttribute('aria-hidden', 'true');
+                }
+            };
+
+            window.savePreviewContractorReg = function () {
+                var inp = document.getElementById('previewNewContractorName');
+                var v = inp && inp.value != null ? String(inp.value).trim() : '';
+                if (!v) {
+                    alert('업체명을 입력해 주세요.');
+                    return;
+                }
+                var exists = mergedUnique();
+                if (exists.indexOf(v) >= 0) {
+                    alert('이미 목록에 있는 도급사입니다. (매입·등록 합쳐 중복 없음)');
+                    return;
+                }
+                registeredExtra.push(v);
+                window.closePreviewContractorRegModal();
+                if (inp) inp.value = '';
+                renderSelectAndChips(v);
+            };
+
+            document.getElementById('previewOpenContractorRegModal')?.addEventListener('click', openPreviewContractorRegModal);
+            document.getElementById('previewRepContractor')?.addEventListener('change', renderSelectAndChips);
+
+            renderSelectAndChips();
+        })();
     </script>
 </body>
 </html>

@@ -9,6 +9,12 @@ export function createRenderPanelContent(api) {
         const lockedContractorName = isExternalContractorView
             ? String(item.contractor || profile.contractorName || '').trim()
             : '';
+        api.ensureContractorExtraNames(item);
+        const contractorChipsHtml = api.getContractorChipsHtml(
+            item,
+            isExternalContractorView ? { external: true, lockedName: lockedContractorName } : {}
+        );
+        const contractorRepSelectHtml = isExternalContractorView ? '' : api.getRepresentativeContractorSelectHtml(item);
         const canViewSalesTab = !isExternalContractorView;
         /* 구분(type)과 무관: 내부는 매출·매입·사업소득·수익분석. 외부는 매출·수익분석 숨김, 매입·사업소득만 */
         const canViewPurchaseTab = canViewSalesTab || isExternalContractorView;
@@ -219,9 +225,9 @@ export function createRenderPanelContent(api) {
                                 </div>
                             </div>
                             <div class="basic-info-row">
-                                <div class="basic-info-label">도급사</div>
+                                <div class="basic-info-label">대표 도급사</div>
                                 <div class="basic-info-value">
-                                    <span class="detail-list-value">${isExternalContractorView ? (lockedContractorName || '-') : (item.contractor || '-')}</span>
+                                    <span class="detail-list-value">${isExternalContractorView ? api.escapeHtml(lockedContractorName || '-') : api.escapeHtml(item.contractor || '-')}</span>
                                     ${isExternalContractorView ? `
                                     <span class="edit-input" style="display: none; width: 100%;">
                                         <input type="text" class="form-input form-input-inline" readonly value="${api.escapeHtml(lockedContractorName)}" title="외부 도급사 계정은 본인 소속 업체명으로 고정됩니다." style="background: var(--gray-100); cursor: not-allowed;">
@@ -229,18 +235,25 @@ export function createRenderPanelContent(api) {
                                     </span>
                                     ` : `
                                     <span class="edit-input" style="display: none; width: 100%;">
-                                        <input type="text" class="form-input form-input-inline" id="edit_contractor" list="contractorListEdit" value="${api.escapeHtml(item.contractor || '')}" placeholder="도급사 검색/선택">
-                                        <datalist id="contractorListEdit">
-                                            ${api.getContractorDatalistOptionsHtml()}
-                                        </datalist>
+                                        ${contractorRepSelectHtml}
                                     </span>
                                     `}
                                 </div>
                             </div>
                             <div class="basic-info-row">
-                                <div class="basic-info-label">첨부서류</div>
+                                <div class="basic-info-label basic-info-label--stacked"><span>도급사</span></div>
                                 <div class="basic-info-value">
-                                    <span class="detail-list-value">${api.getContractorDocsHtml(item.contractor || '')}</span>
+                                    <span class="detail-list-value">${contractorChipsHtml}</span>
+                                    ${isExternalContractorView ? '' : `
+                                    <span class="edit-input contractor-extra-edit-wrap" style="display: none; width: 100%;">
+                                        <div class="contractor-edit-row">
+                                            <span class="contractor-chip-list-wrap">${contractorChipsHtml}</span>
+                                            <button type="button" class="btn btn-secondary btn-sm btn-contractor-register" onclick="openProjectContractorExtraModal()">
+                                                <i class="fas fa-plus"></i> 등록
+                                            </button>
+                                        </div>
+                                    </span>
+                                    `}
                                 </div>
                             </div>
                         </div>

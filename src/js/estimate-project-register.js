@@ -32,6 +32,7 @@ export function createProjectRegister(api) {
             createdBy: profile.userId || '',
             type: '세금계산서',
             contractor: contractorInitial,
+            contractorExtraNames: [],
             revenue: 0,
             paidStatus: '미수',
             purchase: 0,

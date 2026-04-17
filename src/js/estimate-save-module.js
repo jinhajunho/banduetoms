@@ -36,7 +36,7 @@ export async function saveEstimateChanges(api) {
             }
             api.getCurrentEditItem().contractor = cn;
         } else {
-            const contractorCheck = api.validateContractorSelectionById('edit_contractor');
+            const contractorCheck = api.validateRepresentativeContractorById('edit_contractor_rep', api.getCurrentEditItem());
             if (!contractorCheck.ok) {
                 api.setSaveLoading(false);
                 return;
@@ -70,6 +70,7 @@ export async function saveEstimateChanges(api) {
             manager: cur.manager,
             type: cur.type,
             contractor: cur.contractor,
+            contractorExtraNames: Array.isArray(cur.contractorExtraNames) ? [...cur.contractorExtraNames] : [],
             salesEntriesNone: !!cur.salesEntriesNone,
             purchaseEntriesNone: !!cur.purchaseEntriesNone,
             revenue: cur.revenue || 0,
@@ -143,7 +144,7 @@ export async function saveEstimateChanges(api) {
             }
             cur.contractor = cn2;
         } else {
-            const contractorCheck2 = api.validateContractorSelectionById('edit_contractor');
+            const contractorCheck2 = api.validateRepresentativeContractorById('edit_contractor_rep', cur);
             if (!contractorCheck2.ok) {
                 api.setSaveLoading(false);
                 return;

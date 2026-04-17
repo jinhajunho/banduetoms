@@ -94,6 +94,28 @@
                 </div>
             </div>
 
+            <!-- 프로젝트 기본정보: 도급사 목록에 업체 추가 (업체정보관리 등록 업체만) -->
+            <div class="modal event-modal" id="projectContractorExtraModal" aria-hidden="true" onclick="if(event.target===this) closeProjectContractorExtraModal()">
+                <div class="modal-content" style="max-width: 420px;" onclick="event.stopPropagation()">
+                    <div class="modal-header">
+                        <div class="modal-title">도급사 연결</div>
+                        <button type="button" class="modal-close" onclick="closeProjectContractorExtraModal()" aria-label="닫기">&times;</button>
+                    </div>
+                    <div style="padding: 0 16px 16px;">
+                        <p style="margin: 0 0 12px; font-size: 13px; color: var(--gray-600); line-height: 1.5;">
+                            업체정보관리에 등록된 도급사만 프로젝트 도급사 목록에 연결할 수 있습니다.
+                        </p>
+                        <label class="panel-form-label" for="projectContractorExtraName">업체명</label>
+                        <input type="text" id="projectContractorExtraName" class="form-input" list="projectContractorExtraList" placeholder="검색 또는 선택" autocomplete="off">
+                        <datalist id="projectContractorExtraList"></datalist>
+                        <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="closeProjectContractorExtraModal()">취소</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="confirmProjectContractorExtraModal()">추가</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 경영실적관리: public/partials/page-performance.html (performance-partial-loader.js 주입, 기간별 날짜 패널 포함) -->
             <div id="page-performance" class="page-section" style="display: none;"></div>
 
