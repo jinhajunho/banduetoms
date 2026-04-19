@@ -8632,26 +8632,85 @@ import { createProjectRegister } from './estimate-project-register.js';
                 const day = String(d.getDate()).padStart(2, '0');
                 return m + '/' + day;
             }
-            function getDoneDate(item) {
-                const d = item && item.endDate ? String(item.endDate).trim().slice(0, 10) : '';
-                return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : '';
+            /** 진행일·완료일 등 YYYY-MM-DD만 인정 */
+            function getScheduleYmd(item, key) {
+                const raw = item && item[key] != null ? String(item[key]).trim().slice(0, 10) : '';
+                return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
             }
-            function buildCompletedListHtml(items) {
+            function dateInScheduleWeek(d, wStartYmd, wEndYmd) {
+                return !!d && d >= wStartYmd && d <= wEndYmd;
+            }
+            /** 전주 완료: 완료일(endDate)만 기준 — 전주 구간에 완료일이 있으면 포함 */
+            function itemCompletedInPrevWeek(item, wStartYmd, wEndYmd) {
+                const e = getScheduleYmd(item, 'endDate');
+                return dateInScheduleWeek(e, wStartYmd, wEndYmd);
+            }
+            /** 금주 진행: 진행일(startDate)만 기준 — 금주 구간에 진행일이 있으면 포함 */
+            function itemProgressInThisWeek(item, wStartYmd, wEndYmd) {
+                const s = getScheduleYmd(item, 'startDate');
+                return dateInScheduleWeek(s, wStartYmd, wEndYmd);
+            }
+            function collectWeeklyItems(matchFn, weekStartYmd, weekEndYmd, sortPreferEndFirst) {
+                const out = [];
+                const seen = {};
+                estimates.forEach(function (it) {
+                    if (!matchFn(it, weekStartYmd, weekEndYmd)) return;
+                    const k = String(it && it.code != null ? it.code : '');
+                    if (seen[k]) return;
+                    seen[k] = true;
+                    out.push(it);
+                });
+                out.sort(function (a, b) {
+                    const ae = getScheduleYmd(a, 'endDate');
+                    const be = getScheduleYmd(b, 'endDate');
+                    const as = getScheduleYmd(a, 'startDate');
+                    const bs = getScheduleYmd(b, 'startDate');
+                    if (sortPreferEndFirst) {
+                        if (ae !== be) return ae < be ? 1 : ae > be ? -1 : 0;
+                        if (as !== bs) return as < bs ? 1 : as > bs ? -1 : 0;
+                    } else {
+                        if (as !== bs) return as < bs ? 1 : as > bs ? -1 : 0;
+                        if (ae !== be) return ae < be ? 1 : ae > be ? -1 : 0;
+                    }
+                    return String(b.code || '').localeCompare(String(a.code || ''), 'ko');
+                });
+                return out;
+            }
+            function buildWeeklyListHtml(items) {
                 if (!items.length) {
-                    return '<li style="text-align: center; padding: 40px; color: var(--gray-500);"><i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px;"></i><p>완료된 건이 없습니다</p></li>';
+                    return '<li style="text-align: center; padding: 40px; color: var(--gray-500);"><i class="fas fa-inbox" style="font-size: 48px; opacity: 0.3; margin-bottom: 12px;"></i><p>해당 건이 없습니다</p></li>';
                 }
-                return items.map(function (item) {
-                    const doneLabel = getDoneDate(item) || '완료일 미기재';
-                    return `
-                    <li style="padding: 16px; border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 600; margin-bottom: 4px;">${item.building} - ${item.project}</div>
-                            <div style="font-size: 13px; color: var(--gray-600);">${doneLabel} | ${item.contractor}</div>
-                        </div>
-                        <div style="font-weight: 700; color: var(--primary);">${item.revenue.toLocaleString()}원</div>
-                    </li>
-                `;
-                }).join('');
+                return items
+                    .map(function (item) {
+                        const sLabel = getScheduleYmd(item, 'startDate') || '미기재';
+                        const eLabel = getScheduleYmd(item, 'endDate') || '미기재';
+                        const rep = String(item.contractor || '').trim() || '-';
+                        const meta =
+                            '진행: ' +
+                            escapeHtml(sLabel) +
+                            ' | 완료: ' +
+                            escapeHtml(eLabel) +
+                            ' | ' +
+                            escapeHtml(rep);
+                        return (
+                            '<li style="padding: 16px; border-bottom: 1px solid var(--gray-100); display: flex; justify-content: space-between; align-items: center;">' +
+                            '<div>' +
+                            '<div style="font-weight: 600; margin-bottom: 4px;">' +
+                            escapeHtml(String(item.building || '')) +
+                            ' - ' +
+                            escapeHtml(String(item.project || '')) +
+                            '</div>' +
+                            '<div style="font-size: 13px; color: var(--gray-600);">' +
+                            meta +
+                            '</div>' +
+                            '</div>' +
+                            '<div style="font-weight: 700; color: var(--primary);">' +
+                            (Number(item.revenue) || 0).toLocaleString() +
+                            '원</div>' +
+                            '</li>'
+                        );
+                    })
+                    .join('');
             }
 
             const thisStart = ymd(thisWeekStart);
@@ -8661,27 +8720,18 @@ import { createProjectRegister } from './estimate-project-register.js';
             const weeklyInfo = document.getElementById('weeklyWeekInfo');
             if (weeklyInfo) weeklyInfo.textContent = `금주(${md(thisWeekStart)}~${md(thisWeekEnd)})`;
 
-            const completedAll = estimates.filter(function (e) { return e.status === '완료'; });
-            const prevCompleted = completedAll.filter(function (e) {
-                const d = getDoneDate(e);
-                return d && d >= prevStart && d <= prevEnd;
-            });
-            const thisCompletedByDate = completedAll.filter(function (e) {
-                const d = getDoneDate(e);
-                return d && d >= thisStart && d <= thisEnd;
-            });
-            const undatedCompleted = completedAll.filter(function (e) { return !getDoneDate(e); });
-            const thisCompleted = thisCompletedByDate.concat(undatedCompleted);
+            const prevWeekItems = collectWeeklyItems(itemCompletedInPrevWeek, prevStart, prevEnd, true);
+            const thisWeekItems = collectWeeklyItems(itemProgressInThisWeek, thisStart, thisEnd, false);
 
             const prevCountEl = document.getElementById('weeklyPrevCompleteCount');
-            if (prevCountEl) prevCountEl.textContent = prevCompleted.length;
+            if (prevCountEl) prevCountEl.textContent = prevWeekItems.length;
             const prevListEl = document.getElementById('weeklyPrevCompleteList');
-            if (prevListEl) prevListEl.innerHTML = buildCompletedListHtml(prevCompleted);
+            if (prevListEl) prevListEl.innerHTML = buildWeeklyListHtml(prevWeekItems);
 
             const thisCountEl = document.getElementById('weeklyCompleteCount');
-            if (thisCountEl) thisCountEl.textContent = thisCompleted.length;
+            if (thisCountEl) thisCountEl.textContent = thisWeekItems.length;
             const thisListEl = document.getElementById('weeklyCompleteList');
-            if (thisListEl) thisListEl.innerHTML = buildCompletedListHtml(thisCompleted);
+            if (thisListEl) thisListEl.innerHTML = buildWeeklyListHtml(thisWeekItems);
         }
 
         function downloadWeeklyCSV() {
