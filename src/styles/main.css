@@ -6450,6 +6450,42 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
         }
 
+        /* 이미지(사업자·통장 등): 원본 비율로 패널 크기 자동 — 세로 문서 좌우 여백 최소화 */
+        .image-modal-content.image-modal-content--autosize {
+            width: auto;
+            height: auto;
+            max-width: 96vw;
+            max-height: 92vh;
+        }
+
+        .image-modal-content--autosize .image-modal-body--zoom {
+            flex: 0 0 auto;
+            min-height: 0;
+        }
+
+        .image-modal-content--autosize .image-modal-zoom-viewport {
+            width: auto;
+            height: auto;
+            min-height: 0;
+        }
+
+        .image-modal-content--autosize .image-modal-zoom-pan {
+            width: auto;
+            height: auto;
+        }
+
+        .image-modal-content--autosize .image-modal-zoom-img {
+            width: auto;
+            height: auto;
+            max-width: none;
+            max-height: none;
+        }
+
+        .image-modal-content.bps-float-modal-panel.image-modal-content--autosize .image-modal-zoom-img {
+            max-width: none;
+            max-height: none;
+        }
+
         .image-modal-header {
             padding: 16px 20px;
             background: white;

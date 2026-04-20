@@ -4778,7 +4778,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
                                     <div class="file-list-item-meta">업로드: ${file.date || '-'}</div>
                                 </div>
                                 <div class="file-list-item-actions">
-                                    <button class="btn-file-view" onclick="viewCurrentAttachmentFile(${index})">
+                                    <button class="btn-file-view" onclick="viewCurrentAttachmentFile(${index}, event)">
                                         <i class="fas fa-eye"></i> 보기
                                     </button>
                                     <button class="btn-file-download" onclick="downloadCurrentAttachmentFile(${index})">
@@ -4796,11 +4796,15 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             if (listPanel) initBpsFloatModalPanel(modal, listPanel, { minWidth: 340, minHeight: 200 });
         }
 
-        function viewCurrentAttachmentFile(index) {
+        function viewCurrentAttachmentFile(index, evt) {
             const files = window.currentAttachmentFiles || [];
             const file = files[index];
             if (!file) return;
-            openPreviewFromAttachmentList(file.name, file.data, file.type || 'image/png');
+            var fromList = null;
+            if (evt && evt.currentTarget && evt.currentTarget.closest) {
+                fromList = evt.currentTarget.closest('.file-list-modal');
+            }
+            openPreviewFromAttachmentList(file.name, file.data, file.type || 'image/png', fromList);
         }
 
         function downloadCurrentAttachmentFile(index) {
@@ -12044,8 +12048,11 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             return list.length ? list[list.length - 1] : null;
         }
 
-        function openPreviewFromAttachmentList(fileName, fileData, fileType) {
-            var listModal = getTopmostActiveAttachmentListModal();
+        function openPreviewFromAttachmentList(fileName, fileData, fileType, listModalOverride) {
+            var listModal =
+                listModalOverride && listModalOverride.classList && listModalOverride.classList.contains('file-list-modal')
+                    ? listModalOverride
+                    : getTopmostActiveAttachmentListModal();
             var restoreList = null;
             if (listModal) {
                 listModal.classList.remove('active');
@@ -12057,6 +12064,70 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
                 };
             }
             viewFileModal(fileName, fileData, fileType, { onClose: restoreList });
+        }
+
+        /** 이미지 미리보기: 원본 크기·비율을 유지해 뷰포트 안에 맞추고 모달 박스 크기를 그에 맞춤 */
+        function fitImageModalContentToPhoto(panel, img, done) {
+            function apply() {
+                if (!panel.isConnected) {
+                    if (done) done();
+                    return;
+                }
+                var header = panel.querySelector('.image-modal-header');
+                var body = panel.querySelector('.image-modal-body--zoom');
+                var viewport = panel.querySelector('.image-modal-zoom-viewport');
+                var hh = header ? header.offsetHeight : 56;
+                var bpadX = 16;
+                var bpadY = 16;
+                if (body) {
+                    var cs = window.getComputedStyle(body);
+                    bpadX =
+                        (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+                    bpadY = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+                }
+                var maxW = Math.max(200, window.innerWidth * 0.96 - bpadX);
+                var maxH = Math.max(160, window.innerHeight * 0.92 - hh - bpadY);
+                var nw = img.naturalWidth;
+                var nh = img.naturalHeight;
+                if (!nw || !nh) {
+                    panel.style.width = Math.min(720, Math.round(window.innerWidth * 0.96)) + 'px';
+                    panel.style.height = Math.min(520, Math.round(window.innerHeight * 0.7)) + 'px';
+                    if (done) done();
+                    return;
+                }
+                var scale = Math.min(maxW / nw, maxH / nh);
+                if (!isFinite(scale) || scale <= 0) scale = 1;
+                var dw = Math.max(1, Math.round(nw * scale));
+                var dh = Math.max(1, Math.round(nh * scale));
+                img.style.width = dw + 'px';
+                img.style.height = dh + 'px';
+                img.style.objectFit = 'contain';
+                panel.style.width = Math.ceil(dw + bpadX) + 'px';
+                panel.style.height = Math.ceil(hh + dh + bpadY) + 'px';
+                panel.style.maxWidth = '96vw';
+                panel.style.maxHeight = '92vh';
+                if (viewport) {
+                    viewport.style.width = dw + 'px';
+                    viewport.style.height = dh + 'px';
+                }
+                if (done) done();
+            }
+            function schedule() {
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(apply);
+                });
+            }
+            if (img.complete && img.naturalWidth) schedule();
+            else {
+                img.addEventListener('load', schedule, { once: true });
+                img.addEventListener(
+                    'error',
+                    function () {
+                        schedule();
+                    },
+                    { once: true }
+                );
+            }
         }
 
         // 파일 미리보기 모달
@@ -12111,8 +12182,10 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
                       '<button type="button" class="image-modal-zoom-btn image-modal-zoom-btn--text" data-bps-zoom="reset" title="원래 크기">맞춤</button>' +
                       '</div>'
                     : '';
+            var contentRootClass =
+                'image-modal-content' + (isImage && !isPdf ? ' image-modal-content--autosize' : '');
             modal.innerHTML = `
-                <div class="image-modal-content">
+                <div class="${contentRootClass}">
                     <div class="image-modal-header">
                         <div class="image-modal-title">
                             <i class="fas fa-file-invoice"></i> ${safeTitle}
@@ -12136,18 +12209,6 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
 
             document.body.appendChild(modal);
             var imgPanel = modal.querySelector('.image-modal-content');
-            if (imgPanel) {
-                initBpsFloatModalPanel(modal, imgPanel, {
-                    minWidth: 320,
-                    minHeight: 260,
-                    initialWidth: 1200,
-                    initialHeight: 860,
-                    useExplicitHeight: true,
-                });
-            }
-            if (isImage && !isPdf) {
-                attachImageModalZoom(modal);
-            }
             var prevRemove = modal.remove.bind(modal);
             var onClose = opts && typeof opts.onClose === 'function' ? opts.onClose : null;
             modal.remove = function () {
@@ -12165,6 +12226,28 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
                     onClose = null;
                 }
             };
+            if (isImage && !isPdf && imgPanel) {
+                var imgEl = imgPanel.querySelector('.image-modal-zoom-img');
+                if (imgEl) {
+                    fitImageModalContentToPhoto(imgPanel, imgEl, function () {
+                        if (!modal.parentNode) return;
+                        initBpsFloatModalPanel(modal, imgPanel, {
+                            minWidth: 240,
+                            minHeight: 180,
+                            useExplicitHeight: true,
+                        });
+                        attachImageModalZoom(modal);
+                    });
+                }
+            } else if (imgPanel) {
+                initBpsFloatModalPanel(modal, imgPanel, {
+                    minWidth: 320,
+                    minHeight: 260,
+                    initialWidth: 1200,
+                    initialHeight: 860,
+                    useExplicitHeight: true,
+                });
+            }
         }
 
         // 기본정보 탭만 수정 시작
