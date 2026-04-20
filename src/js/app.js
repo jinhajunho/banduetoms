@@ -9018,6 +9018,11 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             return unpaidRoundedSalesGross(e) !== unpaidRoundedPaymentGross(e);
         }
 
+        /** 미수금 화면·CSV: 진행상태가 완료인 프로젝트만 */
+        function unpaidItemIncludedInList(e) {
+            return String(e && e.status != null ? e.status : '').trim() === '완료' && unpaidItemIsMismatch(e);
+        }
+
         /** VAT포함 차이를 한 번에 별도로 환산(수금이 더 크면 음수·과수) */
         function unpaidBalanceNetFromItem(e) {
             const revG = unpaidRoundedSalesGross(e);
@@ -9032,7 +9037,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
         }
 
         function getUnpaidSortedPool() {
-            return estimates.filter(unpaidItemIsMismatch).sort(function (a, b) {
+            return estimates.filter(unpaidItemIncludedInList).sort(function (a, b) {
                 const aSales = getUnpaidSalesDisplayDate(a);
                 const bSales = getUnpaidSalesDisplayDate(b);
                 if (aSales !== bSales) return aSales < bSales ? 1 : -1;
