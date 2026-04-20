@@ -6,6 +6,7 @@ import { saveEstimateChanges } from './estimate-save-module.js';
 import { createFinanceRecalc } from './estimate-finance-recalc.js';
 import { createEstimateFinanceModal } from './estimate-finance-modal.js';
 import { createProjectRegister } from './estimate-project-register.js';
+import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
 
         /** Chart.js 전역 테마: 다크모드와 동기화 (Modern & Deep Dark 팔레트) */
         (function initChartThemeSync() {
@@ -4791,6 +4792,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             `;
             modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
             document.body.appendChild(modal);
+            var listPanel = modal.querySelector('.file-list-modal-content');
+            if (listPanel) initBpsFloatModalPanel(modal, listPanel, { minWidth: 340, minHeight: 200 });
         }
 
         function viewCurrentAttachmentFile(index) {
@@ -11683,6 +11686,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             };
             
             document.body.appendChild(modal);
+            var taxListPanel = modal.querySelector('.file-list-modal-content');
+            if (taxListPanel) initBpsFloatModalPanel(modal, taxListPanel, { minWidth: 360, minHeight: 260 });
         }
 
         function resolveFinanceAttachmentPreviewUrl(file, done) {
@@ -11808,6 +11813,8 @@ import { createProjectRegister } from './estimate-project-register.js';
             `;
             modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
             document.body.appendChild(modal);
+            var savedListPanel = modal.querySelector('.file-list-modal-content');
+            if (savedListPanel) initBpsFloatModalPanel(modal, savedListPanel, { minWidth: 340, minHeight: 200 });
         }
 
         function viewSavedFileByIndex(rowFileId, index) {
@@ -11931,6 +11938,107 @@ import { createProjectRegister } from './estimate-project-register.js';
             alert('저장된 세금계산서 파일이 없습니다.\n(' + fileName + ')');
         }
 
+        /** 이미지 미리보기 모달: 휠 확대·축소, 드래그 이동, 헤더/더블클릭 초기화 */
+        function attachImageModalZoom(modalEl) {
+            var viewport = modalEl.querySelector('.image-modal-zoom-viewport');
+            var pan = modalEl.querySelector('.image-modal-zoom-pan');
+            var pctEl = modalEl.querySelector('.image-modal-zoom-pct');
+            if (!viewport || !pan) return;
+
+            var scale = 1;
+            var tx = 0;
+            var ty = 0;
+            var isPanning = false;
+            var panStartX = 0;
+            var panStartY = 0;
+            var panStartTx = 0;
+            var panStartTy = 0;
+
+            function applyTransform() {
+                pan.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+                if (pctEl) pctEl.textContent = Math.round(scale * 100) + '%';
+            }
+
+            function resetView() {
+                scale = 1;
+                tx = 0;
+                ty = 0;
+                applyTransform();
+            }
+
+            function onWheel(e) {
+                e.preventDefault();
+                var dir = e.deltaY > 0 ? -1 : 1;
+                var next = scale * (1 + dir * 0.14);
+                next = Math.max(0.2, Math.min(6, next));
+                scale = next;
+                applyTransform();
+            }
+
+            function onMouseDown(e) {
+                if (e.button !== 0) return;
+                if (e.target.closest('.image-modal-zoom-controls')) return;
+                isPanning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                panStartTx = tx;
+                panStartTy = ty;
+                viewport.style.cursor = 'grabbing';
+            }
+
+            function onWindowMove(e) {
+                if (!isPanning) return;
+                tx = panStartTx + (e.clientX - panStartX);
+                ty = panStartTy + (e.clientY - panStartY);
+                applyTransform();
+            }
+
+            function onWindowUp() {
+                if (!isPanning) return;
+                isPanning = false;
+                viewport.style.cursor = '';
+            }
+
+            function zoomCleanup() {
+                viewport.removeEventListener('wheel', onWheel);
+                viewport.removeEventListener('mousedown', onMouseDown);
+                window.removeEventListener('mousemove', onWindowMove);
+                window.removeEventListener('mouseup', onWindowUp);
+            }
+
+            viewport.addEventListener('wheel', onWheel, { passive: false });
+            viewport.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mousemove', onWindowMove);
+            window.addEventListener('mouseup', onWindowUp);
+
+            viewport.addEventListener('dblclick', function (e) {
+                if (e.target.closest('.image-modal-zoom-controls')) return;
+                resetView();
+            });
+
+            var controls = modalEl.querySelector('.image-modal-zoom-controls');
+            if (controls) {
+                controls.addEventListener('click', function (e) {
+                    var btn = e.target.closest('[data-bps-zoom]');
+                    if (!btn) return;
+                    var act = btn.getAttribute('data-bps-zoom');
+                    if (act === 'in') {
+                        scale = Math.min(6, scale * 1.2);
+                    } else if (act === 'out') {
+                        scale = Math.max(0.2, scale / 1.2);
+                    } else if (act === 'reset') {
+                        resetView();
+                        return;
+                    }
+                    applyTransform();
+                });
+            }
+
+            applyTransform();
+
+            modalEl._bpsImageZoomCleanup = zoomCleanup;
+        }
+
         // 파일 미리보기 모달
         function viewFileModal(fileName, fileData, fileType) {
             const modal = document.createElement('div');
@@ -11950,39 +12058,75 @@ import { createProjectRegister } from './estimate-project-register.js';
 
             let content = '';
             if (isImage && !isPdf) {
-                content = '<img src="' + fd.replace(/"/g, '&quot;') + '" alt="' + String(fileName || '').replace(/"/g, '&quot;') + '" style="max-width: 100%; max-height: 82vh; border-radius: 8px;">';
+                content =
+                    '<div class="image-modal-zoom-viewport">' +
+                    '<div class="image-modal-zoom-pan">' +
+                    '<img class="image-modal-zoom-img" src="' +
+                    fd.replace(/"/g, '&quot;') +
+                    '" alt="' +
+                    String(fileName || '').replace(/"/g, '&quot;') +
+                    '" draggable="false">' +
+                    '</div></div>';
             } else if (isPdf) {
-                content = '<iframe src="' + fd.replace(/"/g, '&quot;') + '" style="width: min(1200px, 92vw); height: 82vh; border: none; border-radius: 8px;"></iframe>';
+                content =
+                    '<iframe src="' +
+                    fd.replace(/"/g, '&quot;') +
+                    '" title="' +
+                    String(fileName || '').replace(/"/g, '&quot;') +
+                    '"></iframe>';
             } else {
                 content = `<div style="padding: 40px; text-align: center;">
                     <i class="fas fa-file" style="font-size: 48px; color: var(--gray-400);"></i>
                     <p style="margin-top: 20px; color: var(--gray-600);">미리보기를 지원하지 않는 파일 형식입니다.</p>
                 </div>`;
             }
-            
+
+            var safeTitle = escapeHtml(String(fileName || ''));
+            var zoomBar =
+                isImage && !isPdf
+                    ? '<div class="image-modal-zoom-controls">' +
+                      '<button type="button" class="image-modal-zoom-btn" data-bps-zoom="out" title="축소" aria-label="축소"><i class="fas fa-minus"></i></button>' +
+                      '<span class="image-modal-zoom-pct">100%</span>' +
+                      '<button type="button" class="image-modal-zoom-btn" data-bps-zoom="in" title="확대" aria-label="확대"><i class="fas fa-plus"></i></button>' +
+                      '<button type="button" class="image-modal-zoom-btn image-modal-zoom-btn--text" data-bps-zoom="reset" title="원래 크기">맞춤</button>' +
+                      '</div>'
+                    : '';
             modal.innerHTML = `
-                <div class="image-modal-content" style="max-width: 96vw; max-height: 96vh;">
-                    <div class="image-modal-header" style="padding: 16px 20px; background: white; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
-                        <div style="font-size: 16px; font-weight: 600; color: var(--gray-900);">
-                            <i class="fas fa-file-invoice"></i> ${fileName}
+                <div class="image-modal-content">
+                    <div class="image-modal-header">
+                        <div class="image-modal-title">
+                            <i class="fas fa-file-invoice"></i> ${safeTitle}
                         </div>
-                        <button onclick="this.closest('.image-modal').remove()" style="width: 32px; height: 32px; border: none; border-radius: 6px; background: var(--gray-100); color: var(--gray-600); cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        ${zoomBar}
+                        <button type="button" class="image-modal-close" onclick="this.closest('.image-modal').remove()" aria-label="닫기">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    <div style="padding: 12px; background: var(--gray-50); display: flex; align-items: center; justify-content: center; overflow: auto;">
+                    <div class="image-modal-body ${isImage && !isPdf ? 'image-modal-body--zoom' : ''}">
                         ${content}
                     </div>
                 </div>
             `;
-            
+
             modal.onclick = function(e) {
                 if (e.target === modal) {
                     modal.remove();
                 }
             };
-            
+
             document.body.appendChild(modal);
+            var imgPanel = modal.querySelector('.image-modal-content');
+            if (imgPanel) initBpsFloatModalPanel(modal, imgPanel, { minWidth: 320, minHeight: 260, useExplicitHeight: true });
+            if (isImage && !isPdf) {
+                attachImageModalZoom(modal);
+                var prevRemove = modal.remove.bind(modal);
+                modal.remove = function () {
+                    if (typeof modal._bpsImageZoomCleanup === 'function') {
+                        modal._bpsImageZoomCleanup();
+                    }
+                    prevRemove();
+                };
+            }
         }
 
         // 기본정보 탭만 수정 시작
