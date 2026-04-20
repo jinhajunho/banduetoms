@@ -38,6 +38,8 @@ loadEnvFileToProcessEnv(path.join(__dirname, '.env.local'));
 
 export default defineConfig({
   root: '.',
+  // dist를 file://로 열거나 서브패스에 올릴 때 /assets 404 방지 (상대 경로로 빌드)
+  base: './',
   publicDir: 'public',
   build: {
     target: 'es2022',
