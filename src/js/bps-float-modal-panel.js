@@ -11,6 +11,8 @@ export function initBpsFloatModalPanel(shell, panel, opts) {
     opts = opts || {};
     var minW = opts.minWidth != null ? opts.minWidth : 300;
     var minH = opts.minHeight != null ? opts.minHeight : 160;
+    var initW = opts.initialWidth != null ? opts.initialWidth : null;
+    var initH = opts.initialHeight != null ? opts.initialHeight : null;
     var useExplicitHeight = opts.useExplicitHeight === true;
 
     if (typeof shell._bpsFloatCleanup === 'function') {
@@ -65,14 +67,20 @@ export function initBpsFloatModalPanel(shell, panel, opts) {
         panel.style.top = r.top + 'px';
         panel.style.transform = 'none';
         panel.style.boxSizing = 'border-box';
-        var w = Math.max(minW, Math.min(r.width, window.innerWidth - 8));
+        var baseW = r.width;
+        if (initW != null) baseW = Math.max(baseW, Number(initW) || 0);
+        var w = Math.max(minW, Math.min(baseW, window.innerWidth - 8));
         panel.style.width = w + 'px';
         if (useExplicitHeight) {
-            var h = Math.max(minH, Math.min(r.height, window.innerHeight - 8));
+            var baseH = r.height;
+            if (initH != null) baseH = Math.max(baseH, Number(initH) || 0);
+            var h = Math.max(minH, Math.min(baseH, window.innerHeight - 8));
             panel.style.height = h + 'px';
             panel.style.maxHeight = '';
         } else {
-            var mh = Math.max(minH, Math.min(r.height, window.innerHeight * 0.92));
+            var baseMH = r.height;
+            if (initH != null) baseMH = Math.max(baseMH, Number(initH) || 0);
+            var mh = Math.max(minH, Math.min(baseMH, window.innerHeight * 0.92));
             panel.style.maxHeight = mh + 'px';
             panel.style.height = '';
         }

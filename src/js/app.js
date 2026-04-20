@@ -4800,7 +4800,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             const files = window.currentAttachmentFiles || [];
             const file = files[index];
             if (!file) return;
-            viewFileModal(file.name, file.data, file.type || 'image/png');
+            openPreviewFromAttachmentList(file.name, file.data, file.type || 'image/png');
         }
 
         function downloadCurrentAttachmentFile(index) {
@@ -11764,7 +11764,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             if (window.uploadedFiles && window.uploadedFiles[rowId] && window.uploadedFiles[rowId][index]) {
                 const file = window.uploadedFiles[rowId][index];
                 resolveFinanceAttachmentPreviewUrl(file, function (url) {
-                    viewFileModal(file.name, url, file.type);
+                    openPreviewFromAttachmentList(file.name, url, file.type);
                 });
             }
         }
@@ -11821,7 +11821,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             if (window.savedRowFiles && window.savedRowFiles[rowFileId] && window.savedRowFiles[rowFileId][index]) {
                 const file = window.savedRowFiles[rowFileId][index];
                 resolveFinanceAttachmentPreviewUrl(file, function (url) {
-                    viewFileModal(file.name, url, file.type);
+                    openPreviewFromAttachmentList(file.name, url, file.type);
                 });
             }
         }
@@ -12039,8 +12039,28 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             modalEl._bpsImageZoomCleanup = zoomCleanup;
         }
 
+        function getTopmostActiveAttachmentListModal() {
+            var list = Array.from(document.querySelectorAll('.file-list-modal.active'));
+            return list.length ? list[list.length - 1] : null;
+        }
+
+        function openPreviewFromAttachmentList(fileName, fileData, fileType) {
+            var listModal = getTopmostActiveAttachmentListModal();
+            var restoreList = null;
+            if (listModal) {
+                listModal.classList.remove('active');
+                listModal.style.display = 'none';
+                restoreList = function () {
+                    if (!listModal.parentNode) return;
+                    listModal.style.display = '';
+                    listModal.classList.add('active');
+                };
+            }
+            viewFileModal(fileName, fileData, fileType, { onClose: restoreList });
+        }
+
         // 파일 미리보기 모달
-        function viewFileModal(fileName, fileData, fileType) {
+        function viewFileModal(fileName, fileData, fileType, opts) {
             const modal = document.createElement('div');
             modal.className = 'image-modal active';
             const ft = fileType || '';
@@ -12116,17 +12136,35 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
 
             document.body.appendChild(modal);
             var imgPanel = modal.querySelector('.image-modal-content');
-            if (imgPanel) initBpsFloatModalPanel(modal, imgPanel, { minWidth: 320, minHeight: 260, useExplicitHeight: true });
+            if (imgPanel) {
+                initBpsFloatModalPanel(modal, imgPanel, {
+                    minWidth: 320,
+                    minHeight: 260,
+                    initialWidth: 1200,
+                    initialHeight: 860,
+                    useExplicitHeight: true,
+                });
+            }
             if (isImage && !isPdf) {
                 attachImageModalZoom(modal);
-                var prevRemove = modal.remove.bind(modal);
-                modal.remove = function () {
-                    if (typeof modal._bpsImageZoomCleanup === 'function') {
-                        modal._bpsImageZoomCleanup();
-                    }
-                    prevRemove();
-                };
             }
+            var prevRemove = modal.remove.bind(modal);
+            var onClose = opts && typeof opts.onClose === 'function' ? opts.onClose : null;
+            modal.remove = function () {
+                if (typeof modal._bpsImageZoomCleanup === 'function') {
+                    modal._bpsImageZoomCleanup();
+                    modal._bpsImageZoomCleanup = null;
+                }
+                prevRemove();
+                if (onClose) {
+                    try {
+                        onClose();
+                    } catch (_e) {
+                        /* ignore */
+                    }
+                    onClose = null;
+                }
+            };
         }
 
         // 기본정보 탭만 수정 시작
