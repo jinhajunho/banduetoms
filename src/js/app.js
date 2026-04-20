@@ -10324,9 +10324,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return;
             }
             const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
-            if (tStr === '') {
+            const useAutoVat = tStr === '' || (kind === 'input' && tStr === '0');
+            if (useAutoVat) {
                 const tax = Math.round(net * 0.1);
-                if (taxInp) taxInp.value = String(tax);
+                if (taxInp) taxInp.value = tax > 0 ? String(tax) : '';
                 if (grossInp) grossInp.value = String(Math.round(net + tax));
             } else {
                 const t = parseFloat(String(tStr).replace(/,/g, ''), 10) || 0;
@@ -10351,7 +10352,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!isNaN(gross) && gross !== 0) {
                 const parts = splitNetTaxFromGross(gross);
                 if (netInp) netInp.value = String(parts.net);
-                if (taxInp) taxInp.value = String(parts.tax);
+                if (taxInp) taxInp.value = parts.tax > 0 ? String(parts.tax) : '';
                 grossInput.value = String(parts.gross);
             } else {
                 if (netInp) netInp.value = '';
@@ -10431,9 +10432,10 @@ import { createProjectRegister } from './estimate-project-register.js';
                 return;
             }
             const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
-            if (tStr === '') {
+            const useAutoVat = tStr === '' || (kind === 'input' && tStr === '0');
+            if (useAutoVat) {
                 const tax = Math.round(net * 0.1);
-                if (taxInp) taxInp.value = String(tax);
+                if (taxInp) taxInp.value = tax > 0 ? String(tax) : '';
                 if (grossInp) grossInp.value = String(Math.round(net + tax));
             } else {
                 const t = parseFloat(String(tStr).replace(/,/g, ''), 10) || 0;
@@ -10458,7 +10460,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!isNaN(gross) && gross !== 0) {
                 const parts = splitNetTaxFromGross(gross);
                 if (netInp) netInp.value = String(parts.net);
-                if (taxInp) taxInp.value = String(parts.tax);
+                if (taxInp) taxInp.value = parts.tax > 0 ? String(parts.tax) : '';
                 grossInput.value = String(parts.gross);
             } else {
                 if (netInp) netInp.value = '';

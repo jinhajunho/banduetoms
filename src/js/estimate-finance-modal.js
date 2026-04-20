@@ -328,9 +328,12 @@ export function createEstimateFinanceModal(api) {
                 return;
             }
             const tStr = taxEl && taxEl.value != null ? String(taxEl.value).trim() : '';
-            if (tStr === '') {
+            // round(net*0.1)이 0이면 부가세에 "0"을 넣으면 다음 입력에서 비어 있지 않아 자동 10%가 막힘 → 0일 땐 칸 비움.
+            // 입력 중 부가세가 "0"만 있으면 자동 계산 대기로 본다.
+            const useAutoVat = tStr === '' || (kind === 'input' && tStr === '0');
+            if (useAutoVat) {
                 const v = Math.round(n * 0.1);
-                if (taxEl) taxEl.value = String(v);
+                if (taxEl) taxEl.value = v > 0 ? String(v) : '';
                 grossEl.value = String(Math.round(n + v));
             } else {
                 const t = parseFloat(String(tStr).replace(/,/g, ''), 10);
@@ -356,7 +359,7 @@ export function createEstimateFinanceModal(api) {
             const netEl = document.getElementById('fm_net');
             const taxEl = document.getElementById('fm_tax');
             if (netEl) netEl.value = String(p.net);
-            if (taxEl) taxEl.value = String(p.tax);
+            if (taxEl) taxEl.value = p.tax > 0 ? String(p.tax) : '';
         }
         if (gross) {
             gross.addEventListener('input', applyFmGrossDerived);
@@ -406,7 +409,7 @@ export function createEstimateFinanceModal(api) {
             const tStr = taxEl && taxEl.value != null ? String(taxEl.value).trim() : '';
             if (tStr === '') {
                 const v = Math.round(n * 0.1);
-                if (taxEl) taxEl.value = String(v);
+                if (taxEl) taxEl.value = v > 0 ? String(v) : '';
                 grossEl.value = String(Math.round(n + v));
             } else {
                 const t = parseFloat(String(tStr).replace(/,/g, ''), 10);
