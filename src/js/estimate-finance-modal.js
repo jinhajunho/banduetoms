@@ -31,6 +31,22 @@ export function createEstimateFinanceModal(api) {
             ? api.scheduleFitProjectDetailModalWidth.bind(api)
             : function () {};
 
+    /** 별도는 큰데 부가세가 정상 10%의 5% 미만이고(예: 1 오타), 포함≈별도+부가세면 잘못 입력으로 보고 자동 10%로 되돌림 */
+    function financeVatLooksLikeTypoOnNet(net, taxStr, grossRead) {
+        var n = Number(net);
+        if (!Number.isFinite(n) || n <= 0) return false;
+        var ts = taxStr != null ? String(taxStr).trim() : '';
+        if (ts === '') return false;
+        var t = parseFloat(String(ts).replace(/,/g, ''), 10);
+        if (!Number.isFinite(t) || t <= 0) return false;
+        var g = Number(grossRead);
+        if (!Number.isFinite(g)) return false;
+        var expected = Math.round(n * 0.1);
+        if (expected < 100) return false;
+        if (Math.abs(Math.round(g) - Math.round(n + t)) > 1) return false;
+        return t < expected * 0.05;
+    }
+
     let financeModalState = null;
 
     function paymentRowMenuHtml() {
@@ -304,6 +320,16 @@ export function createEstimateFinanceModal(api) {
         const net = document.getElementById('fm_net');
         const tax = document.getElementById('fm_tax');
         const gross = document.getElementById('fm_gross');
+        if (tax && (type === 'sales' || type === 'purchase' || type === 'payment')) {
+            var netInitM = parseFloat(String(values[2] || '').replace(/,/g, '').trim(), 10) || 0;
+            var taxInitM = String(values[3] != null ? values[3] : '')
+                .replace(/,/g, '')
+                .trim();
+            var expTM = netInitM > 0 ? String(Math.round(netInitM * 0.1)) : '';
+            if (taxInitM !== '' && taxInitM !== expTM) {
+                tax.setAttribute('data-bps-tax-manual', '1');
+            }
+        }
         function applyFmNetDerived(ev) {
             const taxEl = document.getElementById('fm_tax');
             const grossEl = document.getElementById('fm_gross');
@@ -314,7 +340,10 @@ export function createEstimateFinanceModal(api) {
             const kind = ev && ev.type ? ev.type : '';
             if (raw === '') {
                 if (kind === 'change') {
-                    if (taxEl) taxEl.value = '';
+                    if (taxEl) {
+                        taxEl.value = '';
+                        taxEl.removeAttribute('data-bps-tax-manual');
+                    }
                     grossEl.value = '';
                 }
                 return;
@@ -322,15 +351,28 @@ export function createEstimateFinanceModal(api) {
             const n = parseFloat(raw, 10);
             if (isNaN(n) || n === 0) {
                 if (kind === 'change') {
-                    if (taxEl) taxEl.value = '';
+                    if (taxEl) {
+                        taxEl.value = '';
+                        taxEl.removeAttribute('data-bps-tax-manual');
+                    }
                     grossEl.value = '';
                 }
                 return;
             }
+            // 별도만 칠 때: 중간 단계(예: "10")에서 부가세가 1로 잠깐 채워져도 다음 글자 입력 시 다시 10%로 따라가야 함
+            var taxManual = taxEl && taxEl.getAttribute('data-bps-tax-manual') === '1';
+            if (kind === 'input' && !taxManual) {
+                var vIn = Math.round(n * 0.1);
+                if (taxEl) taxEl.value = vIn > 0 ? String(vIn) : '';
+                grossEl.value = String(Math.round(n + vIn));
+                return;
+            }
             const tStr = taxEl && taxEl.value != null ? String(taxEl.value).trim() : '';
-            // round(net*0.1)이 0이면 부가세에 "0"을 넣으면 다음 입력에서 비어 있지 않아 자동 10%가 막힘 → 0일 땐 칸 비움.
-            // 입력 중 부가세가 "0"만 있으면 자동 계산 대기로 본다.
-            const useAutoVat = tStr === '' || (kind === 'input' && tStr === '0');
+            const grossRead = parseFloat(String(grossEl.value || '').replace(/,/g, '').trim(), 10) || 0;
+            // round(net*0.1)이 0이면 부가세 칸은 비움(change 시 자동 유지).
+            // 별도는 큰데 부가세가 비정상적으로 작으면 change 시 자동 10%로 교정(financeVatLooksLikeTypoOnNet).
+            const useAutoVat =
+                tStr === '' || (kind === 'change' && financeVatLooksLikeTypoOnNet(n, tStr, grossRead));
             if (useAutoVat) {
                 const v = Math.round(n * 0.1);
                 if (taxEl) taxEl.value = v > 0 ? String(v) : '';
@@ -346,11 +388,20 @@ export function createEstimateFinanceModal(api) {
             net.addEventListener('change', applyFmNetDerived);
         }
         if (tax) {
+            function markFmTaxManualFromUser() {
+                if (String(tax.value || '').trim() === '') {
+                    tax.removeAttribute('data-bps-tax-manual');
+                } else {
+                    tax.setAttribute('data-bps-tax-manual', '1');
+                }
+            }
             tax.addEventListener('input', function () {
+                markFmTaxManualFromUser();
                 const n = parseFloat(String(net && net.value != null ? net.value : '').replace(/,/g, '').trim(), 10) || 0;
                 const t = parseFloat(String(tax.value || '').replace(/,/g, '').trim(), 10) || 0;
                 if (gross) gross.value = (n || t) ? String(Math.round(n + t)) : '';
             });
+            tax.addEventListener('change', markFmTaxManualFromUser);
         }
         function applyFmGrossDerived() {
             const grossEl = document.getElementById('fm_gross');
@@ -359,7 +410,10 @@ export function createEstimateFinanceModal(api) {
             const netEl = document.getElementById('fm_net');
             const taxEl = document.getElementById('fm_tax');
             if (netEl) netEl.value = String(p.net);
-            if (taxEl) taxEl.value = p.tax > 0 ? String(p.tax) : '';
+            if (taxEl) {
+                taxEl.removeAttribute('data-bps-tax-manual');
+                taxEl.value = p.tax > 0 ? String(p.tax) : '';
+            }
         }
         if (gross) {
             gross.addEventListener('input', applyFmGrossDerived);
@@ -414,7 +468,14 @@ export function createEstimateFinanceModal(api) {
             } else {
                 const t = parseFloat(String(tStr).replace(/,/g, ''), 10);
                 const tNum = isNaN(t) ? 0 : t;
-                grossEl.value = String(Math.round(n + tNum));
+                const grossRead = parseFloat(String(grossEl.value || '').replace(/,/g, '').trim(), 10) || 0;
+                if (financeVatLooksLikeTypoOnNet(n, tStr, grossRead)) {
+                    const v = Math.round(n * 0.1);
+                    if (taxEl) taxEl.value = v > 0 ? String(v) : '';
+                    grossEl.value = String(Math.round(n + v));
+                } else {
+                    grossEl.value = String(Math.round(n + tNum));
+                }
             }
         }
         normalizeFinanceModalVatBeforeSave();

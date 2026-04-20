@@ -10301,6 +10301,22 @@ import { createProjectRegister } from './estimate-project-register.js';
             scheduleFitProjectDetailModalWidth();
         }
 
+        /** 별도는 큰데 부가세가 정상 10%의 5% 미만·포함≈별도+부가세면 잘못 입력으로 보고 자동 10% */
+        function bpsFinanceVatLooksLikeTypoOnNet(net, taxStr, grossRead) {
+            var n = Number(net);
+            if (!Number.isFinite(n) || n <= 0) return false;
+            var ts = taxStr != null ? String(taxStr).trim() : '';
+            if (ts === '') return false;
+            var t = parseFloat(String(ts).replace(/,/g, ''), 10);
+            if (!Number.isFinite(t) || t <= 0) return false;
+            var g = Number(grossRead);
+            if (!Number.isFinite(g)) return false;
+            var expected = Math.round(n * 0.1);
+            if (expected < 100) return false;
+            if (Math.abs(Math.round(g) - Math.round(n + t)) > 1) return false;
+            return t < expected * 0.05;
+        }
+
         /** vat별도 입력 시: 부가세 칸이 비어 있으면 10%·포함 자동, 값이 있으면(0 포함) 포함 = 별도+부가세 */
         function syncSalesVatGrossFromNet(netInput, evType) {
             const kind = evType || 'change';
@@ -10310,7 +10326,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const raw = String(netInput.value || '').replace(/,/g, '').trim();
             if (raw === '') {
                 if (kind === 'change') {
-                    if (taxInp) taxInp.value = '';
+                    if (taxInp) {
+                        taxInp.value = '';
+                        taxInp.removeAttribute('data-bps-tax-manual');
+                    }
                     if (grossInp) grossInp.value = '';
                 }
                 return;
@@ -10318,13 +10337,26 @@ import { createProjectRegister } from './estimate-project-register.js';
             const net = parseFloat(raw, 10);
             if (isNaN(net) || net === 0) {
                 if (kind === 'change') {
-                    if (taxInp) taxInp.value = '';
+                    if (taxInp) {
+                        taxInp.value = '';
+                        taxInp.removeAttribute('data-bps-tax-manual');
+                    }
                     if (grossInp) grossInp.value = '';
                 }
                 return;
             }
+            var taxManualRow = taxInp && taxInp.getAttribute('data-bps-tax-manual') === '1';
+            if (kind === 'input' && !taxManualRow) {
+                var taxAuto = Math.round(net * 0.1);
+                if (taxInp) taxInp.value = taxAuto > 0 ? String(taxAuto) : '';
+                if (grossInp) grossInp.value = String(Math.round(net + taxAuto));
+                return;
+            }
             const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
-            const useAutoVat = tStr === '' || (kind === 'input' && tStr === '0');
+            const grossRead =
+                grossInp ? parseFloat(String(grossInp.value || '').replace(/,/g, '').trim(), 10) || 0 : 0;
+            const useAutoVat =
+                tStr === '' || (kind === 'change' && bpsFinanceVatLooksLikeTypoOnNet(net, tStr, grossRead));
             if (useAutoVat) {
                 const tax = Math.round(net * 0.1);
                 if (taxInp) taxInp.value = tax > 0 ? String(tax) : '';
@@ -10352,11 +10384,17 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!isNaN(gross) && gross !== 0) {
                 const parts = splitNetTaxFromGross(gross);
                 if (netInp) netInp.value = String(parts.net);
-                if (taxInp) taxInp.value = parts.tax > 0 ? String(parts.tax) : '';
+                if (taxInp) {
+                    taxInp.removeAttribute('data-bps-tax-manual');
+                    taxInp.value = parts.tax > 0 ? String(parts.tax) : '';
+                }
                 grossInput.value = String(parts.gross);
             } else {
                 if (netInp) netInp.value = '';
-                if (taxInp) taxInp.value = '';
+                if (taxInp) {
+                    taxInp.removeAttribute('data-bps-tax-manual');
+                    taxInp.value = '';
+                }
             }
         }
 
@@ -10418,7 +10456,10 @@ import { createProjectRegister } from './estimate-project-register.js';
             const raw = String(netInput.value || '').replace(/,/g, '').trim();
             if (raw === '') {
                 if (kind === 'change') {
-                    if (taxInp) taxInp.value = '';
+                    if (taxInp) {
+                        taxInp.value = '';
+                        taxInp.removeAttribute('data-bps-tax-manual');
+                    }
                     if (grossInp) grossInp.value = '';
                 }
                 return;
@@ -10426,13 +10467,26 @@ import { createProjectRegister } from './estimate-project-register.js';
             const net = parseFloat(raw, 10);
             if (isNaN(net) || net === 0) {
                 if (kind === 'change') {
-                    if (taxInp) taxInp.value = '';
+                    if (taxInp) {
+                        taxInp.value = '';
+                        taxInp.removeAttribute('data-bps-tax-manual');
+                    }
                     if (grossInp) grossInp.value = '';
                 }
                 return;
             }
+            var taxManualPay = taxInp && taxInp.getAttribute('data-bps-tax-manual') === '1';
+            if (kind === 'input' && !taxManualPay) {
+                var taxPayAuto = Math.round(net * 0.1);
+                if (taxInp) taxInp.value = taxPayAuto > 0 ? String(taxPayAuto) : '';
+                if (grossInp) grossInp.value = String(Math.round(net + taxPayAuto));
+                return;
+            }
             const tStr = taxInp && taxInp.value != null ? String(taxInp.value).trim() : '';
-            const useAutoVat = tStr === '' || (kind === 'input' && tStr === '0');
+            const grossRead =
+                grossInp ? parseFloat(String(grossInp.value || '').replace(/,/g, '').trim(), 10) || 0 : 0;
+            const useAutoVat =
+                tStr === '' || (kind === 'change' && bpsFinanceVatLooksLikeTypoOnNet(net, tStr, grossRead));
             if (useAutoVat) {
                 const tax = Math.round(net * 0.1);
                 if (taxInp) taxInp.value = tax > 0 ? String(tax) : '';
@@ -10460,11 +10514,17 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!isNaN(gross) && gross !== 0) {
                 const parts = splitNetTaxFromGross(gross);
                 if (netInp) netInp.value = String(parts.net);
-                if (taxInp) taxInp.value = parts.tax > 0 ? String(parts.tax) : '';
+                if (taxInp) {
+                    taxInp.removeAttribute('data-bps-tax-manual');
+                    taxInp.value = parts.tax > 0 ? String(parts.tax) : '';
+                }
                 grossInput.value = String(parts.gross);
             } else {
                 if (netInp) netInp.value = '';
-                if (taxInp) taxInp.value = '';
+                if (taxInp) {
+                    taxInp.removeAttribute('data-bps-tax-manual');
+                    taxInp.value = '';
+                }
             }
         }
 
@@ -11131,8 +11191,27 @@ import { createProjectRegister } from './estimate-project-register.js';
                     }
                     var salesTaxInp = row.querySelector('.row-input-sales-vat-tax');
                     if (salesTaxInp) {
-                        salesTaxInp.addEventListener('input', function () { syncSalesVatGrossFromTax(this); });
-                        salesTaxInp.addEventListener('change', function () { syncSalesVatGrossFromTax(this); });
+                        var netInitS = parseFloat(String(netStr || '').replace(/,/g, '').trim(), 10) || 0;
+                        var taxInitStrS = String(vatStr || '').trim();
+                        var expectedTS = netInitS > 0 ? String(Math.round(netInitS * 0.1)) : '';
+                        if (taxInitStrS !== '' && taxInitStrS !== expectedTS) {
+                            salesTaxInp.setAttribute('data-bps-tax-manual', '1');
+                        }
+                        function markSalesTaxManual() {
+                            if (String(salesTaxInp.value || '').trim() === '') {
+                                salesTaxInp.removeAttribute('data-bps-tax-manual');
+                            } else {
+                                salesTaxInp.setAttribute('data-bps-tax-manual', '1');
+                            }
+                        }
+                        salesTaxInp.addEventListener('input', function () {
+                            markSalesTaxManual();
+                            syncSalesVatGrossFromTax(this);
+                        });
+                        salesTaxInp.addEventListener('change', function () {
+                            markSalesTaxManual();
+                            syncSalesVatGrossFromTax(this);
+                        });
                     }
                 } else if (type === 'purchase') {
                     // 구 데이터 호환: 날짜 컬럼이 없던 값 배열이면 앞에 빈 값 추가
@@ -11173,8 +11252,27 @@ import { createProjectRegister } from './estimate-project-register.js';
                     }
                     var payTaxInp = row.querySelector('.row-input-payment-vat-tax');
                     if (payTaxInp) {
-                        payTaxInp.addEventListener('input', function () { syncPaymentVatGrossFromTax(this); });
-                        payTaxInp.addEventListener('change', function () { syncPaymentVatGrossFromTax(this); });
+                        var netInitP = parseFloat(String(payNetStr || '').replace(/,/g, '').trim(), 10) || 0;
+                        var taxInitStrP = String(payTaxStr || '').trim();
+                        var expectedTP = netInitP > 0 ? String(Math.round(netInitP * 0.1)) : '';
+                        if (taxInitStrP !== '' && taxInitStrP !== expectedTP) {
+                            payTaxInp.setAttribute('data-bps-tax-manual', '1');
+                        }
+                        function markPayTaxManual() {
+                            if (String(payTaxInp.value || '').trim() === '') {
+                                payTaxInp.removeAttribute('data-bps-tax-manual');
+                            } else {
+                                payTaxInp.setAttribute('data-bps-tax-manual', '1');
+                            }
+                        }
+                        payTaxInp.addEventListener('input', function () {
+                            markPayTaxManual();
+                            syncPaymentVatGrossFromTax(this);
+                        });
+                        payTaxInp.addEventListener('change', function () {
+                            markPayTaxManual();
+                            syncPaymentVatGrossFromTax(this);
+                        });
                     }
                 } else {
                     // transfer
