@@ -3960,6 +3960,21 @@
             max-height: calc(100vh - 180px);
         }
 
+        .expense-save-status {
+            margin: -4px 0 12px;
+            padding: 8px 12px;
+            font-size: 13px;
+            line-height: 1.45;
+            color: var(--gray-700);
+            background: var(--gray-100);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+        }
+
+        .expense-save-status[hidden] {
+            display: none !important;
+        }
+
         .expense-panel-body .panel-desc {
             font-size: 13px;
             color: var(--gray-600);

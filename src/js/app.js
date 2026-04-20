@@ -1109,6 +1109,109 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
         }
 
+        var BPS_EXPENSE_RECEIPT_IMAGE_MAX_EDGE = 1920;
+        var BPS_EXPENSE_RECEIPT_JPEG_QUALITY = 0.84;
+
+        function bpsExpenseReceiptImageMimeCompressable(mime) {
+            var m = mime && String(mime).toLowerCase().trim();
+            if (!m || m.indexOf('image/') !== 0) return false;
+            if (m === 'image/svg+xml' || m === 'image/gif') return false;
+            return (
+                m === 'image/jpeg' ||
+                m === 'image/jpg' ||
+                m === 'image/png' ||
+                m === 'image/webp' ||
+                m === 'image/bmp' ||
+                m === 'image/x-ms-bmp'
+            );
+        }
+
+        /** 경비 모달 업로드 전: 큰 사진은 긴 변 기준 리사이즈 후 JPEG로 줄여 전송 시간을 줄임 (PDF·GIF·SVG는 그대로) */
+        function bpsCompressImageFileForExpenseReceipt(file) {
+            return new Promise(function (resolve) {
+                if (!file || typeof file !== 'object') {
+                    resolve(file);
+                    return;
+                }
+                if (file.type === 'application/pdf' || !bpsExpenseReceiptImageMimeCompressable(file.type)) {
+                    resolve(file);
+                    return;
+                }
+                var maxEdge = BPS_EXPENSE_RECEIPT_IMAGE_MAX_EDGE;
+                var url = URL.createObjectURL(file);
+                var img = new Image();
+                img.onload = function () {
+                    URL.revokeObjectURL(url);
+                    var w = img.naturalWidth || img.width;
+                    var h = img.naturalHeight || img.height;
+                    if (!w || !h) {
+                        resolve(file);
+                        return;
+                    }
+                    if (w <= maxEdge && h <= maxEdge && file.size <= 400 * 1024) {
+                        resolve(file);
+                        return;
+                    }
+                    var scale = Math.min(1, maxEdge / Math.max(w, h));
+                    var tw = Math.max(1, Math.round(w * scale));
+                    var th = Math.max(1, Math.round(h * scale));
+                    var canvas = document.createElement('canvas');
+                    canvas.width = tw;
+                    canvas.height = th;
+                    var ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        resolve(file);
+                        return;
+                    }
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, tw, th);
+                    ctx.drawImage(img, 0, 0, tw, th);
+                    canvas.toBlob(
+                        function (blob) {
+                            if (!blob) {
+                                resolve(file);
+                                return;
+                            }
+                            if (blob.size >= file.size * 0.98) {
+                                resolve(file);
+                                return;
+                            }
+                            var rawName = (file.name && String(file.name).trim()) || 'receipt.jpg';
+                            var sanitized = bpsSanitizeStorageFileName(rawName);
+                            var outName = sanitized.replace(/\.(png|gif|webp|jpeg|jpe|jpg)$/i, '') + '.jpg';
+                            try {
+                                resolve(
+                                    new File([blob], outName, {
+                                        type: 'image/jpeg',
+                                        lastModified: Date.now(),
+                                    })
+                                );
+                            } catch (e) {
+                                resolve(file);
+                            }
+                        },
+                        'image/jpeg',
+                        BPS_EXPENSE_RECEIPT_JPEG_QUALITY
+                    );
+                };
+                img.onerror = function () {
+                    URL.revokeObjectURL(url);
+                    resolve(file);
+                };
+                img.src = url;
+            });
+        }
+
+        function bpsPrepareExpenseReceiptFilesForUpload(files) {
+            var list = Array.isArray(files) ? files : [];
+            if (list.length === 0) return Promise.resolve([]);
+            return Promise.all(
+                list.map(function (f) {
+                    return bpsCompressImageFileForExpenseReceipt(f);
+                })
+            );
+        }
+
         /** 경비 영수증: Storage multipart (토큰은 호출부에서 1회만 받아 병렬 업로드에 재사용) */
         function uploadExpenseReceiptToStorageWithToken(expenseId, file, accessToken) {
             var fd = new FormData();
@@ -1152,7 +1255,7 @@ import { createProjectRegister } from './estimate-project-register.js';
             });
         }
 
-        function uploadExpenseReceiptFilesToStorage(expenseId, files) {
+        function uploadExpenseReceiptFilesToStorage(expenseId, files, options) {
             var id = Number(expenseId);
             if (!Number.isFinite(id) || id < 1) {
                 return Promise.reject(new Error('경비 id가 올바르지 않습니다.'));
@@ -1162,14 +1265,22 @@ import { createProjectRegister } from './estimate-project-register.js';
             if (!window.__bpsSupabase || !window.__bpsSupabase.auth) {
                 return Promise.reject(new Error('로그인이 필요합니다.'));
             }
+            var opt = options && typeof options === 'object' ? options : null;
+            var onProgress = opt && typeof opt.onProgress === 'function' ? opt.onProgress : null;
             return window.__bpsSupabase.auth.getSession().then(function (res) {
                 if (res.error || !res.data || !res.data.session) {
                     return Promise.reject(new Error('로그인이 필요합니다.'));
                 }
                 var tok = res.data.session.access_token;
+                var total = list.length;
+                var done = 0;
                 return Promise.all(
                     list.map(function (file) {
-                        return uploadExpenseReceiptToStorageWithToken(id, file, tok);
+                        return uploadExpenseReceiptToStorageWithToken(id, file, tok).then(function (meta) {
+                            done++;
+                            if (onProgress) onProgress(done, total);
+                            return meta;
+                        });
                     })
                 );
             });
@@ -1385,15 +1496,23 @@ import { createProjectRegister } from './estimate-project-register.js';
             return uploadContractorFileHybrid(contractorId, slot, file, accessToken);
         }
 
-        function uploadContractorFilesToStorage(contractorId, slot, files, accessToken) {
+        function uploadContractorFilesToStorage(contractorId, slot, files, accessToken, options) {
             var list = Array.isArray(files) ? files : [];
             if (!list.length) return Promise.resolve([]);
             if (!accessToken) {
                 return Promise.reject(new Error('로그인이 필요합니다.'));
             }
+            var opt = options && typeof options === 'object' ? options : null;
+            var onProgress = opt && typeof opt.onProgress === 'function' ? opt.onProgress : null;
+            var total = list.length;
+            var done = 0;
             return Promise.all(
                 list.map(function (f) {
-                    return uploadContractorFileHybrid(contractorId, slot, f, accessToken);
+                    return uploadContractorFileHybrid(contractorId, slot, f, accessToken).then(function (meta) {
+                        done++;
+                        if (onProgress) onProgress(done, total);
+                        return meta;
+                    });
                 })
             );
         }
@@ -3250,6 +3369,8 @@ import { createProjectRegister } from './estimate-project-register.js';
         let contractorBankRemovedSavedIndexes = [];
         /** 사용자가 뺀 Storage 경로 — 저장 성공 후 일괄 삭제 */
         let contractorRemovedStoragePathsPending = [];
+        /** 업체 모달 저장 중 — 닫기·중복 저장 방지 */
+        let contractorSaveInProgress = false;
 
         function pushContractorRemovedPathOnce(p) {
             var s = String(p || '').trim();
@@ -3728,10 +3849,13 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             document.getElementById('contractorPanelOverlay').classList.add('active');
             document.getElementById('contractorSlidePanel').classList.add('active');
+            contractorSaveInProgress = false;
+            setContractorPanelSaveUi(false, '');
             renderContractorAttachmentChips();
         }
 
         function closeContractorPanel() {
+            if (contractorSaveInProgress) return;
             document.getElementById('contractorPanelOverlay').classList.remove('active');
             document.getElementById('contractorSlidePanel').classList.remove('active');
             var delBtn = document.getElementById('contractorPanelDeleteBtn');
@@ -4341,7 +4465,31 @@ import { createProjectRegister } from './estimate-project-register.js';
             document.getElementById('contractorDetailSlidePanel').classList.remove('active');
         }
 
-        // 저장 (작은 첨부는 /api/storage·큰 첨부만 브라우저→Storage 직접, DB는 /api/contractor)
+        function setContractorPanelSaveUi(busy, message) {
+            var btn = document.getElementById('contractorPanelSaveBtn');
+            var icon = document.getElementById('contractorPanelSaveIcon');
+            var statusEl = document.getElementById('contractorSaveStatus');
+            var delBtn = document.getElementById('contractorPanelDeleteBtn');
+            var closeBtn = document.querySelector('#contractorSlidePanel .panel-close');
+            if (btn) btn.disabled = !!busy;
+            if (delBtn) {
+                if (busy && delBtn.style.display !== 'none') delBtn.disabled = true;
+                else delBtn.disabled = false;
+            }
+            if (closeBtn) closeBtn.disabled = !!busy;
+            if (icon) icon.className = busy ? 'fas fa-spinner fa-spin' : 'fas fa-save';
+            if (statusEl) {
+                if (busy && message) {
+                    statusEl.textContent = message;
+                    statusEl.hidden = false;
+                } else {
+                    statusEl.textContent = '';
+                    statusEl.hidden = true;
+                }
+            }
+        }
+
+        // 저장 (작은 첨부는 /api/storage·큰 첨부만 브라우저→Storage 직접, DB는 /api/contractor; 경비와 동일하게 저장 시 이미지 압축·진행 표시)
         function saveContractor() {
             const name = document.getElementById('contractorName').value.trim();
             const phone = document.getElementById('contractorPhone').value.trim();
@@ -4356,38 +4504,98 @@ import { createProjectRegister } from './estimate-project-register.js';
                 alert('로그인(Supabase)이 필요합니다.');
                 return;
             }
+            if (contractorSaveInProgress) return;
 
-            function getAccessTokenOnce() {
-                return window.__bpsSupabase.auth.getSession().then(function (res) {
-                    if (res.error || !res.data || !res.data.session) {
-                        return Promise.reject(new Error('로그인이 필요합니다.'));
-                    }
-                    return res.data.session.access_token;
-                });
-            }
-
-            function finish() {
-                closeContractorPanel();
-                renderContractorTable({ preservePage: true });
-            }
-
+            var targetId;
+            var editIndex = -1;
             if (contractorEditingId) {
-                const index = contractors.findIndex(function (c) {
+                editIndex = contractors.findIndex(function (c) {
                     return c.id === contractorEditingId;
                 });
-                if (index === -1) return;
-                const prev = contractors[index];
-                const cid = prev.id;
-                getAccessTokenOnce()
-                    .then(function (tok) {
-                        return Promise.all([
-                            uploadContractorFilesToStorage(cid, 'license', licenseFiles, tok),
-                            uploadContractorFilesToStorage(cid, 'bank', bankFiles, tok),
-                        ]);
-                    })
-                    .then(function (results) {
-                        const licUploaded = Array.isArray(results[0]) ? results[0] : [];
-                        const bankUploaded = Array.isArray(results[1]) ? results[1] : [];
+                if (editIndex === -1) return;
+                targetId = contractors[editIndex].id;
+            } else {
+                targetId =
+                    contractors.length > 0
+                        ? Math.max.apply(
+                              null,
+                              contractors.map(function (c) {
+                                  return c.id;
+                              })
+                          ) + 1
+                        : 1;
+            }
+
+            async function getAccessTokenOnce() {
+                var res = await window.__bpsSupabase.auth.getSession();
+                if (res.error || !res.data || !res.data.session) {
+                    throw new Error('로그인이 필요합니다.');
+                }
+                return res.data.session.access_token;
+            }
+
+            contractorSaveInProgress = true;
+            setContractorPanelSaveUi(
+                true,
+                licenseFiles.length + bankFiles.length > 0 ? '이미지 최적화 중…' : '서버에 저장 중…'
+            );
+
+            (async function () {
+                try {
+                    var prepped = await Promise.all([
+                        bpsPrepareExpenseReceiptFilesForUpload(licenseFiles),
+                        bpsPrepareExpenseReceiptFilesForUpload(bankFiles),
+                    ]);
+                    var licPrep = prepped[0];
+                    var bankPrep = prepped[1];
+                    var needTok = licPrep.length > 0 || bankPrep.length > 0;
+                    var tok = needTok ? await getAccessTokenOnce() : null;
+
+                    var licUploaded = [];
+                    if (licPrep.length) {
+                        setContractorPanelSaveUi(
+                            true,
+                            '사업자등록증 업로드 중… (0/' + licPrep.length + ')'
+                        );
+                        licUploaded = await uploadContractorFilesToStorage(
+                            targetId,
+                            'license',
+                            licPrep,
+                            tok,
+                            {
+                                onProgress: function (done, total) {
+                                    setContractorPanelSaveUi(
+                                        true,
+                                        '사업자등록증 업로드 중… (' + done + '/' + total + ')'
+                                    );
+                                },
+                            }
+                        );
+                    }
+
+                    var bankUploaded = [];
+                    if (bankPrep.length) {
+                        setContractorPanelSaveUi(true, '통장사본 업로드 중… (0/' + bankPrep.length + ')');
+                        bankUploaded = await uploadContractorFilesToStorage(
+                            targetId,
+                            'bank',
+                            bankPrep,
+                            tok,
+                            {
+                                onProgress: function (done, total) {
+                                    setContractorPanelSaveUi(
+                                        true,
+                                        '통장사본 업로드 중… (' + done + '/' + total + ')'
+                                    );
+                                },
+                            }
+                        );
+                    }
+
+                    setContractorPanelSaveUi(true, '서버에 저장 중…');
+
+                    if (contractorEditingId) {
+                        const prev = contractors[editIndex];
                         const keptLicense = getContractorSavedVisibleFiles(prev, 'license');
                         const keptBank = getContractorSavedVisibleFiles(prev, 'bank');
                         const licenseFilesFinal = keptLicense.concat(
@@ -4426,84 +4634,64 @@ import { createProjectRegister } from './estimate-project-register.js';
                         delete next.bankFileName;
                         delete next.bankMimeType;
                         delete next.bankDataUrl;
-                        return upsertContractorToServer(next).then(function (remote) {
-                            if (!remote.ok) {
-                                alert(remote.error || '업체 서버 저장 실패');
-                                return;
+                        const remote = await upsertContractorToServer(next);
+                        if (!remote.ok) {
+                            alert(remote.error || '업체 서버 저장 실패');
+                            return;
+                        }
+                        var toDelete = new Set(contractorRemovedStoragePathsPending);
+                        contractorRemovedStoragePathsPending = [];
+                        toDelete.forEach(function (p) {
+                            if (p) {
+                                bpsStorageDeletePath(p).catch(function () {});
                             }
-                            var toDelete = new Set(contractorRemovedStoragePathsPending);
-                            contractorRemovedStoragePathsPending = [];
-                            toDelete.forEach(function (p) {
-                                if (p) {
-                                    bpsStorageDeletePath(p).catch(function () {});
-                                }
-                            });
-                            contractors[index] = next;
-                            alert('업체 정보가 수정되었습니다.');
-                            contractorEditingId = null;
-                            finish();
                         });
-                    })
-                    .catch(function (e) {
-                        alert((e && e.message) || '파일 업로드에 실패했습니다.');
-                    });
-                return;
-            }
-
-            const newId =
-                contractors.length > 0
-                    ? Math.max.apply(
-                          null,
-                          contractors.map(function (c) {
-                              return c.id;
-                          })
-                      ) + 1
-                    : 1;
-            getAccessTokenOnce()
-                .then(function (tok) {
-                    return Promise.all([
-                        uploadContractorFilesToStorage(newId, 'license', licenseFiles, tok),
-                        uploadContractorFilesToStorage(newId, 'bank', bankFiles, tok),
-                    ]);
-                })
-                .then(function (results) {
-                    const licMeta = Array.isArray(results[0]) ? results[0] : [];
-                    const bankMeta = Array.isArray(results[1]) ? results[1] : [];
-                    const newContractor = {
-                        id: newId,
-                        name: name,
-                        phone: phone,
-                        date: new Date().toISOString().slice(0, 10),
-                        hasLicense: licMeta.length > 0,
-                        hasBankAccount: bankMeta.length > 0,
-                        licenseFiles: licMeta.map(function (m) {
-                            return {
-                                storagePath: m.storagePath,
-                                name: m.name,
-                                mimeType: m.mimeType,
-                            };
-                        }),
-                        bankFiles: bankMeta.map(function (m) {
-                            return {
-                                storagePath: m.storagePath,
-                                name: m.name,
-                                mimeType: m.mimeType,
-                            };
-                        }),
-                    };
-                    return upsertContractorToServer(newContractor).then(function (remote) {
+                        contractors[editIndex] = next;
+                        alert('업체 정보가 수정되었습니다.');
+                        contractorEditingId = null;
+                    } else {
+                        const newContractor = {
+                            id: targetId,
+                            name: name,
+                            phone: phone,
+                            date: new Date().toISOString().slice(0, 10),
+                            hasLicense: licUploaded.length > 0,
+                            hasBankAccount: bankUploaded.length > 0,
+                            licenseFiles: licUploaded.map(function (m) {
+                                return {
+                                    storagePath: m.storagePath,
+                                    name: m.name,
+                                    mimeType: m.mimeType,
+                                };
+                            }),
+                            bankFiles: bankUploaded.map(function (m) {
+                                return {
+                                    storagePath: m.storagePath,
+                                    name: m.name,
+                                    mimeType: m.mimeType,
+                                };
+                            }),
+                        };
+                        const remote = await upsertContractorToServer(newContractor);
                         if (!remote.ok) {
                             alert(remote.error || '업체 서버 저장 실패');
                             return;
                         }
                         contractors.push(newContractor);
                         alert('업체가 등록되었습니다.');
-                        finish();
-                    });
-                })
-                .catch(function (e) {
-                    alert((e && e.message) || '파일 업로드에 실패했습니다.');
-                });
+                    }
+
+                    contractorSaveInProgress = false;
+                    setContractorPanelSaveUi(false, '');
+                    closeContractorPanel();
+                    renderContractorTable({ preservePage: true });
+                } catch (e) {
+                    alert((e && e.message) || '파일 업로드 또는 저장에 실패했습니다.');
+                } finally {
+                    contractorSaveInProgress = false;
+                    setContractorPanelSaveUi(false, '');
+                }
+            })();
         }
 
         // 수정
@@ -4848,6 +5036,8 @@ import { createProjectRegister } from './estimate-project-register.js';
         let expenseReceiptPendingFiles = [];
         /** 수정 중 사용자가 뺀 Storage 경로 — 저장 성공 후 일괄 삭제 */
         let expenseRemovedReceiptPathsPending = [];
+        /** 경비 모달 저장 중(업로드·서버 저장) — 닫기·중복 저장 방지 */
+        let expenseSaveInProgress = false;
         let sgaEditingId = null;
 
         function renderExpenseReceiptChipList() {
@@ -5308,11 +5498,14 @@ import { createProjectRegister } from './estimate-project-register.js';
             }
             document.getElementById('expensePanelOverlay').classList.add('active');
             document.getElementById('expenseSlidePanel').classList.add('active');
+            expenseSaveInProgress = false;
+            setExpensePanelSaveUi(false, '');
             renderExpenseReceiptChipList();
         }
 
         // 경비 등록·수정 중앙 모달 닫기
         function closeExpensePanel() {
+            if (expenseSaveInProgress) return;
             document.getElementById('expensePanelOverlay').classList.remove('active');
             document.getElementById('expenseSlidePanel').classList.remove('active');
             var delBtn = document.getElementById('expensePanelDeleteBtn');
@@ -5394,6 +5587,30 @@ import { createProjectRegister } from './estimate-project-register.js';
             );
         }
 
+        function setExpensePanelSaveUi(busy, message) {
+            var btn = document.getElementById('expensePanelSaveBtn');
+            var icon = document.getElementById('expensePanelSaveIcon');
+            var statusEl = document.getElementById('expenseSaveStatus');
+            var delBtn = document.getElementById('expensePanelDeleteBtn');
+            var closeBtn = document.querySelector('#expenseSlidePanel .panel-close');
+            if (btn) btn.disabled = !!busy;
+            if (delBtn) {
+                if (busy && delBtn.style.display !== 'none') delBtn.disabled = true;
+                else delBtn.disabled = false;
+            }
+            if (closeBtn) closeBtn.disabled = !!busy;
+            if (icon) icon.className = busy ? 'fas fa-spinner fa-spin' : 'fas fa-save';
+            if (statusEl) {
+                if (busy && message) {
+                    statusEl.textContent = message;
+                    statusEl.hidden = false;
+                } else {
+                    statusEl.textContent = '';
+                    statusEl.hidden = true;
+                }
+            }
+        }
+
         // 저장 — chips의 저장분 + 업로드 대기 File만 반영
         function saveExpense() {
             const type = document.querySelector('input[name="expensePaymentType"]:checked').value;
@@ -5411,79 +5628,8 @@ import { createProjectRegister } from './estimate-project-register.js';
                 alert('결제 금액을 입력해주세요.');
                 return;
             }
+            if (expenseSaveInProgress) return;
 
-            function runAfterSave(uploadedMeta) {
-                async function finishSave() {
-                    var up = uploadedMeta || [];
-                    var saved = expenseEditSavedReceipts.map(function (r) {
-                        var o = { ...r };
-                        delete o.signedUrl;
-                        return o;
-                    });
-                    var receipts = expenseEditingId ? saved.concat(up) : up.slice();
-
-                    if (expenseEditingId) {
-                        const index = expenses.findIndex(e => e.id === expenseEditingId);
-                        if (index === -1) return;
-                        const updated = {
-                            ...expenses[index],
-                            type,
-                            date,
-                            building,
-                            purpose,
-                            amount,
-                            receipts: receipts,
-                        };
-                        const remote = await upsertExpenseToServer(updated);
-                        if (!remote.ok) {
-                            alert(remote.error || '경비 서버 저장 실패');
-                            return;
-                        }
-                        expenses[index] = updated;
-                        var rm = expenseRemovedReceiptPathsPending.slice();
-                        expenseRemovedReceiptPathsPending = [];
-                        rm.forEach(function (p) {
-                            bpsStorageDeletePath(p).catch(function () {});
-                        });
-                        alert('경비 내역이 수정되었습니다.');
-                        expenseEditingId = null;
-                    } else {
-                        var maxId = 0;
-                        expenses.forEach(function (e) {
-                            var n = Number(e && e.id);
-                            if (Number.isFinite(n) && n > maxId) maxId = n;
-                        });
-                        const newExpense = {
-                            id: maxId + 1,
-                            type,
-                            date,
-                            building,
-                            purpose,
-                            amount,
-                            receipts: receipts,
-                        };
-                        const remote = await upsertExpenseToServer(newExpense);
-                        if (!remote.ok) {
-                            alert(remote.error || '경비 서버 저장 실패');
-                            return;
-                        }
-                        expenses.unshift(newExpense);
-                        expenseRemovedReceiptPathsPending = [];
-                        alert('경비가 등록되었습니다.');
-                    }
-                    closeExpensePanel();
-                    fillExpenseMonthFilter();
-                    renderExpenseTable({ preservePage: true });
-                }
-                finishSave().catch(function (e) {
-                    alert((e && e.message) || '경비 저장 중 오류가 발생했습니다.');
-                });
-            }
-
-            if (files.length === 0) {
-                runAfterSave([]);
-                return;
-            }
             var targetExpenseId;
             if (expenseEditingId != null && Number.isFinite(Number(expenseEditingId))) {
                 targetExpenseId = Number(expenseEditingId);
@@ -5495,13 +5641,97 @@ import { createProjectRegister } from './estimate-project-register.js';
                 });
                 targetExpenseId = maxIdNew + 1;
             }
-            uploadExpenseReceiptFilesToStorage(targetExpenseId, files)
-                .then(function (uploaded) {
-                    runAfterSave(uploaded);
-                })
-                .catch(function (e) {
-                    alert((e && e.message) || '영수증 업로드에 실패했습니다.');
+
+            async function persistExpenseAfterUpload(uploadedMeta) {
+                var up = uploadedMeta || [];
+                var saved = expenseEditSavedReceipts.map(function (r) {
+                    var o = { ...r };
+                    delete o.signedUrl;
+                    return o;
                 });
+                var receipts = expenseEditingId ? saved.concat(up) : up.slice();
+
+                if (expenseEditingId) {
+                    const index = expenses.findIndex(e => e.id === expenseEditingId);
+                    if (index === -1) return;
+                    const updated = {
+                        ...expenses[index],
+                        type,
+                        date,
+                        building,
+                        purpose,
+                        amount,
+                        receipts: receipts,
+                    };
+                    const remote = await upsertExpenseToServer(updated);
+                    if (!remote.ok) {
+                        alert(remote.error || '경비 서버 저장 실패');
+                        return;
+                    }
+                    expenses[index] = updated;
+                    var rm = expenseRemovedReceiptPathsPending.slice();
+                    expenseRemovedReceiptPathsPending = [];
+                    rm.forEach(function (p) {
+                        bpsStorageDeletePath(p).catch(function () {});
+                    });
+                    alert('경비 내역이 수정되었습니다.');
+                    expenseEditingId = null;
+                } else {
+                    var maxId = 0;
+                    expenses.forEach(function (e) {
+                        var n = Number(e && e.id);
+                        if (Number.isFinite(n) && n > maxId) maxId = n;
+                    });
+                    const newExpense = {
+                        id: maxId + 1,
+                        type,
+                        date,
+                        building,
+                        purpose,
+                        amount,
+                        receipts: receipts,
+                    };
+                    const remote = await upsertExpenseToServer(newExpense);
+                    if (!remote.ok) {
+                        alert(remote.error || '경비 서버 저장 실패');
+                        return;
+                    }
+                    expenses.unshift(newExpense);
+                    expenseRemovedReceiptPathsPending = [];
+                    alert('경비가 등록되었습니다.');
+                }
+                expenseSaveInProgress = false;
+                setExpensePanelSaveUi(false, '');
+                closeExpensePanel();
+                fillExpenseMonthFilter();
+                renderExpenseTable({ preservePage: true });
+            }
+
+            expenseSaveInProgress = true;
+            setExpensePanelSaveUi(true, files.length > 0 ? '이미지 최적화 중…' : '서버에 저장 중…');
+
+            (async function () {
+                try {
+                    if (files.length === 0) {
+                        await persistExpenseAfterUpload([]);
+                        return;
+                    }
+                    var toUpload = await bpsPrepareExpenseReceiptFilesForUpload(files);
+                    setExpensePanelSaveUi(true, '영수증 업로드 중… (0/' + toUpload.length + ')');
+                    var uploaded = await uploadExpenseReceiptFilesToStorage(targetExpenseId, toUpload, {
+                        onProgress: function (done, total) {
+                            setExpensePanelSaveUi(true, '영수증 업로드 중… (' + done + '/' + total + ')');
+                        },
+                    });
+                    setExpensePanelSaveUi(true, '서버에 저장 중…');
+                    await persistExpenseAfterUpload(uploaded);
+                } catch (e) {
+                    alert((e && e.message) || '경비 저장 중 오류가 발생했습니다.');
+                } finally {
+                    expenseSaveInProgress = false;
+                    setExpensePanelSaveUi(false, '');
+                }
+            })();
         }
 
         // 수정

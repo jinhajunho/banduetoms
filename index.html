@@ -150,14 +150,15 @@
                     <button type="button" class="btn btn-sm expense-panel-header-delete" id="contractorPanelDeleteBtn" style="display: none;" aria-hidden="true">
                         삭제
                     </button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="saveContractor()">
-                        <i class="fas fa-save"></i> 저장
+                    <button type="button" class="btn btn-primary btn-sm" id="contractorPanelSaveBtn" onclick="saveContractor()">
+                        <i class="fas fa-save" id="contractorPanelSaveIcon" aria-hidden="true"></i> 저장
                     </button>
                     <button type="button" class="panel-close" onclick="closeContractorPanel()" aria-label="닫기">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
                 <div class="panel-body expense-panel-body contractor-panel-body">
+                    <div class="expense-save-status" id="contractorSaveStatus" role="status" aria-live="polite" hidden></div>
                     <div class="panel-form-row">
                         <label class="panel-form-label" for="contractorName">업체명 <span class="required">*</span></label>
                         <input type="text" class="form-input" id="contractorName" placeholder="업체명을 입력하세요">
@@ -251,14 +252,15 @@
                     <button type="button" class="btn btn-sm expense-panel-header-delete" id="expensePanelDeleteBtn" style="display: none;" aria-hidden="true">
                         삭제
                     </button>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="saveExpense()">
-                        <i class="fas fa-save"></i> 저장
+                    <button type="button" class="btn btn-primary btn-sm" id="expensePanelSaveBtn" onclick="saveExpense()">
+                        <i class="fas fa-save" id="expensePanelSaveIcon" aria-hidden="true"></i> 저장
                     </button>
                     <button type="button" class="panel-close" onclick="closeExpensePanel()" aria-label="닫기">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
                 <div class="panel-body expense-panel-body" onmousedown="var t=event.target,i=document.getElementById('expenseUsageDate');if(i&&t.id!=='expenseUsageDate'&&!t.closest('label[for=expenseUsageDate]'))i.blur();">
+                    <div class="expense-save-status" id="expenseSaveStatus" role="status" aria-live="polite" hidden></div>
                     <div class="panel-form-row">
                         <label class="panel-form-label">구분 <span class="required">*</span></label>
                         <div class="radio-group">
