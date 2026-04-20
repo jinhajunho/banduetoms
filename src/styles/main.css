@@ -6440,8 +6440,10 @@
 
         .image-modal-content {
             position: relative;
-            max-width: 90%;
-            max-height: 90%;
+            width: min(1200px, 96vw);
+            height: min(860px, 92vh);
+            max-width: 96vw;
+            max-height: 92vh;
             background: white;
             border-radius: 12px;
             overflow: hidden;
