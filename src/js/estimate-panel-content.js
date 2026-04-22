@@ -10,9 +10,15 @@ export function createRenderPanelContent(api) {
             ? String(item.contractor || profile.contractorName || '').trim()
             : '';
         api.ensureContractorExtraNames(item);
-        const contractorChipsHtml = api.getContractorChipsHtml(
+        const contractorChipsViewHtml = api.getContractorChipsHtml(
             item,
             isExternalContractorView ? { external: true, lockedName: lockedContractorName } : {}
+        );
+        const contractorChipsEditHtml = api.getContractorChipsHtml(
+            item,
+            isExternalContractorView
+                ? { external: true, lockedName: lockedContractorName }
+                : { editable: true }
         );
         const contractorRepSelectHtml = isExternalContractorView ? '' : api.getRepresentativeContractorSelectHtml(item);
         const canViewSalesTab = !isExternalContractorView;
@@ -243,11 +249,11 @@ export function createRenderPanelContent(api) {
                             <div class="basic-info-row">
                                 <div class="basic-info-label basic-info-label--stacked"><span>도급사</span></div>
                                 <div class="basic-info-value">
-                                    <span class="detail-list-value">${contractorChipsHtml}</span>
+                                    <span class="detail-list-value">${contractorChipsViewHtml}</span>
                                     ${isExternalContractorView ? '' : `
                                     <span class="edit-input contractor-extra-edit-wrap" style="display: none; width: 100%;">
                                         <div class="contractor-edit-row">
-                                            <span class="contractor-chip-list-wrap">${contractorChipsHtml}</span>
+                                            <span class="contractor-chip-list-wrap">${contractorChipsEditHtml}</span>
                                             <button type="button" class="btn btn-secondary btn-sm btn-contractor-register" onclick="openProjectContractorExtraModal()">
                                                 <i class="fas fa-plus"></i> 등록
                                             </button>

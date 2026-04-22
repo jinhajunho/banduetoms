@@ -911,6 +911,92 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             });
         }
 
+        /** Storage 객체 배치 삭제(비차단 정리용) */
+        function bpsStorageDeletePaths(paths) {
+            var raw = Array.isArray(paths)
+                ? paths.map(function (p) {
+                      return String(p || '').trim();
+                  })
+                : [];
+            var seen = Object.create(null);
+            var list = [];
+            for (var i = 0; i < raw.length; i++) {
+                var p = raw[i];
+                if (!p || seen[p]) continue;
+                seen[p] = true;
+                list.push(p);
+            }
+            if (!list.length) return Promise.resolve({ ok: true });
+            return bpsAuthedPost('/api/storage', { deletePaths: list }).then(function (r) {
+                return { ok: r.ok && r.body && r.body.ok === true, error: r.body && r.body.error };
+            });
+        }
+
+        let estimateRemovedStoragePathsPendingByCode = Object.create(null);
+        let estimateRemovedStoragePathsPendingByFileRowId = Object.create(null);
+
+        function queueEstimateRemovedStoragePathsByCode(code, paths) {
+            var key = estimateCodeKey(code);
+            if (!key) return;
+            var list = Array.isArray(paths) ? paths : [];
+            if (!list.length) return;
+            if (!estimateRemovedStoragePathsPendingByCode[key]) {
+                estimateRemovedStoragePathsPendingByCode[key] = [];
+            }
+            var target = estimateRemovedStoragePathsPendingByCode[key];
+            for (var i = 0; i < list.length; i++) {
+                var p = String(list[i] || '').trim();
+                if (!p || target.indexOf(p) !== -1) continue;
+                target.push(p);
+            }
+        }
+
+        function flushEstimateRemovedStoragePathsByCode(code) {
+            var key = estimateCodeKey(code);
+            if (!key) return;
+            var pending = estimateRemovedStoragePathsPendingByCode[key];
+            if (!Array.isArray(pending) || pending.length === 0) return;
+            delete estimateRemovedStoragePathsPendingByCode[key];
+            bpsStorageDeletePaths(pending).catch(function () {
+                queueEstimateRemovedStoragePathsByCode(key, pending);
+            });
+        }
+
+        function queueEstimateRemovedStoragePathByFileRowId(fileRowId, path) {
+            var rid = String(fileRowId || '').trim();
+            var p = String(path || '').trim();
+            if (!rid || !p) return;
+            if (!estimateRemovedStoragePathsPendingByFileRowId[rid]) {
+                estimateRemovedStoragePathsPendingByFileRowId[rid] = [];
+            }
+            var list = estimateRemovedStoragePathsPendingByFileRowId[rid];
+            if (list.indexOf(p) === -1) list.push(p);
+        }
+
+        function consumeEstimateRemovedStoragePathsByFileRowId(fileRowId) {
+            var rid = String(fileRowId || '').trim();
+            if (!rid) return [];
+            var list = estimateRemovedStoragePathsPendingByFileRowId[rid];
+            delete estimateRemovedStoragePathsPendingByFileRowId[rid];
+            return Array.isArray(list) ? list.slice() : [];
+        }
+
+        function clearEstimateRemovedStoragePathsByFileRowId(fileRowId) {
+            var rid = String(fileRowId || '').trim();
+            if (!rid) return;
+            delete estimateRemovedStoragePathsPendingByFileRowId[rid];
+        }
+
+        function getEstimateCodeFromFinanceTbodyId(tbodyId) {
+            var tid = String(tbodyId || '').trim();
+            if (!tid) return '';
+            if (tid.indexOf('salesList-') === 0) return tid.slice('salesList-'.length);
+            if (tid.indexOf('purchaseList-') === 0) return tid.slice('purchaseList-'.length);
+            if (tid.indexOf('salesPayments-') === 0) return tid.slice('salesPayments-'.length);
+            if (tid.indexOf('transferList-') === 0) return tid.slice('transferList-'.length);
+            return '';
+        }
+
         function bpsEstimateApi(path, payload) {
             return bpsAuthedPost(path, payload);
         }
@@ -957,7 +1043,12 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
         function persistEstimateToServerByCode(code) {
             const k = estimateCodeKey(code);
             const ix = findEstimateIndexByCode(k);
-            if (ix !== -1) return upsertEstimateToServer(estimates[ix]);
+            if (ix !== -1) {
+                return upsertEstimateToServer(estimates[ix]).then(function (res) {
+                    if (res && res.ok) flushEstimateRemovedStoragePathsByCode(k);
+                    return res;
+                });
+            }
             // 신규 등록 중에는 아직 `estimates`에 없고 패널의 `currentEditItem`만 존재함
             if (
                 currentEditItem &&
@@ -965,7 +1056,10 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             ) {
                 const item = { ...currentEditItem };
                 applyEstimateDefaultsAndSeed([item]);
-                return upsertEstimateToServer(item);
+                return upsertEstimateToServer(item).then(function (res) {
+                    if (res && res.ok) flushEstimateRemovedStoragePathsByCode(k);
+                    return res;
+                });
             }
             return Promise.resolve({ ok: false, error: '항목을 찾을 수 없습니다.' });
         }
@@ -3505,6 +3599,16 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             });
         }
 
+        function getProjectContractorExtraNameSet(item) {
+            ensureContractorExtraNames(item);
+            const set = new Set();
+            (item.contractorExtraNames || []).forEach(function (n) {
+                const t = String(n || '').trim();
+                if (t) set.add(t);
+            });
+            return set;
+        }
+
         function validateRepresentativeContractorById(inputId, item) {
             const input = document.getElementById(inputId);
             if (!input) return { ok: true, value: '' };
@@ -3576,6 +3680,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             }
             const rep = String(item.contractor || '').trim();
             const names = getMergedProjectContractorNames(item);
+            const extraNames = getProjectContractorExtraNameSet(item);
             const orderedNames =
                 rep && names.indexOf(rep) >= 0
                     ? [rep].concat(
@@ -3592,14 +3697,31 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
                 orderedNames
                     .map(function (n) {
                         const isRep = !!rep && n === rep;
+                        const canRemove = !!opt.editable && extraNames.has(n);
+                        const encodedName = encodeURIComponent(n);
+                        const removeButton = canRemove
+                            ? (
+                                '<button type="button" class="contractor-chip-remove" onclick="removeProjectContractorExtra(decodeURIComponent(\'' +
+                                encodedName +
+                                '\'))" aria-label="' +
+                                escapeHtmlAttr(n + ' 도급사 삭제') +
+                                '" title="도급사 삭제">' +
+                                '<i class="fas fa-times" aria-hidden="true"></i>' +
+                                '</button>'
+                            )
+                            : '';
                         return (
                             '<span class="contractor-chip' +
                             (isRep ? ' contractor-chip--rep' : '') +
+                            (canRemove ? ' contractor-chip--removable' : '') +
                             '" title="' +
                             escapeHtmlAttr(n + (isRep ? ' (대표)' : '')) +
                             '">' +
+                            '<span class="contractor-chip-label">' +
                             escapeHtml(n) +
+                            '</span>' +
                             (isRep ? ' <span class="contractor-chip-rep-badge">대표</span>' : '') +
+                            removeButton +
                             '</span>'
                         );
                     })
@@ -10935,6 +11057,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             isCurrentUserExternalContractor: isCurrentUserExternalContractor,
             findContractorByName: findContractorByName,
             scheduleFitProjectDetailModalWidth: scheduleFitProjectDetailModalWidth,
+            deleteStoragePath: bpsStorageDeletePath,
         });
         const {
             paymentRowMenuHtml,
@@ -10959,7 +11082,14 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
 
         // 새로 추가한 행 취소 (행 삭제)
         function cancelNewRow(btn) {
-            btn.closest('tr').remove();
+            var row = btn.closest('tr');
+            if (row) {
+                var fileInput = row.querySelector('input[type="file"]');
+                if (fileInput && fileInput.id) {
+                    clearEstimateRemovedStoragePathsByFileRowId(fileInput.id);
+                }
+                row.remove();
+            }
         }
 
         // 행 저장
@@ -11052,6 +11182,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             });
 
             var tid = (row.closest('tbody') && row.closest('tbody').id) || '';
+            var code = getEstimateCodeFromFinanceTbodyId(tid);
             var type = row.getAttribute('data-row-type') || (tid.indexOf('salesList') === 0 ? 'sales' : tid.indexOf('purchaseList') === 0 ? 'purchase' : tid.indexOf('salesPayments') === 0 ? 'payment' : tid.indexOf('transferList') === 0 ? 'transfer' : 'sales');
             if (!row.getAttribute('data-row-type')) row.setAttribute('data-row-type', type);
 
@@ -11091,6 +11222,12 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             ensureFinanceRowMetaSlot(values, type);
             stampFinanceRowMemoMetaAfterEdit(values, type, prevForStamp);
             mergeFinanceAttachmentsIntoValues9(values, type, rowFileId);
+            if (fileRowId) {
+                var removedPathsForRow = consumeEstimateRemovedStoragePathsByFileRowId(fileRowId);
+                if (removedPathsForRow.length && code) {
+                    queueEstimateRemovedStoragePathsByCode(code, removedPathsForRow);
+                }
+            }
 
             row.setAttribute('data-saved', 'true');
             row.dataset.rowValues = JSON.stringify(values);
@@ -11328,6 +11465,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             const inputs = row.querySelectorAll('.row-input');
             const tbodyEarly2 = row.closest('tbody');
             const tidEarly2 = (tbodyEarly2 && tbodyEarly2.id) || '';
+            const code = getEstimateCodeFromFinanceTbodyId(tidEarly2);
             let rowTypeEarly2 = row.getAttribute('data-row-type') || '';
             if (!rowTypeEarly2) {
                 rowTypeEarly2 =
@@ -11448,6 +11586,12 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             ensureFinanceRowMetaSlot(values, type);
             stampFinanceRowMemoMetaAfterEdit(values, type, prevForStamp);
             mergeFinanceAttachmentsIntoValues9(values, type, rowFileId);
+            if (fileRowId) {
+                var removedPathsForEditedRow = consumeEstimateRemovedStoragePathsByFileRowId(fileRowId);
+                if (removedPathsForEditedRow.length && code) {
+                    queueEstimateRemovedStoragePathsByCode(code, removedPathsForEditedRow);
+                }
+            }
             row.dataset.rowValues = JSON.stringify(values);
             var actionHtml = '<td class="payment-action-cell">' + paymentRowMenuHtml(true) + '</td>';
             var fileCellHtml = '-';
@@ -11492,6 +11636,10 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             var row = btn.closest('tr');
             var values = JSON.parse(row.dataset.rowValues || '[]');
             var type = row.getAttribute('data-row-type') || 'sales';
+            var fileInput = row.querySelector('input[type="file"]');
+            if (fileInput && fileInput.id) {
+                clearEstimateRemovedStoragePathsByFileRowId(fileInput.id);
+            }
             row.setAttribute('data-saved', 'true');
             row.removeAttribute('data-original');
             var actionHtml = '<td class="payment-action-cell">' + paymentRowMenuHtml(true) + '</td>';
@@ -11867,6 +12015,19 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
         // 목록에서 파일 삭제
         function removeFileFromList(rowId, index) {
             if (confirm('이 파일을 삭제하시겠습니까?')) {
+                var removed =
+                    window.uploadedFiles &&
+                    window.uploadedFiles[rowId] &&
+                    window.uploadedFiles[rowId][index]
+                        ? window.uploadedFiles[rowId][index]
+                        : null;
+                var removedPath =
+                    removed && typeof removed.storagePath === 'string'
+                        ? removed.storagePath.trim()
+                        : '';
+                if (removedPath && String(rowId || '').indexOf('modal-file-') !== 0) {
+                    queueEstimateRemovedStoragePathByFileRowId(rowId, removedPath);
+                }
                 window.uploadedFiles[rowId].splice(index, 1);
                 
                 // 모달 닫고 다시 열기
@@ -12314,6 +12475,38 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             currentEditItem.contractorExtraNames.push(name);
             isPanelDirty = true;
             closeProjectContractorExtraModal();
+            renderPanelContent(currentEditItem);
+            setTimeout(function () {
+                const repSelect = document.getElementById('edit_contractor_rep');
+                if (repSelect && typeof repSelect.focus === 'function') {
+                    try {
+                        repSelect.focus();
+                    } catch (_e) {
+                        /* ignore */
+                    }
+                }
+            }, 0);
+        }
+
+        function removeProjectContractorExtra(name) {
+            if (!currentEditItem || isCurrentUserExternalContractor()) return;
+            const target = String(name || '').trim();
+            if (!target) return;
+            ensureContractorExtraNames(currentEditItem);
+            if (!confirm('"' + target + '" 도급사를 삭제할까요?')) {
+                return;
+            }
+            const before = currentEditItem.contractorExtraNames.length;
+            currentEditItem.contractorExtraNames = currentEditItem.contractorExtraNames.filter(function (n) {
+                return String(n || '').trim() !== target;
+            });
+            if (currentEditItem.contractorExtraNames.length === before) return;
+            const mergedAfterRemove = getMergedProjectContractorNames(currentEditItem);
+            const currentRep = String(currentEditItem.contractor || '').trim();
+            if (currentRep && mergedAfterRemove.indexOf(currentRep) === -1) {
+                currentEditItem.contractor = mergedAfterRemove[0] || '';
+            }
+            isPanelDirty = true;
             renderPanelContent(currentEditItem);
             setTimeout(function () {
                 const repSelect = document.getElementById('edit_contractor_rep');
@@ -12803,6 +12996,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
                 openProjectContractorExtraModal,
                 closeProjectContractorExtraModal,
                 confirmProjectContractorExtraModal,
+                removeProjectContractorExtra,
                 startBusinessIncomeEdit,
                 cancelBusinessIncomeEdit,
                 saveBusinessIncomeEdit,

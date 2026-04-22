@@ -140,12 +140,44 @@
         .style-preview-page .preview-contractor-chip {
             display: inline-flex;
             align-items: center;
-            padding: 4px 10px;
+            position: relative;
+            padding: 4px 24px 4px 10px;
             border-radius: 8px;
             background: var(--gray-100, #f3f4f6);
             border: 1px solid var(--gray-200);
             font-size: 13px;
             color: var(--gray-800);
+            line-height: 1.25;
+        }
+        .style-preview-page .preview-contractor-chip-label {
+            display: inline-flex;
+            align-items: center;
+        }
+        .style-preview-page .preview-contractor-chip-remove {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.15);
+            background: #fff;
+            color: var(--gray-600);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+        }
+        .style-preview-page .preview-contractor-chip-remove:hover {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.45);
+        }
+        .style-preview-page .preview-contractor-chip-remove:focus-visible {
+            outline: 2px solid rgba(37, 99, 235, 0.35);
+            outline-offset: 1px;
         }
         .style-preview-page .preview-contractor-chip--rep {
             background: rgba(37, 99, 235, 0.08);
@@ -157,6 +189,15 @@
             background: rgba(255, 255, 255, 0.06);
             border-color: rgba(255, 255, 255, 0.1);
             color: var(--gray-200);
+        }
+        body.dark-mode .style-preview-page .preview-contractor-chip-remove {
+            background: rgba(15, 23, 42, 0.95);
+            border-color: rgba(255, 255, 255, 0.16);
+            color: rgba(229, 231, 235, 0.9);
+        }
+        body.dark-mode .style-preview-page .preview-contractor-chip-remove:hover {
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.5);
         }
         body.dark-mode .style-preview-page .preview-contractor-chip--rep {
             background: rgba(59, 130, 246, 0.15);
@@ -561,26 +602,48 @@
             var purchaseNames = ['영진인프라', '데모건설', '서류없음테스트'];
             var registeredExtra = ['바른시공', '영진인프라'];
 
-            function mergedUnique() {
-                var seen = Object.create(null);
-                var out = [];
-                purchaseNames.concat(registeredExtra).forEach(function (n) {
+            function mergedUniqueWithMeta() {
+                var meta = Object.create(null);
+                purchaseNames.forEach(function (n) {
                     var t = String(n || '').trim();
-                    if (!t || seen[t]) return;
-                    seen[t] = true;
-                    out.push(t);
+                    if (!t) return;
+                    if (!meta[t]) meta[t] = { name: t, isRegistered: false };
                 });
-                out.sort(function (a, b) {
-                    return a.localeCompare(b, 'ko');
+                registeredExtra.forEach(function (n) {
+                    var t = String(n || '').trim();
+                    if (!t) return;
+                    if (!meta[t]) meta[t] = { name: t, isRegistered: true };
+                    else meta[t].isRegistered = true;
                 });
-                return out;
+                return Object.keys(meta)
+                    .map(function (k) { return meta[k]; })
+                    .sort(function (a, b) {
+                        return a.name.localeCompare(b.name, 'ko');
+                    });
+            }
+
+            function mergedUnique() {
+                return mergedUniqueWithMeta().map(function (item) {
+                    return item.name;
+                });
+            }
+
+            function unregisterRegisteredExtra(name) {
+                var target = String(name || '').trim();
+                if (!target) return false;
+                var before = registeredExtra.length;
+                registeredExtra = registeredExtra.filter(function (v) {
+                    return String(v || '').trim() !== target;
+                });
+                return registeredExtra.length !== before;
             }
 
             var sel = document.getElementById('previewRepContractor');
             var chipHost = document.getElementById('previewContractorChipList');
 
             function renderSelectAndChips(preferValue) {
-                var names = mergedUnique();
+                var items = mergedUniqueWithMeta();
+                var names = items.map(function (item) { return item.name; });
                 var prefer = preferValue != null && String(preferValue).trim() !== '' ? String(preferValue).trim() : '';
                 var prev =
                     prefer && names.indexOf(prefer) >= 0
@@ -602,11 +665,25 @@
                 if (chipHost) {
                     chipHost.innerHTML = '';
                     var rep = sel && sel.value ? sel.value : '';
-                    names.forEach(function (n) {
+                    items.forEach(function (item) {
+                        var n = item.name;
                         var sp = document.createElement('span');
                         sp.className = 'preview-contractor-chip' + (n === rep ? ' preview-contractor-chip--rep' : '');
                         sp.setAttribute('data-name', n);
-                        sp.textContent = n === rep ? n + ' (대표)' : n;
+                        var lb = document.createElement('span');
+                        lb.className = 'preview-contractor-chip-label';
+                        lb.textContent = n === rep ? n + ' (대표)' : n;
+                        sp.appendChild(lb);
+                        if (item.isRegistered) {
+                            var rm = document.createElement('button');
+                            rm.type = 'button';
+                            rm.className = 'preview-contractor-chip-remove';
+                            rm.setAttribute('data-remove-name', n);
+                            rm.setAttribute('aria-label', n + ' 도급사 삭제');
+                            rm.title = '도급사 삭제';
+                            rm.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+                            sp.appendChild(rm);
+                        }
                         chipHost.appendChild(sp);
                     });
                 }
@@ -651,6 +728,15 @@
 
             document.getElementById('previewOpenContractorRegModal')?.addEventListener('click', openPreviewContractorRegModal);
             document.getElementById('previewRepContractor')?.addEventListener('change', renderSelectAndChips);
+            chipHost?.addEventListener('click', function (e) {
+                var btn = e.target && e.target.closest ? e.target.closest('.preview-contractor-chip-remove') : null;
+                if (!btn) return;
+                var targetName = btn.getAttribute('data-remove-name');
+                if (!targetName) return;
+                if (!confirm('"' + targetName + '" 도급사를 삭제할까요?')) return;
+                unregisterRegisteredExtra(targetName);
+                renderSelectAndChips();
+            });
 
             /* 첨부/이미지 플로팅 모달: ES module 없이 동작. 로직은 bps-float-modal-panel.js 와 동기 유지 권장 */
             function initPreviewFloatModalPanel(shell, panel, opts) {

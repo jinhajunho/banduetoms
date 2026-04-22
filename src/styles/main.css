@@ -4820,6 +4820,17 @@
             border: 1px solid var(--gray-200);
             font-size: 13px;
             color: var(--gray-800);
+            line-height: 1.25;
+        }
+
+        .contractor-chip--removable {
+            position: relative;
+            padding-right: 24px;
+        }
+
+        .contractor-chip-label {
+            display: inline-flex;
+            align-items: center;
         }
 
         .contractor-chip--rep {
@@ -4834,6 +4845,35 @@
             font-weight: 600;
             margin-left: 4px;
             opacity: 0.9;
+        }
+
+        .contractor-chip-remove {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.15);
+            background: #fff;
+            color: var(--gray-600);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .contractor-chip-remove:hover {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.45);
+        }
+
+        .contractor-chip-remove:focus-visible {
+            outline: 2px solid rgba(37, 99, 235, 0.35);
+            outline-offset: 1px;
         }
 
         .contractor-edit-row {
@@ -4852,6 +4892,17 @@
             background: rgba(255, 255, 255, 0.06);
             border-color: rgba(255, 255, 255, 0.1);
             color: var(--gray-200);
+        }
+
+        body.dark-mode .contractor-chip-remove {
+            background: rgba(15, 23, 42, 0.95);
+            border-color: rgba(255, 255, 255, 0.16);
+            color: rgba(229, 231, 235, 0.9);
+        }
+
+        body.dark-mode .contractor-chip-remove:hover {
+            color: #f87171;
+            border-color: rgba(248, 113, 113, 0.5);
         }
 
         body.dark-mode .contractor-chip--rep {

@@ -1,7 +1,7 @@
 /**
  * Vercel Hobby: 함수 개수 한도(12) 대응 — Storage 서명·업로드를 단일 엔드포인트로 통합.
  *
- * POST + Content-Type: application/json  → { path } / { paths } 서명 URL, { deletePath } 삭제,
+ * POST + Content-Type: application/json  → { path } / { paths } 서명 URL, { deletePath } 또는 { deletePaths } 삭제,
  *   { action: 'contractorSignedUpload', ... } 업체 대용량용 서명 업로드 토큰
  * POST + multipart/form-data:
  *   - expenseId + file          → 경비 영수증
@@ -101,6 +101,28 @@ async function handleSignJson(request, supabaseAdmin) {
             return jsonResponse(400, { ok: false, error: 'invalid path' });
         }
         const { error } = await supabaseAdmin.storage.from(bucket).remove([delPath]);
+        if (error) {
+            return jsonResponse(500, { ok: false, error: error.message || 'Storage 삭제 실패' });
+        }
+        return jsonResponse(200, { ok: true });
+    }
+
+    const delPathsRaw = body && Array.isArray(body.deletePaths) ? body.deletePaths : null;
+    if (delPathsRaw && delPathsRaw.length > 0) {
+        const MAX_DELETE = 100;
+        const normalized = delPathsRaw
+            .slice(0, MAX_DELETE)
+            .map((p) => (typeof p === 'string' ? p.trim() : ''))
+            .filter(Boolean);
+        if (normalized.length === 0) {
+            return jsonResponse(400, { ok: false, error: 'invalid deletePaths' });
+        }
+        for (const p of normalized) {
+            if (!isAllowedStorageObjectPath(p)) {
+                return jsonResponse(400, { ok: false, error: 'invalid path in deletePaths' });
+            }
+        }
+        const { error } = await supabaseAdmin.storage.from(bucket).remove(normalized);
         if (error) {
             return jsonResponse(500, { ok: false, error: error.message || 'Storage 삭제 실패' });
         }

@@ -30,6 +30,12 @@ export function createEstimateFinanceModal(api) {
         typeof api.scheduleFitProjectDetailModalWidth === 'function'
             ? api.scheduleFitProjectDetailModalWidth.bind(api)
             : function () {};
+    const deleteStoragePath =
+        typeof api.deleteStoragePath === 'function'
+            ? api.deleteStoragePath.bind(api)
+            : function () {
+                return Promise.resolve({ ok: true });
+            };
 
     /** 별도는 큰데 부가세가 정상 10%의 5% 미만이고(예: 1 오타), 포함≈별도+부가세면 잘못 입력으로 보고 자동 10%로 되돌림 */
     function financeVatLooksLikeTypoOnNet(net, taxStr, grossRead) {
@@ -241,7 +247,14 @@ export function createEstimateFinanceModal(api) {
         const isEdit = !!row;
         const fileCount = (row && row.dataset.rowFileId && window.savedRowFiles && window.savedRowFiles[row.dataset.rowFileId]) ? window.savedRowFiles[row.dataset.rowFileId].length : 0;
         const modalFileId = 'modal-file-' + Date.now();
-        financeModalState = { type: type, code: code, row: row, modalFileId: modalFileId, rowFileId: row ? (row.dataset.rowFileId || '') : '' };
+        financeModalState = {
+            type: type,
+            code: code,
+            row: row,
+            modalFileId: modalFileId,
+            rowFileId: row ? (row.dataset.rowFileId || '') : '',
+            initialAttachmentStoragePaths: [],
+        };
         const fmNameListAttr = type === 'purchase' || type === 'transfer' ? ' list="contractorListFinanceVendors"' : '';
         const fmNamePlaceholder =
             type === 'sales' || type === 'payment' ? '상호명(선택)' : type === 'purchase' || type === 'transfer' ? '업체 검색/선택' : '상호명';
@@ -421,6 +434,11 @@ export function createEstimateFinanceModal(api) {
         }
         applyFmNetDerived();
         if ((type === 'sales' || type === 'purchase') && row && row.dataset.rowFileId && window.savedRowFiles && window.savedRowFiles[row.dataset.rowFileId]) {
+            financeModalState.initialAttachmentStoragePaths = window.savedRowFiles[row.dataset.rowFileId]
+                .map(function (f) {
+                    return f && typeof f.storagePath === 'string' ? f.storagePath.trim() : '';
+                })
+                .filter(Boolean);
             if (!window.uploadedFiles) window.uploadedFiles = {};
             window.uploadedFiles[modalFileId] = JSON.parse(JSON.stringify(window.savedRowFiles[row.dataset.rowFileId]));
         }
@@ -531,14 +549,46 @@ export function createEstimateFinanceModal(api) {
             targetRow = tbody.insertRow();
         }
         let rowFileId = financeModalState.rowFileId || '';
+        var removedAttachmentPaths = [];
         if (type === 'sales' || type === 'purchase') {
             const fid = financeModalState.modalFileId;
-            if (window.uploadedFiles && window.uploadedFiles[fid] && window.uploadedFiles[fid].length > 0) {
-                if (!rowFileId) rowFileId = 'rowfile-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-                if (!window.savedRowFiles) window.savedRowFiles = {};
-                window.savedRowFiles[rowFileId] = JSON.parse(JSON.stringify(window.uploadedFiles[fid]));
+            const modalFiles =
+                window.uploadedFiles && Array.isArray(window.uploadedFiles[fid])
+                    ? window.uploadedFiles[fid]
+                    : null;
+            if (modalFiles) {
+                if (modalFiles.length > 0) {
+                    if (!rowFileId) rowFileId = 'rowfile-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+                    if (!window.savedRowFiles) window.savedRowFiles = {};
+                    window.savedRowFiles[rowFileId] = JSON.parse(JSON.stringify(modalFiles));
+                } else {
+                    if (rowFileId && window.savedRowFiles && window.savedRowFiles[rowFileId]) {
+                        delete window.savedRowFiles[rowFileId];
+                    }
+                    rowFileId = '';
+                }
+                delete window.uploadedFiles[fid];
             }
-            mergeRowAttachments(values, type, rowFileId);
+            mergeRowAttachments(values, type, rowFileId || null);
+            var beforeSet = Object.create(null);
+            var afterSet = Object.create(null);
+            var beforeList = Array.isArray(financeModalState.initialAttachmentStoragePaths)
+                ? financeModalState.initialAttachmentStoragePaths
+                : [];
+            for (var bi = 0; bi < beforeList.length; bi++) {
+                var bp = String(beforeList[bi] || '').trim();
+                if (bp) beforeSet[bp] = true;
+            }
+            if (rowFileId && window.savedRowFiles && Array.isArray(window.savedRowFiles[rowFileId])) {
+                for (var ai = 0; ai < window.savedRowFiles[rowFileId].length; ai++) {
+                    var apRaw = window.savedRowFiles[rowFileId][ai];
+                    var ap = apRaw && typeof apRaw.storagePath === 'string' ? apRaw.storagePath.trim() : '';
+                    if (ap) afterSet[ap] = true;
+                }
+            }
+            removedAttachmentPaths = Object.keys(beforeSet).filter(function (p) {
+                return !afterSet[p];
+            });
         }
         renderFinanceRow(targetRow, type, values, rowFileId);
         api.recalcFinanceSummaries(code);
@@ -549,6 +599,11 @@ export function createEstimateFinanceModal(api) {
             if (!r.ok) {
                 alert(r.error || '서버에 저장하지 못했습니다. 네트워크·로그인 상태를 확인해 주세요.');
                 return;
+            }
+            if (removedAttachmentPaths.length) {
+                removedAttachmentPaths.forEach(function (p) {
+                    deleteStoragePath(p).catch(function () {});
+                });
             }
             if (window.__bpsSupabase && window.__bpsSupabase.auth) {
                 api.showToast('서버에 저장되었습니다.');
