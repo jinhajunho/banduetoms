@@ -56,29 +56,16 @@ export function createEstimateFinanceModal(api) {
     let financeModalState = null;
 
     function paymentRowMenuHtml() {
-        const delHidden = isExtContractor() ? ' style="display:none !important;" aria-hidden="true" tabindex="-1"' : '';
-        return '<span class="payment-action-inline">' +
-            '<button type="button" class="payment-row-menu-trigger" onclick="event.stopPropagation(); togglePaymentRowInline(this)" title="메뉴"><i class="fas fa-ellipsis-v"></i></button>' +
-            '<span class="payment-action-buttons">' +
-            '<button type="button" class="payment-inline-btn" onclick="event.stopPropagation(); editRow(this); closePaymentRowInlines();">수정</button>' +
-            '<button type="button" class="payment-inline-btn payment-inline-btn-danger" onclick="event.stopPropagation(); deleteRow(this); closePaymentRowInlines();"' + delHidden + '>삭제</button>' +
-            '</span></span>';
+        // 점3개 인라인 편집/삭제 UI는 제거하고, 행 클릭 모달 수정으로 통일
+        return '';
     }
 
     function togglePaymentRowInline(trigger) {
-        const wrap = trigger.closest('.payment-action-inline');
-        if (!wrap) return;
-        const isExpanded = wrap.classList.contains('payment-action-inline--expanded');
-        closePaymentRowInlines();
-        if (!isExpanded) {
-            wrap.classList.add('payment-action-inline--expanded');
-        }
+        void trigger;
     }
 
     function closePaymentRowInlines() {
-        document.querySelectorAll('.payment-action-inline--expanded').forEach(function (w) {
-            w.classList.remove('payment-action-inline--expanded');
-        });
+        // no-op
     }
 
     function onFinanceRowClick(event, row, type) {

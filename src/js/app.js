@@ -11233,7 +11233,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             row.dataset.rowValues = JSON.stringify(values);
 
             // 텍스트만 보이게 (입력 칸 제거) — 첨부파일은 보기(n) 클릭 가능
-            const actionHtml = '<td class="payment-action-cell">' + paymentRowMenuHtml(true) + '</td>';
+            const actionHtml = '';
             var fileCellHtml = '-';
             if (rowFileId && window.savedRowFiles && window.savedRowFiles[rowFileId] && window.savedRowFiles[rowFileId].length > 0) {
                 var n = window.savedRowFiles[rowFileId].length;
@@ -11294,6 +11294,20 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             const row = btn.closest('tr');
             const tbodyId = (row.closest('tbody') && row.closest('tbody').id) || '';
             const code = tbodyId.replace('salesList-', '').replace('purchaseList-', '').replace('salesPayments-', '').replace('transferList-', '');
+            const rowType =
+                row.getAttribute('data-row-type') ||
+                (tbodyId.indexOf('salesList') === 0
+                    ? 'sales'
+                    : tbodyId.indexOf('purchaseList') === 0
+                      ? 'purchase'
+                      : tbodyId.indexOf('salesPayments') === 0
+                        ? 'payment'
+                        : tbodyId.indexOf('transferList') === 0
+                          ? 'transfer'
+                          : 'sales');
+            // 인라인 수정은 폐기하고 행 클릭 모달 수정으로 통일
+            openFinanceRowModal(rowType, code, row);
+            return;
 
             if (row.getAttribute('data-saved') === 'true' && row.dataset.rowValues) {
                 var values = JSON.parse(row.dataset.rowValues);
@@ -11593,7 +11607,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
                 }
             }
             row.dataset.rowValues = JSON.stringify(values);
-            var actionHtml = '<td class="payment-action-cell">' + paymentRowMenuHtml(true) + '</td>';
+            var actionHtml = '';
             var fileCellHtml = '-';
             if (rowFileId && window.savedRowFiles && window.savedRowFiles[rowFileId] && window.savedRowFiles[rowFileId].length > 0) {
                 fileCellHtml = '<span class="file-link" onclick="event.stopPropagation(); viewSavedRowFiles(\'' + rowFileId + '\')" style="color: var(--primary); cursor: pointer;"><i class="fas fa-eye"></i> (' + window.savedRowFiles[rowFileId].length + ')</span>';
@@ -11642,7 +11656,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             }
             row.setAttribute('data-saved', 'true');
             row.removeAttribute('data-original');
-            var actionHtml = '<td class="payment-action-cell">' + paymentRowMenuHtml(true) + '</td>';
+            var actionHtml = '';
             var fileCellHtml = '-';
             var rowFileId = row.dataset.rowFileId;
             if (rowFileId && window.savedRowFiles && window.savedRowFiles[rowFileId] && window.savedRowFiles[rowFileId].length > 0) {
