@@ -10874,7 +10874,9 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
         function cloneFinanceRowValuesForContractorModal(values, type) {
             const copy = values.slice();
             ensureFinanceRowMetaSlot(copy, type);
-            if (type === 'sales' || type === 'purchase') {
+            // 내부 메모(values[8])는 내부 계정에서 모달 수정 시 유지되어야 한다.
+            // 외부 도급사 계정에서만 내부 메모를 마스킹한다.
+            if ((type === 'sales' || type === 'purchase') && isCurrentUserExternalContractor()) {
                 copy[8] = '';
             }
             if (shouldMaskFinanceMemoForContractor(copy, type)) {
