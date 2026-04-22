@@ -10309,6 +10309,59 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             isPanelDirty = getPanelSnapshot() !== panelBaselineSnapshot;
         }
 
+        function syncCurrentEditItemDraftFromPanelElement(target) {
+            if (!currentEditItem || !target) return;
+            const panel = document.getElementById('sharedCenterPanel');
+            if (!panel || !panel.classList.contains('project-detail-modal')) return;
+            const id = target.id || '';
+
+            if (id === 'edit_date') currentEditItem.date = target.value || '';
+            else if (id === 'edit_status') currentEditItem.status = target.value || '';
+            else if (id === 'edit_startDate') currentEditItem.startDate = target.value || '';
+            else if (id === 'edit_endDate') currentEditItem.endDate = target.value || '';
+            else if (id === 'edit_category1') currentEditItem.category1 = target.value || '';
+            else if (id === 'edit_category2') currentEditItem.category2 = target.value || '';
+            else if (id === 'edit_category3') currentEditItem.category3 = String(target.value || '').trim();
+            else if (id === 'edit_building') currentEditItem.building = target.value || '';
+            else if (id === 'edit_project') currentEditItem.project = target.value || '';
+            else if (id === 'edit_manager') currentEditItem.manager = target.value || '';
+            else if (id === 'edit_type') currentEditItem.type = target.value || '';
+            else if (id === 'edit_contractor_rep' || id === 'edit_contractor') currentEditItem.contractor = target.value || '';
+            else if (id === 'edit_showOnDashboardCalendar') currentEditItem.showOnDashboardCalendar = !!target.checked;
+
+            if (target.closest && target.closest('#tab-business')) {
+                readBusinessIncomeFormIntoItem(currentEditItem);
+            }
+        }
+
+        function syncCurrentEditItemDraftFromPanel() {
+            if (!currentEditItem) return;
+            const panelBody = document.getElementById('sharedPanelBody');
+            if (!panelBody) return;
+            [
+                'edit_date',
+                'edit_status',
+                'edit_startDate',
+                'edit_endDate',
+                'edit_category1',
+                'edit_category2',
+                'edit_category3',
+                'edit_building',
+                'edit_project',
+                'edit_manager',
+                'edit_type',
+                'edit_contractor_rep',
+                'edit_contractor',
+                'edit_showOnDashboardCalendar',
+            ].forEach(function (id) {
+                const el = panelBody.querySelector('#' + id);
+                if (el) syncCurrentEditItemDraftFromPanelElement(el);
+            });
+            if (panelBody.querySelector('#tab-business [data-biz-row]')) {
+                readBusinessIncomeFormIntoItem(currentEditItem);
+            }
+        }
+
         function setSaveLoading(loading) {
             isSavingChanges = !!loading;
             const saveButtons = [document.getElementById('sharedPanelBtnBottomSave'), document.getElementById('sharedPanelBtnSave')];
@@ -10337,10 +10390,12 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
 
         document.addEventListener('input', (event) => {
             if (!event.target || !event.target.closest || !event.target.closest('#sharedPanelBody')) return;
+            syncCurrentEditItemDraftFromPanelElement(event.target);
             markPanelDirtyIfChanged();
         });
         document.addEventListener('change', (event) => {
             if (!event.target || !event.target.closest || !event.target.closest('#sharedPanelBody')) return;
+            syncCurrentEditItemDraftFromPanelElement(event.target);
             markPanelDirtyIfChanged();
         });
 
@@ -10410,6 +10465,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
 
         // 패널 탭 전환 (견적서 상세: new-estimate-tab / new-estimate-tab-pane 동일 적용)
         function switchPanelTab(event, tabId) {
+            syncCurrentEditItemDraftFromPanel();
             document.querySelectorAll('.panel-tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.new-estimate-tab').forEach(tab => tab.classList.remove('active'));
             const ev = event != null ? event : window.event;
