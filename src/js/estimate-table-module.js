@@ -356,8 +356,6 @@ export function initEstimateListFiltersModule(api) {
         });
     }
 
-    const searchBtn = document.getElementById('filterSearchBtn');
-    if (searchBtn) searchBtn.addEventListener('click', api.renderTable);
     const fs = document.getElementById('filterSearch');
     if (fs) {
         fs.addEventListener('keydown', function (e) {
