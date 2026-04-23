@@ -94,13 +94,12 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <select class="filter-select" id="filterDateBasis" title="상태 필터 기준">
-                                        <option value="all">전체</option>
-                                        <option value="견적">견적</option>
-                                        <option value="진행">진행</option>
-                                        <option value="완료">완료</option>
-                                        <option value="보류">보류</option>
-                                    </select>
+                                    <input
+                                        type="text"
+                                        class="filter-input"
+                                        id="filterSearch"
+                                        placeholder="코드, 건물명, 공사명, 담당자, 도급사, 매입 상호명 검색"
+                                        autocomplete="off">
                                 </div>
                             </div>
                         </div>
@@ -154,15 +153,6 @@
                                         <option value="발행완료">발행완료</option>
                                         <option value="미발행">미발행</option>
                                     </select>
-                                </div>
-                                <div class="filter-group">
-                                    <label class="filter-label" for="filterSearch">검색</label>
-                                    <input
-                                        type="text"
-                                        class="filter-input"
-                                        id="filterSearch"
-                                        placeholder="코드, 건물명, 공사명, 담당자, 도급사, 매입 상호명 검색"
-                                        autocomplete="off">
                                 </div>
                             </div>
                         </div>
