@@ -3048,15 +3048,13 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
 
             function positionPanel(anchorEl) {
                 const r = anchorEl.getBoundingClientRect();
-                // 성능실적관리 기간 패널은 "버튼 아래" 기준으로 배치하기 위해
-                // fixed 대신 absolute로 배치(스크롤 보정 포함)
-                panel.style.position = 'absolute';
-                panel.style.top = (r.bottom + 8 + window.scrollY) + 'px';
+                // viewport 기준으로 고정 배치해야 기간 직접 팝오버 안에서도 좌표가 어긋나지 않는다.
+                panel.style.position = 'fixed';
+                panel.style.top = (r.bottom + 8) + 'px';
                 const w = panel.offsetWidth || 320;
                 const margin = 8;
-                const leftCandidate = r.left + window.scrollX;
-                const maxLeft = window.scrollX + window.innerWidth - w - margin;
-                const left = Math.min(Math.max(leftCandidate, margin + window.scrollX), maxLeft);
+                const maxLeft = window.innerWidth - w - margin;
+                const left = Math.min(Math.max(r.left, margin), maxLeft);
                 panel.style.left = left + 'px';
             }
 

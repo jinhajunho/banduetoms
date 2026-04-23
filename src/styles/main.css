@@ -1025,7 +1025,7 @@
             flex-direction: row;
             flex-wrap: nowrap;
             align-items: flex-end;
-            gap: 16px;
+            gap: 10px;
             min-width: 0;
         }
 
@@ -1033,16 +1033,16 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
-            flex: 0 1 36%;
-            min-width: 200px;
-            max-width: 400px;
+            flex: 0 1 30%;
+            min-width: 170px;
+            max-width: 340px;
             min-height: 0;
         }
 
         .estimate-filter-mid {
             flex: 0 0 auto;
-            min-width: 140px;
-            max-width: 220px;
+            min-width: 110px;
+            max-width: 160px;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
@@ -1153,7 +1153,7 @@
             min-width: 180px;
         }
 
-        /* 우측 필터: 1줄 고정, 너비 부족 시 각 칸이 동일 비율로 축소(스크롤 없음) */
+        /* 우측 필터: 한 줄 고정 유지 */
         .estimate-filter-right-row--single {
             flex-wrap: nowrap;
             overflow-x: visible;
