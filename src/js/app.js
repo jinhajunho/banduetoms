@@ -3612,9 +3612,7 @@ import { initBpsFloatModalPanel } from './bps-float-modal-panel.js';
             if (!input) return { ok: true, value: '' };
             const value = String(input.value || '').trim();
             if (!value) {
-                alert('대표 도급사를 선택해주세요.');
-                if (typeof input.focus === 'function') input.focus();
-                return { ok: false, value: '' };
+                return { ok: true, value: '' };
             }
             const merged = getMergedProjectContractorNames(item);
             if (merged.indexOf(value) === -1) {

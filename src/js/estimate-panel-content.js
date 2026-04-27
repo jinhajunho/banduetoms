@@ -231,7 +231,7 @@ export function createRenderPanelContent(api) {
                                 </div>
                             </div>
                             <div class="basic-info-row">
-                                <div class="basic-info-label">대표 도급사</div>
+                                <div class="basic-info-label">대표 도급사(선택)</div>
                                 <div class="basic-info-value">
                                     <span class="detail-list-value">${isExternalContractorView ? api.escapeHtml(lockedContractorName || '-') : api.escapeHtml(item.contractor || '-')}</span>
                                     ${isExternalContractorView ? `
