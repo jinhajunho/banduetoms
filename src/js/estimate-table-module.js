@@ -228,6 +228,39 @@ export function bindEstimateListInteractions(api) {
 }
 
 export function initEstimateListFiltersModule(api) {
+    function runEstimateFilterReset() {
+        api.setCurrentStatus('all');
+        document.querySelectorAll('#page-estimate .tabs-left .tab').forEach(function (t) {
+            t.classList.toggle('active', t.dataset.status === 'all');
+        });
+
+        api.setEstimateDatePreset('all');
+
+        const basisEl = document.getElementById('filterDateBasis');
+        if (basisEl) basisEl.value = 'all';
+
+        const c1 = document.getElementById('filterCategory1');
+        const c2 = document.getElementById('filterCategory2');
+        const c3 = document.getElementById('filterCategory3');
+        if (c1) c1.value = '';
+        if (c2) c2.value = '';
+        if (c3) c3.value = '';
+
+        const fType = document.getElementById('filterEstimateType');
+        if (fType) fType.value = '';
+
+        const tax = document.getElementById('filterTax');
+        if (tax) tax.value = '';
+
+        const cf = document.getElementById('filterCashflow');
+        if (cf) cf.value = '';
+
+        const fs = document.getElementById('filterSearch');
+        if (fs) fs.value = '';
+
+        api.renderTable();
+    }
+
     function handleEstimateDatePresetButtonClick(btn) {
         if (!btn) return;
         const p = btn.dataset.preset;
@@ -287,6 +320,13 @@ export function initEstimateListFiltersModule(api) {
             if (t.id === 'filterSearch') api.renderTable();
         });
         document.addEventListener('click', function (e) {
+            const resetHit = e.target && e.target.closest
+                ? e.target.closest('#page-estimate #filterResetBtn')
+                : null;
+            if (resetHit) {
+                runEstimateFilterReset();
+                return;
+            }
             const presetBtn = e.target && e.target.closest
                 ? e.target.closest('#page-estimate .estimate-filter-preset')
                 : null;
@@ -319,42 +359,6 @@ export function initEstimateListFiltersModule(api) {
     const dt = document.getElementById('filterDateTo');
     if (df) df.addEventListener('change', api.renderTable);
     if (dt) dt.addEventListener('change', api.renderTable);
-
-    const resetBtn = document.getElementById('filterResetBtn');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', function () {
-            api.setCurrentStatus('all');
-            document.querySelectorAll('.tab').forEach(function (t) {
-                t.classList.toggle('active', t.dataset.status === 'all');
-            });
-
-            api.setEstimateDatePreset('all');
-
-            const basis = document.getElementById('filterDateBasis');
-            if (basis) basis.value = 'all';
-
-            const c1 = document.getElementById('filterCategory1');
-            const c2 = document.getElementById('filterCategory2');
-            const c3 = document.getElementById('filterCategory3');
-            if (c1) c1.value = '';
-            if (c2) c2.value = '';
-            if (c3) c3.value = '';
-
-            const fType = document.getElementById('filterEstimateType');
-            if (fType) fType.value = '';
-
-            const tax = document.getElementById('filterTax');
-            if (tax) tax.value = '';
-
-            const cf = document.getElementById('filterCashflow');
-            if (cf) cf.value = '';
-
-            const fs = document.getElementById('filterSearch');
-            if (fs) fs.value = '';
-
-            api.renderTable();
-        });
-    }
 
     const fs = document.getElementById('filterSearch');
     if (fs) {
